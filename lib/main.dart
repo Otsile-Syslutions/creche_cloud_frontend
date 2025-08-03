@@ -1,7 +1,6 @@
 // main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:get/get.dart';
 import 'app.dart';
 import 'core/config/app_config.dart';
 
@@ -22,5 +21,3 @@ void main() async {
 
   runApp(const CrecheCloudApp());
 }
-
-//
