@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../../features/auth/controllers/auth_controller.dart';
+import '../../../../../routes/app_routes.dart';
 
 class AdminHomeViewDesktop extends GetView<AuthController> {
   const AdminHomeViewDesktop({super.key});
@@ -55,7 +56,16 @@ class AdminHomeViewDesktop extends GetView<AuthController> {
           }),
           // Logout button
           IconButton(
-            onPressed: () => controller.logout(),
+            onPressed: () async {
+              try {
+                // Get the controller first and hold a reference
+                final authController = Get.find<AuthController>();
+                await authController.logout();
+              } catch (e) {
+                // If controller is not available, navigate directly to login
+                Get.offAllNamed(AppRoutes.login);
+              }
+            },
             icon: const Icon(
               Icons.logout,
               color: Colors.white,

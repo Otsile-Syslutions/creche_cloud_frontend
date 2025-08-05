@@ -32,13 +32,25 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
   // Form key
   final GlobalKey<FormState> loginFormKey = GlobalKey<FormState>();
 
-  // Focus nodes for keyboard navigation
-  final FocusNode emailFocusNode = FocusNode();
-  final FocusNode passwordFocusNode = FocusNode();
-  final FocusNode rememberMeFocusNode = FocusNode();
-  final FocusNode recoverPasswordFocusNode = FocusNode();
-  final FocusNode loginButtonFocusNode = FocusNode();
-  final FocusNode signupLinkFocusNode = FocusNode();
+  // Focus nodes for keyboard navigation - will be initialized in onInit
+  FocusNode? _emailFocusNode;
+  FocusNode? _passwordFocusNode;
+  FocusNode? _rememberMeFocusNode;
+  FocusNode? _recoverPasswordFocusNode;
+  FocusNode? _loginButtonFocusNode;
+  FocusNode? _signupLinkFocusNode;
+
+  // Safe getters that return dummy focus nodes if disposed
+  FocusNode get emailFocusNode => _isDisposed ? _getDummyFocusNode() : (_emailFocusNode ?? _getDummyFocusNode());
+  FocusNode get passwordFocusNode => _isDisposed ? _getDummyFocusNode() : (_passwordFocusNode ?? _getDummyFocusNode());
+  FocusNode get rememberMeFocusNode => _isDisposed ? _getDummyFocusNode() : (_rememberMeFocusNode ?? _getDummyFocusNode());
+  FocusNode get recoverPasswordFocusNode => _isDisposed ? _getDummyFocusNode() : (_recoverPasswordFocusNode ?? _getDummyFocusNode());
+  FocusNode get loginButtonFocusNode => _isDisposed ? _getDummyFocusNode() : (_loginButtonFocusNode ?? _getDummyFocusNode());
+  FocusNode get signupLinkFocusNode => _isDisposed ? _getDummyFocusNode() : (_signupLinkFocusNode ?? _getDummyFocusNode());
+
+  // Dummy focus node for disposed state
+  static final FocusNode _dummyFocusNode = FocusNode();
+  FocusNode _getDummyFocusNode() => _dummyFocusNode;
 
   // Animation controllers for shake effect
   AnimationController? emailShakeController;
@@ -53,6 +65,7 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
       // Reset disposed flag on initialization (in case of recreation)
       _isDisposed = false;
 
+      _initializeFocusNodes();
       _initializeAnimations();
       _initializeFocusListeners();
       _initializeTextListeners();
@@ -91,6 +104,24 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
   // =============================================================================
   // INITIALIZATION METHODS
   // =============================================================================
+
+  void _initializeFocusNodes() {
+    if (_isDisposed) return; // Safety check
+    
+    try {
+      // Create fresh FocusNodes every time the controller is initialized
+      _emailFocusNode = FocusNode();
+      _passwordFocusNode = FocusNode();
+      _rememberMeFocusNode = FocusNode();
+      _recoverPasswordFocusNode = FocusNode();
+      _loginButtonFocusNode = FocusNode();
+      _signupLinkFocusNode = FocusNode();
+      
+      AppLogger.d('Focus nodes initialized successfully');
+    } catch (e) {
+      AppLogger.e('Error initializing focus nodes', e);
+    }
+  }
 
   void _initializeAnimations() {
     if (_isDisposed) return; // Safety check
@@ -137,9 +168,9 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
 
     try {
       // Email focus listener
-      emailFocusNode.addListener(() {
-        if (_isDisposed) return;
-        if (!emailFocusNode.hasFocus) {
+      _emailFocusNode?.addListener(() {
+        if (_isDisposed || _emailFocusNode == null) return;
+        if (!_emailFocusNode!.hasFocus) {
           // Email field lost focus - validate it
           if (emailController.text.isEmpty) {
             setEmailError(AppStrings.emailRequired);
@@ -153,9 +184,9 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
       });
 
       // Password focus listener
-      passwordFocusNode.addListener(() {
-        if (_isDisposed) return;
-        if (!passwordFocusNode.hasFocus) {
+      _passwordFocusNode?.addListener(() {
+        if (_isDisposed || _passwordFocusNode == null) return;
+        if (!_passwordFocusNode!.hasFocus) {
           // Password field lost focus - validate it
           if (passwordController.text.isEmpty) {
             setPasswordError(AppStrings.passwordRequired);
@@ -211,12 +242,12 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
 
   void _clearAllFocus() {
     try {
-      if (emailFocusNode.hasFocus) emailFocusNode.unfocus();
-      if (passwordFocusNode.hasFocus) passwordFocusNode.unfocus();
-      if (rememberMeFocusNode.hasFocus) rememberMeFocusNode.unfocus();
-      if (recoverPasswordFocusNode.hasFocus) recoverPasswordFocusNode.unfocus();
-      if (loginButtonFocusNode.hasFocus) loginButtonFocusNode.unfocus();
-      if (signupLinkFocusNode.hasFocus) signupLinkFocusNode.unfocus();
+      if (_emailFocusNode?.hasFocus == true) _emailFocusNode?.unfocus();
+      if (_passwordFocusNode?.hasFocus == true) _passwordFocusNode?.unfocus();
+      if (_rememberMeFocusNode?.hasFocus == true) _rememberMeFocusNode?.unfocus();
+      if (_recoverPasswordFocusNode?.hasFocus == true) _recoverPasswordFocusNode?.unfocus();
+      if (_loginButtonFocusNode?.hasFocus == true) _loginButtonFocusNode?.unfocus();
+      if (_signupLinkFocusNode?.hasFocus == true) _signupLinkFocusNode?.unfocus();
     } catch (e) {
       AppLogger.w('Error clearing focus nodes', e);
     }
@@ -246,12 +277,20 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
   void _disposeFocusNodes() {
     try {
       // Safely dispose focus nodes with additional error handling
-      _safeFocusNodeDispose(emailFocusNode, 'emailFocusNode');
-      _safeFocusNodeDispose(passwordFocusNode, 'passwordFocusNode');
-      _safeFocusNodeDispose(rememberMeFocusNode, 'rememberMeFocusNode');
-      _safeFocusNodeDispose(recoverPasswordFocusNode, 'recoverPasswordFocusNode');
-      _safeFocusNodeDispose(loginButtonFocusNode, 'loginButtonFocusNode');
-      _safeFocusNodeDispose(signupLinkFocusNode, 'signupLinkFocusNode');
+      if (_emailFocusNode != null) _safeFocusNodeDispose(_emailFocusNode!, 'emailFocusNode');
+      if (_passwordFocusNode != null) _safeFocusNodeDispose(_passwordFocusNode!, 'passwordFocusNode');
+      if (_rememberMeFocusNode != null) _safeFocusNodeDispose(_rememberMeFocusNode!, 'rememberMeFocusNode');
+      if (_recoverPasswordFocusNode != null) _safeFocusNodeDispose(_recoverPasswordFocusNode!, 'recoverPasswordFocusNode');
+      if (_loginButtonFocusNode != null) _safeFocusNodeDispose(_loginButtonFocusNode!, 'loginButtonFocusNode');
+      if (_signupLinkFocusNode != null) _safeFocusNodeDispose(_signupLinkFocusNode!, 'signupLinkFocusNode');
+
+      // Clear references
+      _emailFocusNode = null;
+      _passwordFocusNode = null;
+      _rememberMeFocusNode = null;
+      _recoverPasswordFocusNode = null;
+      _loginButtonFocusNode = null;
+      _signupLinkFocusNode = null;
 
       AppLogger.d('Login form focus nodes disposed successfully');
     } catch (e) {
@@ -261,9 +300,15 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
 
   void _safeFocusNodeDispose(FocusNode focusNode, String nodeName) {
     try {
-      // Ensure node is unfocused before disposal
-      if (focusNode.hasFocus) {
-        focusNode.unfocus();
+      // Check if the focus node is already disposed
+      try {
+        // Ensure node is unfocused before disposal
+        if (focusNode.hasFocus) {
+          focusNode.unfocus();
+        }
+      } catch (e) {
+        // If we can't check hasFocus, the node is likely already disposed
+        AppLogger.w('$nodeName appears to be already disposed during unfocus', e);
       }
 
       // Wait a moment before disposing
@@ -271,7 +316,7 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
         try {
           focusNode.dispose();
         } catch (e) {
-          AppLogger.w('Error disposing $nodeName in microtask', e);
+          AppLogger.w('Error disposing $nodeName in microtask (likely already disposed)', e);
         }
       });
     } catch (e) {
@@ -518,61 +563,75 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
   // =============================================================================
 
   void focusEmailField() {
-    if (_isDisposed) return;
+    if (_isDisposed || _emailFocusNode == null) return;
     try {
-      emailFocusNode.requestFocus();
+      // Check if the focus node is still usable
+      if (!_emailFocusNode!.hasFocus) {
+        _emailFocusNode!.requestFocus();
+      }
     } catch (e) {
-      AppLogger.w('Error focusing email field', e);
+      AppLogger.w('Error focusing email field (likely disposed)', e);
     }
   }
 
   void focusPasswordField() {
-    if (_isDisposed) return;
+    if (_isDisposed || _passwordFocusNode == null) return;
     // Use a slight delay to ensure proper focus transition
     Future.delayed(const Duration(milliseconds: 50), () {
-      if (!_isDisposed) {
+      if (!_isDisposed && _passwordFocusNode != null) {
         try {
-          passwordFocusNode.requestFocus();
+          // Check if the focus node is still usable
+          if (!_passwordFocusNode!.hasFocus) {
+            _passwordFocusNode!.requestFocus();
+          }
         } catch (e) {
-          AppLogger.w('Error focusing password field', e);
+          AppLogger.w('Error focusing password field (likely disposed)', e);
         }
       }
     });
   }
 
   void focusRememberMe() {
-    if (_isDisposed) return;
+    if (_isDisposed || _rememberMeFocusNode == null) return;
     try {
-      rememberMeFocusNode.requestFocus();
+      if (!_rememberMeFocusNode!.hasFocus) {
+        _rememberMeFocusNode!.requestFocus();
+      }
     } catch (e) {
-      AppLogger.w('Error focusing remember me', e);
+      AppLogger.w('Error focusing remember me (likely disposed)', e);
     }
   }
 
   void focusRecoverPassword() {
-    if (_isDisposed) return;
+    if (_isDisposed || _recoverPasswordFocusNode == null) return;
     try {
-      recoverPasswordFocusNode.requestFocus();
+      if (!_recoverPasswordFocusNode!.hasFocus) {
+        _recoverPasswordFocusNode!.requestFocus();
+      }
     } catch (e) {
-      AppLogger.w('Error focusing recover password', e);
+      AppLogger.w('Error focusing recover password (likely disposed)', e);
     }
   }
 
   void focusLoginButton() {
-    if (_isDisposed) return;
+    if (_isDisposed || _loginButtonFocusNode == null) return;
     try {
-      loginButtonFocusNode.requestFocus();
+      if (!_loginButtonFocusNode!.hasFocus) {
+        _loginButtonFocusNode!.requestFocus();
+      }
     } catch (e) {
-      AppLogger.w('Error focusing login button', e);
+      AppLogger.w('Error focusing login button (likely disposed)', e);
     }
   }
 
   void focusSignupLink() {
-    if (_isDisposed) return;
+    if (_isDisposed || _signupLinkFocusNode == null) return;
     try {
-      signupLinkFocusNode.requestFocus();
+      if (!_signupLinkFocusNode!.hasFocus) {
+        _signupLinkFocusNode!.requestFocus();
+      }
     } catch (e) {
-      AppLogger.w('Error focusing signup link', e);
+      AppLogger.w('Error focusing signup link (likely disposed)', e);
     }
   }
 
@@ -648,5 +707,11 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
   void updateValidationErrorState() {
     if (_isDisposed) return;
     _updateValidationErrorState();
+  }
+
+  // Public method to mark controller as disposed early (called before actual disposal)
+  void markAsDisposed() {
+    _isDisposed = true;
+    AppLogger.d('LoginFormController marked as disposed');
   }
 }
