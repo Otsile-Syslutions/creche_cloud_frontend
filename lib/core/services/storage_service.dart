@@ -5,88 +5,131 @@ import 'dart:convert';
 
 class StorageService extends GetxService {
   static StorageService get to => Get.find();
-  late SharedPreferences _prefs;
+  SharedPreferences? _prefs;
+  bool _isInitialized = false;
 
   @override
   Future<void> onInit() async {
     super.onInit();
-    _prefs = await SharedPreferences.getInstance();
+    await _initializePrefs();
   }
 
-  // String operations
+  // FIXED: Proper initialization with error handling and status tracking
+  Future<void> _initializePrefs() async {
+    try {
+      _prefs = await SharedPreferences.getInstance();
+      _isInitialized = true;
+    } catch (e) {
+      print('Failed to initialize SharedPreferences: $e');
+      rethrow;
+    }
+  }
+
+  // FIXED: Ensure prefs are initialized before any operation
+  Future<void> _ensureInitialized() async {
+    if (!_isInitialized || _prefs == null) {
+      await _initializePrefs();
+    }
+  }
+
+  // String operations - FIXED: Added initialization check
   Future<void> setString(String key, String value) async {
-    await _prefs.setString(key, value);
+    await _ensureInitialized();
+    await _prefs!.setString(key, value);
   }
 
-  String? getString(String key) {
-    return _prefs.getString(key);
+  Future<String?> getString(String key) async {
+    await _ensureInitialized();
+    return _prefs!.getString(key);
   }
 
-  // Int operations
+  // Int operations - FIXED: Added initialization check
   Future<void> setInt(String key, int value) async {
-    await _prefs.setInt(key, value);
+    await _ensureInitialized();
+    await _prefs!.setInt(key, value);
   }
 
-  int? getInt(String key) {
-    return _prefs.getInt(key);
+  Future<int?> getInt(String key) async {
+    await _ensureInitialized();
+    return _prefs!.getInt(key);
   }
 
-  // Bool operations
+  // Bool operations - FIXED: Added initialization check
   Future<void> setBool(String key, bool value) async {
-    await _prefs.setBool(key, value);
+    await _ensureInitialized();
+    await _prefs!.setBool(key, value);
   }
 
-  bool? getBool(String key) {
-    return _prefs.getBool(key);
+  Future<bool?> getBool(String key) async {
+    await _ensureInitialized();
+    return _prefs!.getBool(key);
   }
 
-  // Double operations
+  // Double operations - FIXED: Added initialization check
   Future<void> setDouble(String key, double value) async {
-    await _prefs.setDouble(key, value);
+    await _ensureInitialized();
+    await _prefs!.setDouble(key, value);
   }
 
-  double? getDouble(String key) {
-    return _prefs.getDouble(key);
+  Future<double?> getDouble(String key) async {
+    await _ensureInitialized();
+    return _prefs!.getDouble(key);
   }
 
-  // Object operations (JSON)
+  // Object operations (JSON) - FIXED: Added initialization check
   Future<void> setObject(String key, Map<String, dynamic> value) async {
-    await _prefs.setString(key, jsonEncode(value));
+    await _ensureInitialized();
+    await _prefs!.setString(key, jsonEncode(value));
   }
 
-  Map<String, dynamic>? getObject(String key) {
-    final jsonString = _prefs.getString(key);
+  Future<Map<String, dynamic>?> getObject(String key) async {
+    await _ensureInitialized();
+    final jsonString = _prefs!.getString(key);
     if (jsonString != null) {
       return jsonDecode(jsonString) as Map<String, dynamic>;
     }
     return null;
   }
 
-  // List operations
+  // List operations - FIXED: Added initialization check
   Future<void> setStringList(String key, List<String> value) async {
-    await _prefs.setStringList(key, value);
+    await _ensureInitialized();
+    await _prefs!.setStringList(key, value);
   }
 
-  List<String>? getStringList(String key) {
-    return _prefs.getStringList(key);
+  Future<List<String>?> getStringList(String key) async {
+    await _ensureInitialized();
+    return _prefs!.getStringList(key);
   }
 
-  // Remove operations
+  // Remove operations - FIXED: Added initialization check
   Future<void> remove(String key) async {
-    await _prefs.remove(key);
+    await _ensureInitialized();
+    await _prefs!.remove(key);
   }
 
   Future<void> clear() async {
-    await _prefs.clear();
+    await _ensureInitialized();
+    await _prefs!.clear();
   }
 
-  // Check if key exists
-  bool containsKey(String key) {
-    return _prefs.containsKey(key);
+  // Check if key exists - FIXED: Added initialization check
+  Future<bool> containsKey(String key) async {
+    await _ensureInitialized();
+    return _prefs!.containsKey(key);
   }
 
-  // Get all keys
-  Set<String> getKeys() {
-    return _prefs.getKeys();
+  // Get all keys - FIXED: Added initialization check
+  Future<Set<String>> getKeys() async {
+    await _ensureInitialized();
+    return _prefs!.getKeys();
+  }
+
+  // ADDED: Check if service is properly initialized
+  bool get isInitialized => _isInitialized && _prefs != null;
+
+  // ADDED: Manual initialization method for critical paths
+  Future<void> ensureInitialized() async {
+    await _ensureInitialized();
   }
 }

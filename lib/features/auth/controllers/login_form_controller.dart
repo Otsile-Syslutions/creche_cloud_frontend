@@ -8,6 +8,10 @@ import '../../../utils/app_logger.dart';
 import 'auth_controller.dart';
 
 class LoginFormController extends GetxController with GetTickerProviderStateMixin {
+  // Add a disposed flag to prevent operations on disposed controllers
+  bool _isDisposed = false;
+  bool get isDisposed => _isDisposed;
+
   // Observable variables for login form
   final RxBool showPassword = false.obs;
   final RxBool rememberMe = false.obs;
@@ -45,88 +49,177 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
   @override
   void onInit() {
     super.onInit();
-    _initializeAnimations();
-    _setupTextListeners();
-    _setupFocusListeners();
-    _loadRememberMePreference();
-  }
-
-  void _initializeAnimations() {
     try {
-      emailShakeController = AnimationController(
-        duration: const Duration(milliseconds: 600),
-        vsync: this,
-      );
-      passwordShakeController = AnimationController(
-        duration: const Duration(milliseconds: 600),
-        vsync: this,
-      );
+      // Reset disposed flag on initialization (in case of recreation)
+      _isDisposed = false;
 
-      emailShakeAnimation = Tween(begin: 0.0, end: 10.0).animate(
-        CurvedAnimation(parent: emailShakeController!, curve: Curves.elasticIn),
-      );
-      passwordShakeAnimation = Tween(begin: 0.0, end: 10.0).animate(
-        CurvedAnimation(parent: passwordShakeController!, curve: Curves.elasticIn),
-      );
-
-      AppLogger.d('Login form animations initialized successfully');
+      _initializeAnimations();
+      _initializeFocusListeners();
+      _initializeTextListeners();
+      _loadRememberMePreference();
+      AppLogger.d('LoginFormController initialized successfully');
     } catch (e) {
-      AppLogger.e('Failed to initialize login form animations', e);
+      AppLogger.e('Error initializing LoginFormController', e);
     }
-  }
-
-  void _setupTextListeners() {
-    emailController.addListener(_onEmailChanged);
-    passwordController.addListener(_onPasswordChanged);
-  }
-
-  void _setupFocusListeners() {
-    // Auto-focus email field when form is displayed with a small delay
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future.delayed(const Duration(milliseconds: 100), () {
-        if (emailFocusNode.canRequestFocus) {
-          emailFocusNode.requestFocus();
-        }
-      });
-    });
-
-    // Add focus listeners directly to the focus nodes for reliable Tab key detection
-    emailFocusNode.addListener(() {
-      if (!emailFocusNode.hasFocus) {
-        // Email field lost focus - validate it
-        if (emailController.text.isEmpty) {
-          setEmailError(AppStrings.emailRequired);
-        } else {
-          final emailValidation = validateEmail(emailController.text);
-          if (emailValidation != null) {
-            setEmailError(emailValidation);
-          }
-        }
-      }
-    });
-
-    passwordFocusNode.addListener(() {
-      if (!passwordFocusNode.hasFocus) {
-        // Password field lost focus - validate it
-        if (passwordController.text.isEmpty) {
-          setPasswordError(AppStrings.passwordRequired);
-        } else {
-          final passwordValidation = validatePassword(passwordController.text);
-          if (passwordValidation != null) {
-            setPasswordError(passwordValidation);
-          }
-        }
-      }
-    });
   }
 
   @override
   void onClose() {
-    _cancelAllTimers();
-    _disposeControllers();
-    _disposeFocusNodes();
-    _disposeAnimations();
-    super.onClose();
+    // Set the disposed flag first
+    _isDisposed = true;
+
+    try {
+      _cancelAllTimers();
+      _clearAllFocus();
+
+      // Use delayed disposal to prevent conflicts
+      Future.delayed(const Duration(milliseconds: 50), () {
+        if (_isDisposed) { // Double-check before disposing
+          _disposeControllers();
+          _disposeFocusNodes();
+          _disposeAnimations();
+        }
+      });
+
+      super.onClose();
+    } catch (e) {
+      AppLogger.e('Error in LoginFormController.onClose()', e);
+      super.onClose();
+    }
+  }
+
+  // =============================================================================
+  // INITIALIZATION METHODS
+  // =============================================================================
+
+  void _initializeAnimations() {
+    if (_isDisposed) return; // Safety check
+
+    try {
+      // Dispose existing controllers if they exist (safety for recreation)
+      emailShakeController?.dispose();
+      passwordShakeController?.dispose();
+
+      // Email shake animation
+      emailShakeController = AnimationController(
+        duration: const Duration(milliseconds: 500),
+        vsync: this,
+      );
+      emailShakeAnimation = Tween<double>(
+        begin: 0,
+        end: 4,
+      ).animate(CurvedAnimation(
+        parent: emailShakeController!,
+        curve: Curves.elasticIn,
+      ));
+
+      // Password shake animation
+      passwordShakeController = AnimationController(
+        duration: const Duration(milliseconds: 500),
+        vsync: this,
+      );
+      passwordShakeAnimation = Tween<double>(
+        begin: 0,
+        end: 4,
+      ).animate(CurvedAnimation(
+        parent: passwordShakeController!,
+        curve: Curves.elasticIn,
+      ));
+
+      AppLogger.d('Login form animations initialized successfully');
+    } catch (e) {
+      AppLogger.e('Error initializing login form animations', e);
+    }
+  }
+
+  void _initializeFocusListeners() {
+    if (_isDisposed) return;
+
+    try {
+      // Email focus listener
+      emailFocusNode.addListener(() {
+        if (_isDisposed) return;
+        if (!emailFocusNode.hasFocus) {
+          // Email field lost focus - validate it
+          if (emailController.text.isEmpty) {
+            setEmailError(AppStrings.emailRequired);
+          } else {
+            final emailValidation = validateEmail(emailController.text);
+            if (emailValidation != null) {
+              setEmailError(emailValidation);
+            }
+          }
+        }
+      });
+
+      // Password focus listener
+      passwordFocusNode.addListener(() {
+        if (_isDisposed) return;
+        if (!passwordFocusNode.hasFocus) {
+          // Password field lost focus - validate it
+          if (passwordController.text.isEmpty) {
+            setPasswordError(AppStrings.passwordRequired);
+          } else {
+            final passwordValidation = validatePassword(passwordController.text);
+            if (passwordValidation != null) {
+              setPasswordError(passwordValidation);
+            }
+          }
+        }
+      });
+
+      AppLogger.d('Focus listeners initialized successfully');
+    } catch (e) {
+      AppLogger.e('Error initializing focus listeners', e);
+    }
+  }
+
+  void _initializeTextListeners() {
+    if (_isDisposed) return;
+
+    try {
+      // Remove existing listeners first (safety for recreation)
+      emailController.removeListener(_onEmailChanged);
+      passwordController.removeListener(_onPasswordChanged);
+
+      // Add text change listeners
+      emailController.addListener(_onEmailChanged);
+      passwordController.addListener(_onPasswordChanged);
+
+      AppLogger.d('Text listeners initialized successfully');
+    } catch (e) {
+      AppLogger.e('Error initializing text listeners', e);
+    }
+  }
+
+  void _loadRememberMePreference() {
+    if (_isDisposed) return;
+
+    try {
+      // For now, default to false
+      rememberMe.value = false;
+      AppLogger.d('Remember Me preference loaded: ${rememberMe.value}');
+    } catch (e) {
+      AppLogger.e('Error loading remember me preference', e);
+      rememberMe.value = false;
+    }
+  }
+
+  // =============================================================================
+  // DISPOSAL METHODS
+  // =============================================================================
+
+  void _clearAllFocus() {
+    try {
+      if (emailFocusNode.hasFocus) emailFocusNode.unfocus();
+      if (passwordFocusNode.hasFocus) passwordFocusNode.unfocus();
+      if (rememberMeFocusNode.hasFocus) rememberMeFocusNode.unfocus();
+      if (recoverPasswordFocusNode.hasFocus) recoverPasswordFocusNode.unfocus();
+      if (loginButtonFocusNode.hasFocus) loginButtonFocusNode.unfocus();
+      if (signupLinkFocusNode.hasFocus) signupLinkFocusNode.unfocus();
+    } catch (e) {
+      AppLogger.w('Error clearing focus nodes', e);
+    }
   }
 
   void _cancelAllTimers() {
@@ -135,17 +228,55 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
   }
 
   void _disposeControllers() {
-    emailController.dispose();
-    passwordController.dispose();
+    try {
+      // Remove listeners before disposing
+      emailController.removeListener(_onEmailChanged);
+      passwordController.removeListener(_onPasswordChanged);
+
+      // Dispose controllers
+      emailController.dispose();
+      passwordController.dispose();
+
+      AppLogger.d('Login form controllers disposed successfully');
+    } catch (e) {
+      AppLogger.w('Error disposing login form controllers', e);
+    }
   }
 
   void _disposeFocusNodes() {
-    emailFocusNode.dispose();
-    passwordFocusNode.dispose();
-    rememberMeFocusNode.dispose();
-    recoverPasswordFocusNode.dispose();
-    loginButtonFocusNode.dispose();
-    signupLinkFocusNode.dispose();
+    try {
+      // Safely dispose focus nodes with additional error handling
+      _safeFocusNodeDispose(emailFocusNode, 'emailFocusNode');
+      _safeFocusNodeDispose(passwordFocusNode, 'passwordFocusNode');
+      _safeFocusNodeDispose(rememberMeFocusNode, 'rememberMeFocusNode');
+      _safeFocusNodeDispose(recoverPasswordFocusNode, 'recoverPasswordFocusNode');
+      _safeFocusNodeDispose(loginButtonFocusNode, 'loginButtonFocusNode');
+      _safeFocusNodeDispose(signupLinkFocusNode, 'signupLinkFocusNode');
+
+      AppLogger.d('Login form focus nodes disposed successfully');
+    } catch (e) {
+      AppLogger.w('Error disposing login form focus nodes', e);
+    }
+  }
+
+  void _safeFocusNodeDispose(FocusNode focusNode, String nodeName) {
+    try {
+      // Ensure node is unfocused before disposal
+      if (focusNode.hasFocus) {
+        focusNode.unfocus();
+      }
+
+      // Wait a moment before disposing
+      Future.microtask(() {
+        try {
+          focusNode.dispose();
+        } catch (e) {
+          AppLogger.w('Error disposing $nodeName in microtask', e);
+        }
+      });
+    } catch (e) {
+      AppLogger.w('Error disposing $nodeName', e);
+    }
   }
 
   void _disposeAnimations() {
@@ -158,8 +289,13 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
     }
   }
 
-  // Text change listeners - only clear errors, don't validate
+  // =============================================================================
+  // TEXT CHANGE LISTENERS
+  // =============================================================================
+
   void _onEmailChanged() {
+    if (_isDisposed) return; // Safety check
+
     if (emailError.value.isNotEmpty) {
       emailError.value = '';
       emailErrorTimer?.cancel();
@@ -168,6 +304,8 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
   }
 
   void _onPasswordChanged() {
+    if (_isDisposed) return; // Safety check
+
     if (passwordError.value.isNotEmpty) {
       passwordError.value = '';
       passwordErrorTimer?.cancel();
@@ -175,158 +313,93 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
     }
   }
 
-  void _updateValidationErrorState() {
-    hasValidationErrors.value = emailError.value.isNotEmpty || passwordError.value.isNotEmpty;
-  }
+  // =============================================================================
+  // ERROR HANDLING METHODS
+  // =============================================================================
 
-  // Public method to update validation state (for form access)
-  void updateValidationErrorState() {
-    _updateValidationErrorState();
-  }
-
-  // Set error with auto-clear timer
   void setEmailError(String error) {
+    if (_isDisposed) return;
+
     emailError.value = error;
     emailErrorTimer?.cancel();
-    emailErrorTimer = Timer(const Duration(seconds: 7), () {
-      emailError.value = '';
-      _updateValidationErrorState();
+    emailErrorTimer = Timer(const Duration(seconds: 8), () {
+      if (!_isDisposed) {
+        emailError.value = '';
+        _updateValidationErrorState();
+      }
     });
+    _triggerEmailShake();
     _updateValidationErrorState();
   }
 
   void setPasswordError(String error) {
+    if (_isDisposed) return;
+
     passwordError.value = error;
     passwordErrorTimer?.cancel();
-    passwordErrorTimer = Timer(const Duration(seconds: 7), () {
-      passwordError.value = '';
-      _updateValidationErrorState();
+    passwordErrorTimer = Timer(const Duration(seconds: 8), () {
+      if (!_isDisposed) {
+        passwordError.value = '';
+        _updateValidationErrorState();
+      }
     });
+    _triggerPasswordShake();
     _updateValidationErrorState();
   }
 
-  // Trigger shake animation for fields
-  void shakeEmailField() {
-    if (emailShakeController != null && emailShakeController!.isCompleted) {
+  void _updateValidationErrorState() {
+    if (_isDisposed) return;
+    hasValidationErrors.value = emailError.value.isNotEmpty || passwordError.value.isNotEmpty;
+  }
+
+  void _triggerEmailShake() {
+    if (_isDisposed || emailShakeController == null) return;
+
+    try {
       emailShakeController!.reset();
+      emailShakeController!.forward();
+    } catch (e) {
+      AppLogger.w('Error triggering email shake animation', e);
     }
-    emailShakeController?.forward().then((_) {
-      emailShakeController?.repeat(reverse: true);
-      Future.delayed(const Duration(milliseconds: 600), () {
-        emailShakeController?.reset();
-      });
-    });
   }
 
-  void shakePasswordField() {
-    if (passwordShakeController != null && passwordShakeController!.isCompleted) {
+  void _triggerPasswordShake() {
+    if (_isDisposed || passwordShakeController == null) return;
+
+    try {
       passwordShakeController!.reset();
-    }
-    passwordShakeController?.forward().then((_) {
-      passwordShakeController?.repeat(reverse: true);
-      Future.delayed(const Duration(milliseconds: 600), () {
-        passwordShakeController?.reset();
-      });
-    });
-  }
-
-  // Focus management methods
-  void focusEmailField() {
-    emailFocusNode.requestFocus();
-  }
-
-  void focusPasswordField() {
-    // Use a slight delay to ensure proper focus transition
-    Future.delayed(const Duration(milliseconds: 50), () {
-      passwordFocusNode.requestFocus();
-    });
-  }
-
-  void focusRememberMe() {
-    rememberMeFocusNode.requestFocus();
-  }
-
-  void focusRecoverPassword() {
-    recoverPasswordFocusNode.requestFocus();
-  }
-
-  void focusLoginButton() {
-    loginButtonFocusNode.requestFocus();
-  }
-
-  void focusSignupLink() {
-    signupLinkFocusNode.requestFocus();
-  }
-
-  // Toggle methods
-  void togglePasswordVisibility() {
-    showPassword.value = !showPassword.value;
-  }
-
-  // Enhanced toggle method with persistence and password save integration
-  void toggleRememberMe() {
-    final previousValue = rememberMe.value;
-    rememberMe.value = !rememberMe.value;
-
-    AppLogger.d('Remember Me toggled from $previousValue to ${rememberMe.value}');
-
-    _saveRememberMePreference();
-
-    // If toggled on and we have credentials, prepare for password saving
-    if (rememberMe.value && hasCredentialsForSaving) {
-      AppLogger.i('Auto-preparing credentials for saving (credentials available)');
-      _prepareCredentialsForSaving();
-    }
-  }
-
-  // Save remember me preference (using Get.storage or similar)
-  void _saveRememberMePreference() {
-    try {
-      // If you have GetStorage configured:
-      // GetStorage().write('remember_me', rememberMe.value);
-
-      AppLogger.i('Remember Me preference saved: ${rememberMe.value}');
+      passwordShakeController!.forward();
     } catch (e) {
-      AppLogger.e('Error saving remember me preference', e);
+      AppLogger.w('Error triggering password shake animation', e);
     }
   }
 
-  // Load remember me preference on init
-  void _loadRememberMePreference() {
-    try {
-      // If you have GetStorage configured:
-      // rememberMe.value = GetStorage().read('remember_me') ?? false;
+  // =============================================================================
+  // VALIDATION METHODS
+  // =============================================================================
 
-      // For now, default to false
-      rememberMe.value = false;
-      AppLogger.d('Remember Me preference loaded: ${rememberMe.value}');
-    } catch (e) {
-      AppLogger.e('Error loading remember me preference', e);
-      rememberMe.value = false;
+  bool validateForm() {
+    if (_isDisposed) return false; // Safety check
+
+    bool isValid = true;
+
+    // Validate email
+    final emailValidation = validateEmail(emailController.text);
+    if (emailValidation != null) {
+      setEmailError(emailValidation);
+      isValid = false;
     }
-  }
 
-  // Prepare credentials for browser password manager
-  void _prepareCredentialsForSaving() {
-    AppLogger.i('Preparing credentials for password manager integration');
-
-    // Trigger autofill context if available
-    try {
-      TextInput.finishAutofillContext();
-      AppLogger.d('Autofill context finished successfully');
-    } catch (e) {
-      AppLogger.w('Error triggering autofill context', e);
+    // Validate password
+    final passwordValidation = validatePassword(passwordController.text);
+    if (passwordValidation != null) {
+      setPasswordError(passwordValidation);
+      isValid = false;
     }
+
+    return isValid;
   }
 
-  // Method to check if credentials are ready for saving
-  bool get hasCredentialsForSaving {
-    return emailController.text.isNotEmpty &&
-        passwordController.text.isNotEmpty &&
-        rememberMe.value;
-  }
-
-  // Validation methods
   String? validateEmail(String? value) {
     if (value == null || value.isEmpty) {
       return AppStrings.emailRequired;
@@ -347,30 +420,33 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
     return null;
   }
 
-  // Enhanced clear form method
+  // =============================================================================
+  // FORM MANAGEMENT METHODS
+  // =============================================================================
+
   void clearForm() {
-    emailController.clear();
-    passwordController.clear();
-    _cancelAllTimers();
-    emailError.value = '';
-    passwordError.value = '';
-    hasValidationErrors.value = false;
-    showPassword.value = false;
+    if (_isDisposed) return; // Safety check
 
-    // Don't clear remember me preference - let it persist
-    // rememberMe.value = false; // Removed this line
+    try {
+      _clearAllFocus();
+      emailController.clear();
+      passwordController.clear();
+      _cancelAllTimers();
+      emailError.value = '';
+      passwordError.value = '';
+      hasValidationErrors.value = false;
+      showPassword.value = false;
 
-    // Clear focus
-    emailFocusNode.unfocus();
-    passwordFocusNode.unfocus();
-    rememberMeFocusNode.unfocus();
-    recoverPasswordFocusNode.unfocus();
-    loginButtonFocusNode.unfocus();
-    signupLinkFocusNode.unfocus();
+      AppLogger.d('Login form cleared successfully');
+    } catch (e) {
+      AppLogger.w('Error clearing login form', e);
+    }
   }
 
   // Submit form (called by Enter key or button press)
   void submitForm() {
+    if (_isDisposed) return;
+
     if (validateForm()) {
       // If remember me is enabled, prepare for password saving
       if (rememberMe.value) {
@@ -378,7 +454,9 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
 
         // Small delay to ensure autofill context is processed
         Future.delayed(const Duration(milliseconds: 100), () {
-          _performLogin();
+          if (!_isDisposed) {
+            _performLogin();
+          }
         });
       } else {
         _performLogin();
@@ -388,6 +466,8 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
 
   // Enhanced form submission with password saving support
   void submitFormWithPasswordSave() {
+    if (_isDisposed) return;
+
     if (validateForm()) {
       if (rememberMe.value) {
         // Indicate that credentials should be saved
@@ -406,13 +486,17 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
 
       // Perform login after password save preparation
       Future.delayed(const Duration(milliseconds: 200), () {
-        _performLogin();
+        if (!_isDisposed) {
+          _performLogin();
+        }
       });
     }
   }
 
   // Centralized login execution
   void _performLogin() {
+    if (_isDisposed) return;
+
     try {
       AppLogger.i('Initiating login process');
       // Trigger login through Get mechanism to avoid circular dependency
@@ -423,62 +507,146 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
         'Login Error',
         'Unable to process login. Please try again.',
         snackPosition: SnackPosition.TOP,
-        backgroundColor: Get.theme.colorScheme.error,
-        colorText: Get.theme.colorScheme.onError,
+        backgroundColor: Colors.red.withOpacity(0.9),
+        colorText: Colors.white,
       );
     }
   }
 
-  // Updated validate form for submission - both fields shake independently
-  bool validateForm() {
-    _cancelAllTimers();
-    emailError.value = '';
-    passwordError.value = '';
-    hasValidationErrors.value = false;
+  // =============================================================================
+  // FOCUS MANAGEMENT METHODS
+  // =============================================================================
 
-    bool hasErrors = false;
-
-    final emailValidation = validateEmail(emailController.text);
-    if (emailValidation != null) {
-      setEmailError(emailValidation);
-      shakeEmailField();
-      hasErrors = true;
+  void focusEmailField() {
+    if (_isDisposed) return;
+    try {
+      emailFocusNode.requestFocus();
+    } catch (e) {
+      AppLogger.w('Error focusing email field', e);
     }
+  }
 
-    final passwordValidation = validatePassword(passwordController.text);
-    if (passwordValidation != null) {
-      setPasswordError(passwordValidation);
-      shakePasswordField(); // Remove the conditional check - always shake if invalid
-      hasErrors = true;
+  void focusPasswordField() {
+    if (_isDisposed) return;
+    // Use a slight delay to ensure proper focus transition
+    Future.delayed(const Duration(milliseconds: 50), () {
+      if (!_isDisposed) {
+        try {
+          passwordFocusNode.requestFocus();
+        } catch (e) {
+          AppLogger.w('Error focusing password field', e);
+        }
+      }
+    });
+  }
+
+  void focusRememberMe() {
+    if (_isDisposed) return;
+    try {
+      rememberMeFocusNode.requestFocus();
+    } catch (e) {
+      AppLogger.w('Error focusing remember me', e);
     }
-
-    return !hasErrors;
   }
 
-  // Method to get current form data for submission
-  Map<String, dynamic> get formData {
-    return {
-      'email': emailController.text.trim(),
-      'password': passwordController.text,
-      'rememberMe': rememberMe.value,
-    };
+  void focusRecoverPassword() {
+    if (_isDisposed) return;
+    try {
+      recoverPasswordFocusNode.requestFocus();
+    } catch (e) {
+      AppLogger.w('Error focusing recover password', e);
+    }
   }
 
-  // Method to check if form has any input
-  bool get hasAnyInput {
-    return emailController.text.isNotEmpty || passwordController.text.isNotEmpty;
+  void focusLoginButton() {
+    if (_isDisposed) return;
+    try {
+      loginButtonFocusNode.requestFocus();
+    } catch (e) {
+      AppLogger.w('Error focusing login button', e);
+    }
   }
 
-  // Method to check if form is completely filled
-  bool get isFormComplete {
-    return emailController.text.isNotEmpty && passwordController.text.isNotEmpty;
+  void focusSignupLink() {
+    if (_isDisposed) return;
+    try {
+      signupLinkFocusNode.requestFocus();
+    } catch (e) {
+      AppLogger.w('Error focusing signup link', e);
+    }
   }
 
-  // Method to reset only errors without clearing form
-  void resetErrors() {
-    _cancelAllTimers();
-    emailError.value = '';
-    passwordError.value = '';
-    hasValidationErrors.value = false;
+  // =============================================================================
+  // TOGGLE METHODS
+  // =============================================================================
+
+  void togglePasswordVisibility() {
+    if (_isDisposed) return;
+    showPassword.value = !showPassword.value;
+  }
+
+  // Enhanced toggle method with persistence and password save integration
+  void toggleRememberMe() {
+    if (_isDisposed) return;
+
+    final previousValue = rememberMe.value;
+    rememberMe.value = !rememberMe.value;
+
+    AppLogger.d('Remember Me toggled from $previousValue to ${rememberMe.value}');
+
+    _saveRememberMePreference();
+
+    // If toggled on and we have credentials, prepare for password saving
+    if (rememberMe.value && hasCredentialsForSaving) {
+      AppLogger.i('Auto-preparing credentials for saving (credentials available)');
+      _prepareCredentialsForSaving();
+    }
+  }
+
+  // =============================================================================
+  // UTILITY METHODS
+  // =============================================================================
+
+  // Save remember me preference (using Get.storage or similar)
+  void _saveRememberMePreference() {
+    if (_isDisposed) return;
+
+    try {
+      // If you have GetStorage configured:
+      // GetStorage().write('remember_me', rememberMe.value);
+
+      AppLogger.i('Remember Me preference saved: ${rememberMe.value}');
+    } catch (e) {
+      AppLogger.e('Error saving remember me preference', e);
+    }
+  }
+
+  // Prepare credentials for browser password manager
+  void _prepareCredentialsForSaving() {
+    if (_isDisposed) return;
+
+    AppLogger.i('Preparing credentials for password manager integration');
+
+    // Trigger autofill context if available
+    try {
+      TextInput.finishAutofillContext();
+      AppLogger.d('Autofill context finished successfully');
+    } catch (e) {
+      AppLogger.w('Error triggering autofill context', e);
+    }
+  }
+
+  // Method to check if credentials are ready for saving
+  bool get hasCredentialsForSaving {
+    if (_isDisposed) return false;
+    return emailController.text.isNotEmpty &&
+        passwordController.text.isNotEmpty &&
+        rememberMe.value;
+  }
+
+  // Update validation error state
+  void updateValidationErrorState() {
+    if (_isDisposed) return;
+    _updateValidationErrorState();
   }
 }

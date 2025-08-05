@@ -11,6 +11,22 @@ class ResetPasswordViewDesktop extends GetView<AuthController> {
 
   @override
   Widget build(BuildContext context) {
+    // Get the reset token from route parameters
+    final String? token = Get.parameters['token'];
+
+    // If no token, show error and redirect
+    if (token == null || token.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Get.snackbar(
+          'Invalid Link',
+          'This password reset link is invalid or has expired.',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        Get.offAllNamed(AppRoutes.login);
+      });
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Center(
@@ -30,7 +46,7 @@ class ResetPasswordViewDesktop extends GetView<AuthController> {
                     alignment: Alignment.topLeft,
                     child: IconButton(
                       icon: const Icon(Icons.arrow_back),
-                      onPressed: () => Get.back(),
+                      onPressed: () => Get.offAllNamed(AppRoutes.login),
                     ),
                   ),
 
@@ -116,9 +132,9 @@ class ResetPasswordViewDesktop extends GetView<AuthController> {
                           width: double.infinity,
                           height: 50,
                           child: ElevatedButton(
-                            onPressed: controller.isLoading.value
+                            onPressed: controller.isLoading.value || token == null
                                 ? null
-                                : controller.resetPassword,
+                                : () => controller.resetPassword(token),
                             child: controller.isLoading.value
                                 ? const CircularProgressIndicator(color: Colors.white)
                                 : const Text(
