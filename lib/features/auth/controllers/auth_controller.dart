@@ -375,21 +375,36 @@ class AuthController extends GetxController {
 
       AppLogger.i('User logged out successfully');
 
-      // Mark form controllers as disposed first, then navigate
+      // CRITICAL FIX: Force disposal of existing form controllers before navigation
       try {
+        // Remove existing controllers to prevent disposed FocusNode issues
         if (Get.isRegistered<LoginFormController>()) {
-          final controller = Get.find<LoginFormController>();
-          controller.markAsDisposed();
+          Get.delete<LoginFormController>(force: true);
+          AppLogger.d('Existing LoginFormController disposed during logout');
         }
+
         if (Get.isRegistered<SignUpFormController>()) {
-          // Add similar method to SignUpFormController if needed
+          Get.delete<SignUpFormController>(force: true);
+          AppLogger.d('Existing SignUpFormController disposed during logout');
+        }
+
+        // Also dispose the AuthController itself if it's not permanent
+        if (Get.isRegistered<AuthController>()) {
+          // Don't dispose self, but mark for cleanup
+          AppLogger.d('AuthController marked for cleanup during logout');
         }
       } catch (e) {
-        AppLogger.w('Error marking controllers as disposed', e);
+        AppLogger.w('Error disposing form controllers during logout', e);
       }
 
-      // Schedule navigation immediately
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Wait for any pending UI operations to complete
+      await Future.delayed(const Duration(milliseconds: 150));
+
+      // Schedule navigation for after the current frame with fresh bindings
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        // Additional small delay to ensure all cleanup is complete
+        await Future.delayed(const Duration(milliseconds: 50));
+
         // Use Get.offAllNamed with fresh binding to ensure new controller instances
         Get.offAllNamed(
           AppRoutes.login,
@@ -404,8 +419,22 @@ class AuthController extends GetxController {
       // Clear session even if logout fails
       await clearSession();
 
-      // Safe navigation fallback
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Force cleanup of controllers even on error
+      try {
+        if (Get.isRegistered<LoginFormController>()) {
+          Get.delete<LoginFormController>(force: true);
+        }
+        if (Get.isRegistered<SignUpFormController>()) {
+          Get.delete<SignUpFormController>(force: true);
+        }
+      } catch (cleanupError) {
+        AppLogger.w('Error in error cleanup', cleanupError);
+      }
+
+      // Safe navigation fallback with delay
+      await Future.delayed(const Duration(milliseconds: 150));
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await Future.delayed(const Duration(milliseconds: 50));
         Get.offAllNamed(
           AppRoutes.login,
           predicate: (route) => false,

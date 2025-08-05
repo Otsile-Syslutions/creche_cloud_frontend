@@ -7,13 +7,11 @@ import '../controllers/signup_form_controller.dart';
 class AuthBinding extends Bindings {
   @override
   void dependencies() {
-    // Create form controllers fresh each time - let GetX handle existing ones
-    Get.lazyPut<LoginFormController>(() => LoginFormController(), fenix: true);
-    Get.lazyPut<SignUpFormController>(() => SignUpFormController(), fenix: true);
+    // Put form controllers FIRST to ensure they're available before AuthController
+    Get.put<LoginFormController>(LoginFormController(), permanent: false);
+    Get.put<SignUpFormController>(SignUpFormController(), permanent: false);
 
-    // Put AuthController
-    if (!Get.isRegistered<AuthController>()) {
-      Get.put<AuthController>(AuthController(), permanent: false);
-    }
+    // Put AuthController LAST so it can safely access form controllers
+    Get.put<AuthController>(AuthController(), permanent: false);
   }
 }

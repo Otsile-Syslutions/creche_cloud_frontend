@@ -80,10 +80,6 @@ class LoginForm extends GetView<LoginFormController> {
                     return AnimatedBuilder(
                       animation: controller.emailFocusNode,
                       builder: (context, child) {
-                        // Safety check: return early if controller is disposed
-                        if (controller.isDisposed) {
-                          return const SizedBox.shrink();
-                        }
                         final hasFocus = controller.emailFocusNode.hasFocus;
 
                         return _buildAnimatedField(
@@ -101,7 +97,7 @@ class LoginForm extends GetView<LoginFormController> {
                                 maxLines: 1,
                                 onChanged: (value) {
                                   // Clear error when user starts typing
-                                  if (!controller.isDisposed && controller.emailError.value.isNotEmpty) {
+                                  if (controller.emailError.value.isNotEmpty) {
                                     controller.emailError.value = '';
                                     controller.emailErrorTimer?.cancel();
                                     controller.updateValidationErrorState();
@@ -109,7 +105,7 @@ class LoginForm extends GetView<LoginFormController> {
                                 },
                                 onTap: () {
                                   // Clear error when user clicks on field
-                                  if (!controller.isDisposed && controller.emailError.value.isNotEmpty) {
+                                  if (controller.emailError.value.isNotEmpty) {
                                     controller.emailError.value = '';
                                     controller.emailErrorTimer?.cancel();
                                     controller.updateValidationErrorState();
@@ -118,9 +114,7 @@ class LoginForm extends GetView<LoginFormController> {
                                 onFieldSubmitted: (_) {
                                   // Move to password field without validation here
                                   // Validation will happen in focus listener
-                                  if (!controller.isDisposed) {
-                                    controller.focusPasswordField();
-                                  }
+                                  controller.focusPasswordField();
                                 },
                                 style: TextStyle(
                                   fontFamily: 'Poppins',
@@ -186,9 +180,7 @@ class LoginForm extends GetView<LoginFormController> {
                                     child: GestureDetector(
                                       onTap: () {
                                         // Focus the field when overlay is tapped
-                                        if (!controller.isDisposed) {
-                                          controller.emailFocusNode.requestFocus();
-                                        }
+                                        controller.emailFocusNode.requestFocus();
                                       },
                                       child: Container(
                                         decoration: BoxDecoration(
@@ -243,10 +235,6 @@ class LoginForm extends GetView<LoginFormController> {
                     return AnimatedBuilder(
                       animation: controller.passwordFocusNode,
                       builder: (context, child) {
-                        // Safety check: return early if controller is disposed
-                        if (controller.isDisposed) {
-                          return const SizedBox.shrink();
-                        }
                         final hasFocus = controller.passwordFocusNode.hasFocus;
 
                         return _buildAnimatedField(
@@ -264,7 +252,7 @@ class LoginForm extends GetView<LoginFormController> {
                                 maxLines: 1,
                                 onChanged: (value) {
                                   // Clear error when user starts typing
-                                  if (!controller.isDisposed && controller.passwordError.value.isNotEmpty) {
+                                  if (controller.passwordError.value.isNotEmpty) {
                                     controller.passwordError.value = '';
                                     controller.passwordErrorTimer?.cancel();
                                     controller.updateValidationErrorState();
@@ -272,7 +260,7 @@ class LoginForm extends GetView<LoginFormController> {
                                 },
                                 onTap: () {
                                   // Clear error when user clicks on field
-                                  if (!controller.isDisposed && controller.passwordError.value.isNotEmpty) {
+                                  if (controller.passwordError.value.isNotEmpty) {
                                     controller.passwordError.value = '';
                                     controller.passwordErrorTimer?.cancel();
                                     controller.updateValidationErrorState();
@@ -280,9 +268,7 @@ class LoginForm extends GetView<LoginFormController> {
                                 },
                                 onFieldSubmitted: (_) {
                                   // Submit the form when Enter is pressed
-                                  if (!controller.isDisposed) {
-                                    _handleFormSubmission(context);
-                                  }
+                                  _handleFormSubmission(context);
                                 },
                                 style: TextStyle(
                                   fontFamily: 'Poppins',
@@ -360,9 +346,7 @@ class LoginForm extends GetView<LoginFormController> {
                                     child: GestureDetector(
                                       onTap: () {
                                         // Focus the field when overlay is tapped
-                                        if (!controller.isDisposed) {
-                                          controller.passwordFocusNode.requestFocus();
-                                        }
+                                        controller.passwordFocusNode.requestFocus();
                                       },
                                       child: Container(
                                         decoration: BoxDecoration(
@@ -415,8 +399,6 @@ class LoginForm extends GetView<LoginFormController> {
                     child: Focus(
                       focusNode: controller.rememberMeFocusNode,
                       onKeyEvent: (node, event) {
-                        if (controller.isDisposed) return KeyEventResult.ignored;
-                        
                         if (event.logicalKey == LogicalKeyboardKey.space && event is KeyDownEvent) {
                           controller.toggleRememberMe();
                           _handleRememberMeToggle(context);
@@ -426,10 +408,8 @@ class LoginForm extends GetView<LoginFormController> {
                       },
                       child: GestureDetector(
                         onTap: () {
-                          if (!controller.isDisposed) {
-                            controller.toggleRememberMe();
-                            _handleRememberMeToggle(context);
-                          }
+                          controller.toggleRememberMe();
+                          _handleRememberMeToggle(context);
                         },
                         child: Row(
                           children: [
@@ -450,10 +430,8 @@ class LoginForm extends GetView<LoginFormController> {
                                 child: Switch(
                                   value: controller.rememberMe.value,
                                   onChanged: (value) {
-                                    if (!controller.isDisposed) {
-                                      controller.toggleRememberMe();
-                                      _handleRememberMeToggle(context);
-                                    }
+                                    controller.toggleRememberMe();
+                                    _handleRememberMeToggle(context);
                                   },
                                   activeColor: AppColors.loginButton,
                                   inactiveThumbColor: Colors.white,
@@ -506,9 +484,7 @@ class LoginForm extends GetView<LoginFormController> {
                     focusNode: controller.loginButtonFocusNode,
                     child: ElevatedButton(
                       onPressed: authController.isLoading.value ? null : () {
-                        if (!controller.isDisposed) {
-                          _handleFormSubmission(context);
-                        }
+                        _handleFormSubmission(context);
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.loginButton,
@@ -726,9 +702,6 @@ class LoginForm extends GetView<LoginFormController> {
   }
 
   void _handleRememberMeToggle(BuildContext context) {
-    // Safety check: ensure controller is not disposed
-    if (controller.isDisposed) return;
-    
     // If remember me is now enabled and we have credentials
     if (controller.rememberMe.value) {
       if (controller.emailController.text.isNotEmpty &&
@@ -743,9 +716,6 @@ class LoginForm extends GetView<LoginFormController> {
   }
 
   void _handleFormSubmission(BuildContext context) {
-    // Safety check: ensure controller is not disposed
-    if (controller.isDisposed) return;
-    
     // Validate the form first
     if (controller.validateForm()) {
       // If remember me is enabled, trigger password save
@@ -755,9 +725,7 @@ class LoginForm extends GetView<LoginFormController> {
 
         // Small delay to ensure autofill is processed before login
         Future.delayed(const Duration(milliseconds: 100), () {
-          if (!controller.isDisposed) {
-            controller.submitForm();
-          }
+          controller.submitForm();
         });
       } else {
         // Submit normally
