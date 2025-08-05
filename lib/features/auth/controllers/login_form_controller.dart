@@ -77,6 +77,31 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
   }
 
   @override
+  void onReady() {
+    super.onReady();
+
+    // Automatically focus email field when controller is ready
+    if (_isReady && !_isDisposed && !_preparingForDisposal) {
+      try {
+        // Use a post-frame callback to ensure the widget tree is built
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!_isDisposed && !_preparingForDisposal) {
+            // Small delay to ensure focus node is completely ready
+            Future.delayed(const Duration(milliseconds: 100), () {
+              if (!_isDisposed && !_preparingForDisposal) {
+                focusEmailField();
+                AppLogger.d('Email field auto-focused on login form ready');
+              }
+            });
+          }
+        });
+      } catch (e) {
+        AppLogger.w('Error auto-focusing email field', e);
+      }
+    }
+  }
+
+  @override
   void onClose() {
     // Set the disposed flag first
     _isDisposed = true;
@@ -342,6 +367,9 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
       // Step 6: Final validation
       await _validateFocusNodesReady();
 
+      // Step 7: Auto-focus email field after reinitialization
+      _autoFocusEmailField();
+
       AppLogger.d('Focus nodes reinitialized successfully');
     } catch (e) {
       AppLogger.e('Error during focus node reinitialization', e);
@@ -352,6 +380,30 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
       } catch (fallbackError) {
         AppLogger.e('Fallback focus node creation failed', fallbackError);
       }
+    }
+  }
+
+  /// Auto-focus email field helper method
+  void _autoFocusEmailField() {
+    if (_isDisposed || _preparingForDisposal || !_isReady) {
+      return;
+    }
+
+    try {
+      // Use post-frame callback to ensure widget is rendered
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_isDisposed && !_preparingForDisposal && _isReady) {
+          // Small delay to ensure focus node is completely ready
+          Future.delayed(const Duration(milliseconds: 200), () {
+            if (!_isDisposed && !_preparingForDisposal) {
+              focusEmailField();
+              AppLogger.d('Email field auto-focused after focus node reinitialization');
+            }
+          });
+        }
+      });
+    } catch (e) {
+      AppLogger.w('Error in auto-focus email field helper', e);
     }
   }
 
