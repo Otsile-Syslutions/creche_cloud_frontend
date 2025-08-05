@@ -12,6 +12,14 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
   bool _isDisposed = false;
   bool get isDisposed => _isDisposed;
 
+  // Add a flag to indicate if controller is being prepared for disposal
+  bool _preparingForDisposal = false;
+  bool get preparingForDisposal => _preparingForDisposal;
+
+  // Add ready flag for initialization check
+  bool _isReady = false;
+  bool get isReady => _isReady;
+
   // Observable variables for login form
   final RxBool showPassword = false.obs;
   final RxBool rememberMe = false.obs;
@@ -33,12 +41,12 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
   final GlobalKey<FormState> loginFormKey = GlobalKey<FormState>();
 
   // Focus nodes for keyboard navigation
-  final FocusNode emailFocusNode = FocusNode();
-  final FocusNode passwordFocusNode = FocusNode();
-  final FocusNode rememberMeFocusNode = FocusNode();
-  final FocusNode recoverPasswordFocusNode = FocusNode();
-  final FocusNode loginButtonFocusNode = FocusNode();
-  final FocusNode signupLinkFocusNode = FocusNode();
+  late FocusNode emailFocusNode;
+  late FocusNode passwordFocusNode;
+  late FocusNode rememberMeFocusNode;
+  late FocusNode recoverPasswordFocusNode;
+  late FocusNode loginButtonFocusNode;
+  late FocusNode signupLinkFocusNode;
 
   // Animation controllers for shake effect
   AnimationController? emailShakeController;
@@ -52,14 +60,19 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
     try {
       // Reset disposed flag on initialization (in case of recreation)
       _isDisposed = false;
+      _preparingForDisposal = false;
 
+      _initializeFocusNodes();
       _initializeAnimations();
       _initializeFocusListeners();
       _initializeTextListeners();
       _loadRememberMePreference();
+
+      _isReady = true;
       AppLogger.d('LoginFormController initialized successfully');
     } catch (e) {
       AppLogger.e('Error initializing LoginFormController', e);
+      _isReady = false;
     }
   }
 
@@ -67,6 +80,7 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
   void onClose() {
     // Set the disposed flag first
     _isDisposed = true;
+    _isReady = false;
 
     try {
       _cancelAllTimers();
@@ -91,6 +105,23 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
   // =============================================================================
   // INITIALIZATION METHODS
   // =============================================================================
+
+  void _initializeFocusNodes() {
+    if (_isDisposed) return;
+
+    try {
+      emailFocusNode = FocusNode(debugLabel: 'EmailFocusNode');
+      passwordFocusNode = FocusNode(debugLabel: 'PasswordFocusNode');
+      rememberMeFocusNode = FocusNode(debugLabel: 'RememberMeFocusNode');
+      recoverPasswordFocusNode = FocusNode(debugLabel: 'RecoverPasswordFocusNode');
+      loginButtonFocusNode = FocusNode(debugLabel: 'LoginButtonFocusNode');
+      signupLinkFocusNode = FocusNode(debugLabel: 'SignupLinkFocusNode');
+
+      AppLogger.d('Focus nodes initialized successfully');
+    } catch (e) {
+      AppLogger.e('Error initializing focus nodes', e);
+    }
+  }
 
   void _initializeAnimations() {
     if (_isDisposed) return; // Safety check
@@ -137,36 +168,10 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
 
     try {
       // Email focus listener
-      emailFocusNode.addListener(() {
-        if (_isDisposed) return;
-        if (!emailFocusNode.hasFocus) {
-          // Email field lost focus - validate it
-          if (emailController.text.isEmpty) {
-            setEmailError(AppStrings.emailRequired);
-          } else {
-            final emailValidation = validateEmail(emailController.text);
-            if (emailValidation != null) {
-              setEmailError(emailValidation);
-            }
-          }
-        }
-      });
+      emailFocusNode.addListener(_onEmailFocusChanged);
 
       // Password focus listener
-      passwordFocusNode.addListener(() {
-        if (_isDisposed) return;
-        if (!passwordFocusNode.hasFocus) {
-          // Password field lost focus - validate it
-          if (passwordController.text.isEmpty) {
-            setPasswordError(AppStrings.passwordRequired);
-          } else {
-            final passwordValidation = validatePassword(passwordController.text);
-            if (passwordValidation != null) {
-              setPasswordError(passwordValidation);
-            }
-          }
-        }
-      });
+      passwordFocusNode.addListener(_onPasswordFocusChanged);
 
       AppLogger.d('Focus listeners initialized successfully');
     } catch (e) {
@@ -202,6 +207,341 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
     } catch (e) {
       AppLogger.e('Error loading remember me preference', e);
       rememberMe.value = false;
+    }
+  }
+
+  // =============================================================================
+  // IMPROVED PREPARE FOR DISPOSAL METHOD
+  // =============================================================================
+
+  /// Prepare controller for disposal (called from AuthController) - IMPROVED
+  Future<void> prepareForDisposal() async {
+    try {
+      _preparingForDisposal = true;
+      AppLogger.d('Preparing LoginFormController for disposal...');
+
+      // Step 1: Clear all active focus FIRST
+      await _clearAllFocusSafely();
+
+      // Step 2: Cancel timers
+      _cancelAllTimers();
+
+      // Step 3: Clear form data
+      try {
+        emailController.clear();
+        passwordController.clear();
+      } catch (e) {
+        AppLogger.w('Error clearing form data during disposal preparation', e);
+      }
+
+      // Step 4: Reset observable values
+      showPassword.value = false;
+      emailError.value = '';
+      passwordError.value = '';
+      hasValidationErrors.value = false;
+
+      // Step 5: CRITICAL - Wait longer for focus operations to complete
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      // Step 6: Mark focus nodes as ready for disposal (but don't dispose yet)
+      _markFocusNodesForDisposal();
+
+      AppLogger.d('LoginFormController prepared for disposal');
+    } catch (e) {
+      AppLogger.w('Error preparing controller for disposal', e);
+    }
+  }
+
+  /// Improved focus clearing with better timing
+  Future<void> _clearAllFocusSafely() async {
+    try {
+      // Clear focus with proper unfocus sequence
+      final focusNodes = [
+        emailFocusNode,
+        passwordFocusNode,
+        rememberMeFocusNode,
+        recoverPasswordFocusNode,
+        loginButtonFocusNode,
+        signupLinkFocusNode,
+      ];
+
+      for (final node in focusNodes) {
+        try {
+          if (node.hasFocus) {
+            node.unfocus();
+            // Small delay between each unfocus operation
+            await Future.delayed(const Duration(milliseconds: 10));
+          }
+        } catch (e) {
+          AppLogger.w('Error unfocusing individual node', e);
+        }
+      }
+
+      // Additional wait to ensure all focus operations complete
+      await Future.delayed(const Duration(milliseconds: 50));
+
+      AppLogger.d('All focus cleared safely');
+    } catch (e) {
+      AppLogger.w('Error clearing focus safely', e);
+    }
+  }
+
+  /// Mark focus nodes for disposal without actually disposing them yet
+  void _markFocusNodesForDisposal() {
+    try {
+      final focusNodes = [
+        ('emailFocusNode', emailFocusNode),
+        ('passwordFocusNode', passwordFocusNode),
+        ('rememberMeFocusNode', rememberMeFocusNode),
+        ('recoverPasswordFocusNode', recoverPasswordFocusNode),
+        ('loginButtonFocusNode', loginButtonFocusNode),
+        ('signupLinkFocusNode', signupLinkFocusNode),
+      ];
+
+      for (final (name, node) in focusNodes) {
+        try {
+          node.debugLabel = '${node.debugLabel ?? name}_MARKED_FOR_DISPOSAL';
+        } catch (e) {
+          AppLogger.w('Error marking $name for disposal', e);
+        }
+      }
+    } catch (e) {
+      AppLogger.w('Error marking focus nodes for disposal', e);
+    }
+  }
+
+  // =============================================================================
+  // IMPROVED FOCUS NODE REINITIALIZATION
+  // =============================================================================
+
+  /// Reinitialize focus nodes - IMPROVED with better error handling
+  Future<void> reinitializeFocusNodes() async {
+    if (_isDisposed || _preparingForDisposal) {
+      AppLogger.w('Cannot reinitialize focus nodes - controller is disposed or preparing for disposal');
+      return;
+    }
+
+    try {
+      AppLogger.d('Starting focus node reinitialization...');
+
+      // Step 1: Clear any existing focus (non-blocking)
+      await _clearAllFocusSafely();
+
+      // Step 2: Dispose old focus nodes safely if they exist
+      await _disposeOldFocusNodesSafely();
+
+      // Step 3: Wait for disposal to complete
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // Step 4: Create new focus nodes
+      await _createFreshFocusNodes();
+
+      // Step 5: Reinitialize listeners
+      await _reinitializeFocusListeners();
+
+      // Step 6: Final validation
+      await _validateFocusNodesReady();
+
+      AppLogger.d('Focus nodes reinitialized successfully');
+    } catch (e) {
+      AppLogger.e('Error during focus node reinitialization', e);
+
+      // Fallback: try basic focus node creation
+      try {
+        await _fallbackFocusNodeCreation();
+      } catch (fallbackError) {
+        AppLogger.e('Fallback focus node creation failed', fallbackError);
+      }
+    }
+  }
+
+  /// Safely dispose old focus nodes during reinitialization
+  Future<void> _disposeOldFocusNodesSafely() async {
+    try {
+      final nodesToDispose = [
+        ('emailFocusNode', emailFocusNode),
+        ('passwordFocusNode', passwordFocusNode),
+        ('rememberMeFocusNode', rememberMeFocusNode),
+        ('recoverPasswordFocusNode', recoverPasswordFocusNode),
+        ('loginButtonFocusNode', loginButtonFocusNode),
+        ('signupLinkFocusNode', signupLinkFocusNode),
+      ];
+
+      for (final (name, node) in nodesToDispose) {
+        try {
+          // Check if already disposed or marked for disposal
+          if (node.debugLabel?.contains('DISPOSED') == true) {
+            AppLogger.d('$name already disposed, skipping');
+            continue;
+          }
+
+          // Ensure not focused before disposal
+          if (node.hasFocus) {
+            node.unfocus();
+            await Future.delayed(const Duration(milliseconds: 20));
+          }
+
+          // Dispose the node
+          node.dispose();
+          AppLogger.d('$name disposed successfully');
+
+        } catch (e) {
+          AppLogger.w('Error disposing $name during reinitialization', e);
+        }
+      }
+
+      AppLogger.d('Old focus nodes disposed safely');
+    } catch (e) {
+      AppLogger.w('Error during safe focus node disposal', e);
+    }
+  }
+
+  /// Create completely fresh focus nodes
+  Future<void> _createFreshFocusNodes() async {
+    try {
+      // Create new focus nodes with clear debug labels
+      emailFocusNode = FocusNode(debugLabel: 'EmailFocusNode_Fresh_${DateTime.now().millisecondsSinceEpoch}');
+      passwordFocusNode = FocusNode(debugLabel: 'PasswordFocusNode_Fresh_${DateTime.now().millisecondsSinceEpoch}');
+      rememberMeFocusNode = FocusNode(debugLabel: 'RememberMeFocusNode_Fresh_${DateTime.now().millisecondsSinceEpoch}');
+      recoverPasswordFocusNode = FocusNode(debugLabel: 'RecoverPasswordFocusNode_Fresh_${DateTime.now().millisecondsSinceEpoch}');
+      loginButtonFocusNode = FocusNode(debugLabel: 'LoginButtonFocusNode_Fresh_${DateTime.now().millisecondsSinceEpoch}');
+      signupLinkFocusNode = FocusNode(debugLabel: 'SignupLinkFocusNode_Fresh_${DateTime.now().millisecondsSinceEpoch}');
+
+      AppLogger.d('Fresh focus nodes created successfully');
+    } catch (e) {
+      AppLogger.e('Error creating fresh focus nodes', e);
+      throw e;
+    }
+  }
+
+  /// Reinitialize focus listeners after recreation
+  Future<void> _reinitializeFocusListeners() async {
+    try {
+      // Remove any existing listeners first (safety)
+      try {
+        emailFocusNode.removeListener(_onEmailFocusChanged);
+        passwordFocusNode.removeListener(_onPasswordFocusChanged);
+      } catch (e) {
+        // Ignore errors from removing non-existent listeners
+      }
+
+      // Add fresh listeners
+      emailFocusNode.addListener(_onEmailFocusChanged);
+      passwordFocusNode.addListener(_onPasswordFocusChanged);
+
+      AppLogger.d('Focus listeners reinitialized successfully');
+    } catch (e) {
+      AppLogger.w('Error reinitializing focus listeners', e);
+    }
+  }
+
+  /// Validate that focus nodes are ready for use
+  Future<void> _validateFocusNodesReady() async {
+    try {
+      final focusNodes = [
+        ('emailFocusNode', emailFocusNode),
+        ('passwordFocusNode', passwordFocusNode),
+        ('rememberMeFocusNode', rememberMeFocusNode),
+        ('recoverPasswordFocusNode', recoverPasswordFocusNode),
+        ('loginButtonFocusNode', loginButtonFocusNode),
+        ('signupLinkFocusNode', signupLinkFocusNode),
+      ];
+
+      bool allValid = true;
+      for (final (name, node) in focusNodes) {
+        try {
+          // Test if the node is functional by checking its properties
+          final canFocus = node.canRequestFocus;
+          final debugLabel = node.debugLabel;
+
+          if (debugLabel?.contains('Fresh') != true) {
+            AppLogger.w('$name may not be fresh: $debugLabel');
+            allValid = false;
+          }
+
+          AppLogger.d('$name validation: canFocus=$canFocus, label=$debugLabel');
+        } catch (e) {
+          AppLogger.w('$name validation failed', e);
+          allValid = false;
+        }
+      }
+
+      if (allValid) {
+        AppLogger.d('All focus nodes validated successfully');
+      } else {
+        AppLogger.w('Some focus nodes failed validation');
+      }
+    } catch (e) {
+      AppLogger.w('Error validating focus nodes', e);
+    }
+  }
+
+  /// Fallback focus node creation if main process fails
+  Future<void> _fallbackFocusNodeCreation() async {
+    try {
+      AppLogger.i('Running fallback focus node creation...');
+
+      // Create basic focus nodes without listeners
+      emailFocusNode = FocusNode(debugLabel: 'EmailFocusNode_Fallback');
+      passwordFocusNode = FocusNode(debugLabel: 'PasswordFocusNode_Fallback');
+      rememberMeFocusNode = FocusNode(debugLabel: 'RememberMeFocusNode_Fallback');
+      recoverPasswordFocusNode = FocusNode(debugLabel: 'RecoverPasswordFocusNode_Fallback');
+      loginButtonFocusNode = FocusNode(debugLabel: 'LoginButtonFocusNode_Fallback');
+      signupLinkFocusNode = FocusNode(debugLabel: 'SignupLinkFocusNode_Fallback');
+
+      AppLogger.i('Fallback focus nodes created');
+    } catch (e) {
+      AppLogger.e('Fallback focus node creation failed', e);
+    }
+  }
+
+  // =============================================================================
+  // FOCUS LISTENERS
+  // =============================================================================
+
+  void _onEmailFocusChanged() {
+    if (_isDisposed || _preparingForDisposal) return;
+
+    try {
+      if (emailFocusNode.hasFocus) {
+        AppLogger.d('Email field gained focus');
+      } else {
+        AppLogger.d('Email field lost focus');
+        // Email field lost focus - validate it
+        if (emailController.text.isEmpty) {
+          setEmailError(AppStrings.emailRequired);
+        } else {
+          final emailValidation = validateEmail(emailController.text);
+          if (emailValidation != null) {
+            setEmailError(emailValidation);
+          }
+        }
+      }
+    } catch (e) {
+      AppLogger.w('Error in email focus change listener', e);
+    }
+  }
+
+  void _onPasswordFocusChanged() {
+    if (_isDisposed || _preparingForDisposal) return;
+
+    try {
+      if (passwordFocusNode.hasFocus) {
+        AppLogger.d('Password field gained focus');
+      } else {
+        AppLogger.d('Password field lost focus');
+        // Password field lost focus - validate it
+        if (passwordController.text.isEmpty) {
+          setPasswordError(AppStrings.passwordRequired);
+        } else {
+          final passwordValidation = validatePassword(passwordController.text);
+          if (passwordValidation != null) {
+            setPasswordError(passwordValidation);
+          }
+        }
+      }
+    } catch (e) {
+      AppLogger.w('Error in password focus change listener', e);
     }
   }
 
@@ -261,18 +601,33 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
 
   void _safeFocusNodeDispose(FocusNode focusNode, String nodeName) {
     try {
+      // Check if focus node is already disposed
+      if (focusNode.debugLabel != null && focusNode.debugLabel!.contains('DISPOSED')) {
+        AppLogger.d('$nodeName already disposed, skipping');
+        return;
+      }
+
       // Ensure node is unfocused before disposal
       if (focusNode.hasFocus) {
         focusNode.unfocus();
       }
 
-      // Wait a moment before disposing
-      Future.microtask(() {
-        try {
-          focusNode.dispose();
-        } catch (e) {
-          AppLogger.w('Error disposing $nodeName in microtask', e);
-        }
+      // Mark as being disposed to prevent double disposal
+      focusNode.debugLabel = '${focusNode.debugLabel ?? nodeName}_DISPOSED';
+
+      // Schedule disposal after current frame to avoid widget conflicts
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future.microtask(() {
+          try {
+            if (!focusNode.debugLabel!.contains('DISPOSED_COMPLETE')) {
+              focusNode.dispose();
+              focusNode.debugLabel = '${focusNode.debugLabel}_COMPLETE';
+              AppLogger.d('$nodeName disposed successfully');
+            }
+          } catch (e) {
+            AppLogger.w('Error disposing $nodeName in microtask', e);
+          }
+        });
       });
     } catch (e) {
       AppLogger.w('Error disposing $nodeName', e);
@@ -294,22 +649,22 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
   // =============================================================================
 
   void _onEmailChanged() {
-    if (_isDisposed) return; // Safety check
+    if (_isDisposed || _preparingForDisposal) return; // Safety check
 
     if (emailError.value.isNotEmpty) {
       emailError.value = '';
       emailErrorTimer?.cancel();
-      _updateValidationErrorState();
+      updateValidationErrorState();
     }
   }
 
   void _onPasswordChanged() {
-    if (_isDisposed) return; // Safety check
+    if (_isDisposed || _preparingForDisposal) return; // Safety check
 
     if (passwordError.value.isNotEmpty) {
       passwordError.value = '';
       passwordErrorTimer?.cancel();
-      _updateValidationErrorState();
+      updateValidationErrorState();
     }
   }
 
@@ -318,70 +673,79 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
   // =============================================================================
 
   void setEmailError(String error) {
-    if (_isDisposed) return;
+    if (_isDisposed || _preparingForDisposal) return;
 
     emailError.value = error;
     emailErrorTimer?.cancel();
     emailErrorTimer = Timer(const Duration(seconds: 8), () {
-      if (!_isDisposed) {
+      if (!_isDisposed && !_preparingForDisposal) {
         emailError.value = '';
-        _updateValidationErrorState();
+        updateValidationErrorState();
       }
     });
     _triggerEmailShake();
-    _updateValidationErrorState();
+    updateValidationErrorState();
   }
 
   void setPasswordError(String error) {
-    if (_isDisposed) return;
+    if (_isDisposed || _preparingForDisposal) return;
 
     passwordError.value = error;
     passwordErrorTimer?.cancel();
     passwordErrorTimer = Timer(const Duration(seconds: 8), () {
-      if (!_isDisposed) {
+      if (!_isDisposed && !_preparingForDisposal) {
         passwordError.value = '';
-        _updateValidationErrorState();
+        updateValidationErrorState();
       }
     });
     _triggerPasswordShake();
-    _updateValidationErrorState();
+    updateValidationErrorState();
   }
 
-  void _updateValidationErrorState() {
-    if (_isDisposed) return;
+  /// Update validation error state - RESTORED MISSING METHOD
+  void updateValidationErrorState() {
+    if (_isDisposed || _preparingForDisposal) return;
     hasValidationErrors.value = emailError.value.isNotEmpty || passwordError.value.isNotEmpty;
   }
 
   void _triggerEmailShake() {
-    if (_isDisposed || emailShakeController == null) return;
-
+    if (_isDisposed || _preparingForDisposal) return;
     try {
-      emailShakeController!.reset();
-      emailShakeController!.forward();
+      emailShakeController?.forward().then((_) {
+        if (!_isDisposed && !_preparingForDisposal) {
+          emailShakeController?.reverse();
+        }
+      });
     } catch (e) {
       AppLogger.w('Error triggering email shake animation', e);
     }
   }
 
   void _triggerPasswordShake() {
-    if (_isDisposed || passwordShakeController == null) return;
-
+    if (_isDisposed || _preparingForDisposal) return;
     try {
-      passwordShakeController!.reset();
-      passwordShakeController!.forward();
+      passwordShakeController?.forward().then((_) {
+        if (!_isDisposed && !_preparingForDisposal) {
+          passwordShakeController?.reverse();
+        }
+      });
     } catch (e) {
       AppLogger.w('Error triggering password shake animation', e);
     }
   }
 
   // =============================================================================
-  // VALIDATION METHODS
+  // FORM VALIDATION METHODS
   // =============================================================================
 
   bool validateForm() {
-    if (_isDisposed) return false; // Safety check
+    if (_isDisposed || _preparingForDisposal) return false;
 
     bool isValid = true;
+
+    // Clear previous errors
+    emailError.value = '';
+    passwordError.value = '';
 
     // Validate email
     final emailValidation = validateEmail(emailController.text);
@@ -425,7 +789,7 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
   // =============================================================================
 
   void clearForm() {
-    if (_isDisposed) return; // Safety check
+    if (_isDisposed || _preparingForDisposal) return; // Safety check
 
     try {
       _clearAllFocus();
@@ -445,7 +809,7 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
 
   // Submit form (called by Enter key or button press)
   void submitForm() {
-    if (_isDisposed) return;
+    if (_isDisposed || _preparingForDisposal) return;
 
     if (validateForm()) {
       // If remember me is enabled, prepare for password saving
@@ -454,7 +818,7 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
 
         // Small delay to ensure autofill context is processed
         Future.delayed(const Duration(milliseconds: 100), () {
-          if (!_isDisposed) {
+          if (!_isDisposed && !_preparingForDisposal) {
             _performLogin();
           }
         });
@@ -466,7 +830,7 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
 
   // Enhanced form submission with password saving support
   void submitFormWithPasswordSave() {
-    if (_isDisposed) return;
+    if (_isDisposed || _preparingForDisposal) return;
 
     if (validateForm()) {
       if (rememberMe.value) {
@@ -486,7 +850,7 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
 
       // Perform login after password save preparation
       Future.delayed(const Duration(milliseconds: 200), () {
-        if (!_isDisposed) {
+        if (!_isDisposed && !_preparingForDisposal) {
           _performLogin();
         }
       });
@@ -495,7 +859,7 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
 
   // Centralized login execution
   void _performLogin() {
-    if (_isDisposed) return;
+    if (_isDisposed || _preparingForDisposal) return;
 
     try {
       AppLogger.i('Initiating login process');
@@ -513,26 +877,62 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
     }
   }
 
+  void _prepareCredentialsForSaving() {
+    if (_isDisposed || _preparingForDisposal) return;
+
+    try {
+      // This method is called when the user wants to save credentials
+      AppLogger.d('Preparing credentials for saving (remember me enabled)');
+      // Implementation would go here for actual credential saving
+    } catch (e) {
+      AppLogger.w('Error preparing credentials for saving', e);
+    }
+  }
+
   // =============================================================================
-  // FOCUS MANAGEMENT METHODS
+  // IMPROVED FOCUS MANAGEMENT METHODS
   // =============================================================================
 
+  /// Enhanced focus email field with validation
   void focusEmailField() {
-    if (_isDisposed) return;
+    if (_isDisposed || _preparingForDisposal) {
+      AppLogger.w('Cannot focus email field - controller not ready');
+      return;
+    }
+
     try {
+      // Validate focus node is ready
+      if (emailFocusNode.debugLabel?.contains('DISPOSED') == true) {
+        AppLogger.w('Email focus node is disposed, cannot focus');
+        return;
+      }
+
       emailFocusNode.requestFocus();
+      AppLogger.d('Email field focused successfully');
     } catch (e) {
       AppLogger.w('Error focusing email field', e);
     }
   }
 
+  /// Enhanced focus password field with validation
   void focusPasswordField() {
-    if (_isDisposed) return;
+    if (_isDisposed || _preparingForDisposal) {
+      AppLogger.w('Cannot focus password field - controller not ready');
+      return;
+    }
+
     // Use a slight delay to ensure proper focus transition
     Future.delayed(const Duration(milliseconds: 50), () {
-      if (!_isDisposed) {
+      if (!_isDisposed && !_preparingForDisposal) {
         try {
+          // Validate focus node is ready
+          if (passwordFocusNode.debugLabel?.contains('DISPOSED') == true) {
+            AppLogger.w('Password focus node is disposed, cannot focus');
+            return;
+          }
+
           passwordFocusNode.requestFocus();
+          AppLogger.d('Password field focused successfully');
         } catch (e) {
           AppLogger.w('Error focusing password field', e);
         }
@@ -541,7 +941,7 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
   }
 
   void focusRememberMe() {
-    if (_isDisposed) return;
+    if (_isDisposed || _preparingForDisposal) return;
     try {
       rememberMeFocusNode.requestFocus();
     } catch (e) {
@@ -550,7 +950,7 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
   }
 
   void focusRecoverPassword() {
-    if (_isDisposed) return;
+    if (_isDisposed || _preparingForDisposal) return;
     try {
       recoverPasswordFocusNode.requestFocus();
     } catch (e) {
@@ -559,7 +959,7 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
   }
 
   void focusLoginButton() {
-    if (_isDisposed) return;
+    if (_isDisposed || _preparingForDisposal) return;
     try {
       loginButtonFocusNode.requestFocus();
     } catch (e) {
@@ -568,7 +968,7 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
   }
 
   void focusSignupLink() {
-    if (_isDisposed) return;
+    if (_isDisposed || _preparingForDisposal) return;
     try {
       signupLinkFocusNode.requestFocus();
     } catch (e) {
@@ -576,77 +976,15 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
     }
   }
 
-  // =============================================================================
-  // TOGGLE METHODS
-  // =============================================================================
-
+  // Toggle password visibility
   void togglePasswordVisibility() {
-    if (_isDisposed) return;
+    if (_isDisposed || _preparingForDisposal) return;
     showPassword.value = !showPassword.value;
   }
 
-  // Enhanced toggle method with persistence and password save integration
+  // Toggle remember me checkbox
   void toggleRememberMe() {
-    if (_isDisposed) return;
-
-    final previousValue = rememberMe.value;
+    if (_isDisposed || _preparingForDisposal) return;
     rememberMe.value = !rememberMe.value;
-
-    AppLogger.d('Remember Me toggled from $previousValue to ${rememberMe.value}');
-
-    _saveRememberMePreference();
-
-    // If toggled on and we have credentials, prepare for password saving
-    if (rememberMe.value && hasCredentialsForSaving) {
-      AppLogger.i('Auto-preparing credentials for saving (credentials available)');
-      _prepareCredentialsForSaving();
-    }
-  }
-
-  // =============================================================================
-  // UTILITY METHODS
-  // =============================================================================
-
-  // Save remember me preference (using Get.storage or similar)
-  void _saveRememberMePreference() {
-    if (_isDisposed) return;
-
-    try {
-      // If you have GetStorage configured:
-      // GetStorage().write('remember_me', rememberMe.value);
-
-      AppLogger.i('Remember Me preference saved: ${rememberMe.value}');
-    } catch (e) {
-      AppLogger.e('Error saving remember me preference', e);
-    }
-  }
-
-  // Prepare credentials for browser password manager
-  void _prepareCredentialsForSaving() {
-    if (_isDisposed) return;
-
-    AppLogger.i('Preparing credentials for password manager integration');
-
-    // Trigger autofill context if available
-    try {
-      TextInput.finishAutofillContext();
-      AppLogger.d('Autofill context finished successfully');
-    } catch (e) {
-      AppLogger.w('Error triggering autofill context', e);
-    }
-  }
-
-  // Method to check if credentials are ready for saving
-  bool get hasCredentialsForSaving {
-    if (_isDisposed) return false;
-    return emailController.text.isNotEmpty &&
-        passwordController.text.isNotEmpty &&
-        rememberMe.value;
-  }
-
-  // Update validation error state
-  void updateValidationErrorState() {
-    if (_isDisposed) return;
-    _updateValidationErrorState();
   }
 }

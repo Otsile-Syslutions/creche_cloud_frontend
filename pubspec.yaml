@@ -36,6 +36,7 @@ dependencies:
   # Device Information
   device_info_plus: ^9.1.1
   package_info_plus: ^4.2.0
+  web: ^0.5.1
 
   # Fonts
   google_fonts: ^6.1.0

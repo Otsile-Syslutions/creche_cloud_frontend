@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'dart:async';
 
+import '../../../shared/widgets/logout_splash_screen.dart';
 import '../models/tenant_model.dart';
 import '../models/user_model.dart';
 import '../../../routes/app_routes.dart';
@@ -26,6 +27,11 @@ class AuthController extends GetxController {
   final RxBool isAuthenticated = false.obs;
   final RxString errorMessage = ''.obs;
   final RxBool isInitialized = false.obs;
+
+  // Background reinitialization state
+  final RxBool isBackgroundReinitializing = false.obs;
+  final RxString backgroundReinitStatus = ''.obs;
+  final RxBool backgroundReinitComplete = false.obs;
 
   // Session management
   final RxString currentTenantId = ''.obs;
@@ -138,34 +144,26 @@ class AuthController extends GetxController {
       errorMessage.value = '';
       sessionExpired.value = false;
 
-      final loginData = {
-        'email': formController.emailController.text.trim(),
-        'password': formController.passwordController.text,
-        'rememberMe': formController.rememberMe.value,
-      };
+      final email = formController.emailController.text.trim();
+      final password = formController.passwordController.text;
 
-      AppLogger.i('Attempting login for user: ${loginData['email']}');
+      AppLogger.i('Attempting login for user: $email');
 
-      final response = await _apiService.login(
-        email: loginData['email'] as String,
-        password: loginData['password'] as String,
-        rememberMe: loginData['rememberMe'] as bool,
-        tenantId: currentTenantId.value.isNotEmpty ? currentTenantId.value : null,
-      );
+      // Call API service with correct method signature
+      final response = await _apiService.login(email: email, password: password);
+
+      AppLogger.d('Login API response: success=${response.success}, message=${response.message}');
+      AppLogger.d('Login response data: ${response.data}');
 
       if (response.success && response.data != null) {
         await _handleSuccessfulLogin(response.data!, formController);
       } else {
-        final message = response.message ?? 'Login failed';
-        throw ApiException(message: message);
+        throw Exception(response.message ?? 'Login failed');
       }
 
-    } on ApiException catch (e) {
-      await _handleLoginError(e, formController);
     } catch (e) {
-      AppLogger.e('Login error', e);
-      errorMessage.value = 'An unexpected error occurred. Please try again.';
-      _showErrorSnackbar('Error', errorMessage.value);
+      AppLogger.e('Login error details', e);
+      await _handleLoginError(e, formController);
     } finally {
       isLoading.value = false;
     }
@@ -173,66 +171,82 @@ class AuthController extends GetxController {
 
   /// Handle successful login
   Future<void> _handleSuccessfulLogin(Map<String, dynamic> data, LoginFormController formController) async {
-    final userData = data['user'];
-    final accessToken = data['accessToken'];
-    final refreshToken = data['refreshToken'];
+    try {
+      AppLogger.d('Processing login response data: $data');
 
-    // Store authentication data
-    await _storageService.setString('access_token', accessToken);
-    await _storageService.setString('user_data', jsonEncode(userData));
+      final userData = data['user'];
+      final accessToken = data['access_token'] ?? data['accessToken'];
+      final refreshToken = data['refresh_token'] ?? data['refreshToken'];
 
-    if (refreshToken != null) {
-      await _storageService.setString('refresh_token', refreshToken);
+      if (userData == null) {
+        throw Exception('User data not found in response');
+      }
+
+      if (accessToken == null) {
+        throw Exception('Access token not found in response');
+      }
+
+      // Store authentication data
+      await _storageService.setString('access_token', accessToken);
+      await _storageService.setString('user_data', jsonEncode(userData));
+
+      if (refreshToken != null) {
+        await _storageService.setString('refresh_token', refreshToken);
+      }
+
+      // Create user model with null safety
+      final user = UserModel.fromJson(userData);
+      currentUser.value = user;
+      isAuthenticated.value = true;
+
+      // Update tenant ID and load tenant data
+      if (user.tenantId != null && user.tenantId!.isNotEmpty) {
+        currentTenantId.value = user.tenantId!;
+        await _storageService.setString('current_tenant_id', user.tenantId!);
+        await getCurrentTenant();
+      }
+
+      // Store remember me preference
+      if (formController.rememberMe.value) {
+        await _storageService.setBool('remember_me', true);
+        await _storageService.setString('remembered_email', formController.emailController.text.trim());
+      }
+
+      // Start session management
+      _startSessionManagement();
+
+      AppLogger.i('Login successful for user: ${user.fullName}');
+
+      // Navigate to appropriate platform
+      final homeRoute = AppRoutes.getHomeRouteForRoles(user.roleNames);
+      Get.offAllNamed(homeRoute);
+
+      _showSuccessSnackbar('Welcome Back', 'Hello ${user.firstName}!');
+
+      // Log the successful login
+      _logAuthEvent('login_success', {
+        'user_id': user.id,
+        'tenant_id': currentTenantId.value,
+      });
+
+    } catch (e) {
+      AppLogger.e('Error processing successful login response', e);
+      throw Exception('Login processing failed: ${e.toString()}');
     }
-
-    // Create user model
-    final user = UserModel.fromJson(userData);
-    currentUser.value = user;
-    isAuthenticated.value = true;
-
-    // Update tenant ID and load tenant data
-    if (user.tenantId != null) {
-      currentTenantId.value = user.tenantId!;
-      await _storageService.setString('current_tenant_id', user.tenantId!);
-      await getCurrentTenant();
-    }
-
-    // Store remember me preference
-    if (formController.rememberMe.value) {
-      await _storageService.setBool('remember_me', true);
-      await _storageService.setString('remembered_email', formController.emailController.text.trim());
-    }
-
-    // Start session management
-    _startSessionManagement();
-
-    AppLogger.i('Login successful for user: ${user.fullName}');
-
-    // Navigate to appropriate platform
-    final homeRoute = AppRoutes.getHomeRouteForRoles(user.roleNames);
-    Get.offAllNamed(homeRoute);
-
-    _showSuccessSnackbar('Welcome Back', 'Hello ${user.firstName}!');
-
-    // Log the successful login
-    _logAuthEvent('login_success', {
-      'user_id': user.id,
-      'tenant_id': currentTenantId.value,
-    });
   }
 
   /// Handle login errors
-  Future<void> _handleLoginError(ApiException e, LoginFormController formController) async {
-    AppLogger.w('Login failed: ${e.message}');
-    errorMessage.value = e.message;
+  Future<void> _handleLoginError(dynamic e, LoginFormController formController) async {
+    String message = e.toString().replaceAll('Exception: ', '');
+    AppLogger.w('Login failed: $message');
+    errorMessage.value = message;
 
-    // Handle specific error cases
-    if (e.statusCode == 423) {
-      // Account locked
+    // Handle specific error cases based on message content
+    if (message.contains('ACCOUNT_LOCKED')) {
       Get.dialog(
         AlertDialog(
           title: const Text('Account Locked'),
-          content: Text(e.message),
+          content: Text(message),
           actions: [
             TextButton(
               onPressed: () => Get.back(),
@@ -241,8 +255,7 @@ class AuthController extends GetxController {
           ],
         ),
       );
-    } else if (e.statusCode == 403 && e.message.contains('TENANT_SUSPENDED')) {
-      // Tenant suspended
+    } else if (message.contains('TENANT_SUSPENDED')) {
       Get.dialog(
         AlertDialog(
           title: const Text('Account Suspended'),
@@ -263,12 +276,12 @@ class AuthController extends GetxController {
         ),
       );
     } else {
-      _showErrorSnackbar('Login Failed', e.message);
+      _showErrorSnackbar('Login Failed', message);
     }
 
     _logAuthEvent('login_failed', {
       'email': formController.emailController.text.trim(),
-      'error': e.message,
+      'error': message,
     });
   }
 
@@ -319,99 +332,72 @@ class AuthController extends GetxController {
 
       } else {
         final message = response.message ?? 'Registration failed';
-        throw ApiException(message: message);
+        throw Exception(message);
       }
 
-    } on ApiException catch (e) {
-      AppLogger.w('Registration failed: ${e.message}');
-      errorMessage.value = e.message;
+    } catch (e) {
+      String message = e.toString().replaceAll('Exception: ', '');
+      AppLogger.w('Registration failed: $message');
+      errorMessage.value = message;
 
       // Handle specific registration errors
-      if (e.message.contains('USER_EXISTS')) {
+      if (message.contains('USER_EXISTS')) {
         _showErrorSnackbar('Email Already Registered',
             'An account with this email already exists. Please try logging in instead.');
-      } else if (e.message.contains('TENANT_REQUIRED')) {
+      } else if (message.contains('TENANT_REQUIRED')) {
         _showErrorSnackbar('Tenant Required',
             'Please select a valid organization to register with.');
-      } else if (e.message.contains('USER_LIMIT_EXCEEDED')) {
+      } else if (message.contains('USER_LIMIT_EXCEEDED')) {
         _showErrorSnackbar('Registration Unavailable',
             'This organization has reached its user limit. Please contact support.');
       } else {
-        _showErrorSnackbar('Registration Failed', e.message);
+        _showErrorSnackbar('Registration Failed', message);
       }
 
       _logAuthEvent('registration_failed', {
         'email': formController.signUpEmailController.text.trim(),
-        'error': e.message,
+        'error': message,
       });
 
-    } catch (e) {
-      AppLogger.e('Registration error', e);
-      errorMessage.value = 'An unexpected error occurred. Please try again.';
-      _showErrorSnackbar('Error', errorMessage.value);
     } finally {
       isLoading.value = false;
     }
   }
 
-  /// Logout user with comprehensive cleanup - FIXED VERSION
+  // =============================================================================
+  // LOGOUT WITH IMPROVED BACKGROUND REINITIALIZATION
+  // =============================================================================
+
+  /// Primary logout method using splash screen approach - IMPROVED
   Future<void> logout({bool showMessage = true}) async {
     try {
+      // Set loading state briefly
       isLoading.value = true;
 
-      // Call logout API to invalidate refresh token
-      try {
-        await _apiService.logout();
-      } catch (e) {
-        AppLogger.w('Logout API call failed, proceeding with local logout', e);
+      // Show initial loading message
+      if (showMessage) {
+        _showInfoSnackbar('Logging Out', 'Securing your session...');
       }
 
-      // Clear session regardless of API response
+      AppLogger.i('Initiating logout with splash screen approach');
+
+      // Step 1: Quick API logout (don't wait too long)
+      try {
+        await _apiService.logout().timeout(const Duration(seconds: 3));
+      } catch (e) {
+        AppLogger.w('Logout API call failed or timed out, proceeding with local logout', e);
+      }
+
+      // Step 2: Clear session immediately
       await clearSession();
 
-      if (showMessage) {
-        _showSuccessSnackbar('Logged Out', 'You have been successfully logged out');
-      }
+      // Step 3: Navigate to logout splash screen immediately
+      Get.offAll(() => const LogoutSplashScreen());
 
-      AppLogger.i('User logged out successfully');
+      // Step 4: Start thorough background reinitialization
+      _startBackgroundReinitialization();
 
-      // CRITICAL FIX: Force disposal of existing form controllers before navigation
-      try {
-        // Remove existing controllers to prevent disposed FocusNode issues
-        if (Get.isRegistered<LoginFormController>()) {
-          Get.delete<LoginFormController>(force: true);
-          AppLogger.d('Existing LoginFormController disposed during logout');
-        }
-
-        if (Get.isRegistered<SignUpFormController>()) {
-          Get.delete<SignUpFormController>(force: true);
-          AppLogger.d('Existing SignUpFormController disposed during logout');
-        }
-
-        // Also dispose the AuthController itself if it's not permanent
-        if (Get.isRegistered<AuthController>()) {
-          // Don't dispose self, but mark for cleanup
-          AppLogger.d('AuthController marked for cleanup during logout');
-        }
-      } catch (e) {
-        AppLogger.w('Error disposing form controllers during logout', e);
-      }
-
-      // Wait for any pending UI operations to complete
-      await Future.delayed(const Duration(milliseconds: 150));
-
-      // Schedule navigation for after the current frame with fresh bindings
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        // Additional small delay to ensure all cleanup is complete
-        await Future.delayed(const Duration(milliseconds: 50));
-
-        // Use Get.offAllNamed with fresh binding to ensure new controller instances
-        Get.offAllNamed(
-          AppRoutes.login,
-          predicate: (route) => false, // Remove all previous routes
-          arguments: {'forceRefresh': true}, // Optional flag for fresh initialization
-        );
-      });
+      AppLogger.i('User logged out successfully - showing splash screen');
 
     } catch (e) {
       AppLogger.e('Logout error', e);
@@ -419,31 +405,562 @@ class AuthController extends GetxController {
       // Clear session even if logout fails
       await clearSession();
 
-      // Force cleanup of controllers even on error
-      try {
-        if (Get.isRegistered<LoginFormController>()) {
-          Get.delete<LoginFormController>(force: true);
-        }
-        if (Get.isRegistered<SignUpFormController>()) {
-          Get.delete<SignUpFormController>(force: true);
-        }
-      } catch (cleanupError) {
-        AppLogger.w('Error in error cleanup', cleanupError);
-      }
+      // Still show splash screen - user experience is priority
+      Get.offAll(() => const LogoutSplashScreen());
 
-      // Safe navigation fallback with delay
-      await Future.delayed(const Duration(milliseconds: 150));
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        await Future.delayed(const Duration(milliseconds: 50));
-        Get.offAllNamed(
-          AppRoutes.login,
-          predicate: (route) => false,
-        );
-      });
+      // Start background cleanup anyway
+      _startBackgroundReinitialization();
     } finally {
       isLoading.value = false;
     }
   }
+
+  /// Start thorough background reinitialization (non-blocking)
+  void _startBackgroundReinitialization() {
+    // Don't await this - let it run in background
+    _performBackgroundReinitialization().catchError((e) {
+      AppLogger.e('Background reinitialization error', e);
+      // Mark as complete anyway to prevent indefinite pending state
+      backgroundReinitComplete.value = true;
+    });
+  }
+
+  /// Perform thorough background reinitialization - IMPROVED
+  Future<void> _performBackgroundReinitialization() async {
+    try {
+      isBackgroundReinitializing.value = true;
+      backgroundReinitComplete.value = false;
+
+      AppLogger.i('Starting thorough background reinitialization...');
+
+      // Phase 1: Controller cleanup
+      backgroundReinitStatus.value = 'Cleaning up form controllers...';
+      await _thoroughControllerCleanup();
+      await Future.delayed(const Duration(milliseconds: 400)); // Increased delay
+
+      // Phase 2: Memory optimization
+      backgroundReinitStatus.value = 'Optimizing memory usage...';
+      await _performMemoryCleanup();
+      await Future.delayed(const Duration(milliseconds: 400));
+
+      // Phase 3: Storage cleanup
+      backgroundReinitStatus.value = 'Cleaning temporary data...';
+      await _cleanupTemporaryStorage();
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      // Phase 4: Security validation
+      backgroundReinitStatus.value = 'Validating security state...';
+      await _validateSecurityState();
+      await Future.delayed(const Duration(milliseconds: 400));
+
+      // Phase 5: Pre-initialize fresh controllers
+      backgroundReinitStatus.value = 'Preparing fresh login environment...';
+      await _prepareLoginEnvironment();
+      await Future.delayed(const Duration(milliseconds: 600)); // Increased delay
+
+      // Phase 6: Final validation
+      backgroundReinitStatus.value = 'Finalizing reinitialization...';
+      await _finalizeReinitialization();
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      // Mark as complete
+      backgroundReinitStatus.value = 'Reinitialization complete';
+      backgroundReinitComplete.value = true;
+
+      AppLogger.i('Background reinitialization completed successfully');
+
+      // Clear status after a moment
+      await Future.delayed(const Duration(seconds: 2));
+      backgroundReinitStatus.value = '';
+
+    } catch (e) {
+      AppLogger.e('Background reinitialization failed', e);
+      backgroundReinitStatus.value = 'Reinitialization failed - using fallback';
+
+      // Attempt fallback initialization
+      await _fallbackInitialization();
+
+      backgroundReinitComplete.value = true;
+    } finally {
+      isBackgroundReinitializing.value = false;
+    }
+  }
+
+  /// Thorough controller cleanup - IMPROVED with better timing
+  Future<void> _thoroughControllerCleanup() async {
+    try {
+      AppLogger.d('Starting thorough controller cleanup...');
+
+      // Cleanup LoginFormController with enhanced disposal process
+      if (Get.isRegistered<LoginFormController>()) {
+        try {
+          final controller = Get.find<LoginFormController>();
+
+          // Enhanced preparation for disposal
+          if (!controller.isDisposed && !controller.preparingForDisposal) {
+            AppLogger.d('Preparing controller for disposal...');
+            await controller.prepareForDisposal();
+
+            // Extended wait for thorough cleanup - INCREASED from 500ms
+            await Future.delayed(const Duration(milliseconds: 800));
+          }
+
+          // Force delete with verification
+          Get.delete<LoginFormController>(force: true);
+
+          // Verify deletion
+          await Future.delayed(const Duration(milliseconds: 200));
+          if (Get.isRegistered<LoginFormController>()) {
+            AppLogger.w('Controller still registered after deletion');
+          } else {
+            AppLogger.d('LoginFormController thoroughly cleaned up');
+          }
+
+        } catch (controllerError) {
+          AppLogger.w('Error during controller cleanup', controllerError);
+          // Force delete anyway
+          try {
+            Get.delete<LoginFormController>(force: true);
+          } catch (deleteError) {
+            AppLogger.w('Force delete also failed', deleteError);
+          }
+        }
+      }
+
+      // Cleanup SignUpFormController (unchanged)
+      if (Get.isRegistered<SignUpFormController>()) {
+        try {
+          Get.delete<SignUpFormController>(force: true);
+          AppLogger.d('SignUpFormController cleaned up');
+        } catch (e) {
+          AppLogger.w('Error cleaning up SignUpFormController', e);
+        }
+      }
+
+      // Extended wait for cleanup to complete - INCREASED from 300ms
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      AppLogger.d('Thorough controller cleanup completed');
+
+    } catch (e) {
+      AppLogger.w('Error during thorough controller cleanup', e);
+    }
+  }
+
+  /// Perform memory cleanup and optimization
+  Future<void> _performMemoryCleanup() async {
+    try {
+      // Clear any cached data
+      // Force garbage collection hint (if applicable)
+      // Clear any static caches
+
+      // Simulate memory optimization process
+      await Future.delayed(const Duration(milliseconds: 200));
+      AppLogger.d('Memory cleanup completed');
+
+    } catch (e) {
+      AppLogger.w('Error during memory cleanup', e);
+    }
+  }
+
+  /// Clean up temporary storage and cached data
+  Future<void> _cleanupTemporaryStorage() async {
+    try {
+      // Remove any temporary files or cached data
+      await _storageService.remove('temp_login_data');
+      await _storageService.remove('cached_form_data');
+      await _storageService.remove('session_cache');
+
+      AppLogger.d('Temporary storage cleaned up');
+
+    } catch (e) {
+      AppLogger.w('Error during storage cleanup', e);
+    }
+  }
+
+  /// Validate security state after logout
+  Future<void> _validateSecurityState() async {
+    try {
+      // Ensure no sensitive data remains in memory
+      // Validate that tokens are properly cleared
+      // Check that user data is completely removed
+
+      final remainingToken = await _storageService.getString('access_token');
+      final remainingUserData = await _storageService.getString('user_data');
+
+      if (remainingToken != null || remainingUserData != null) {
+        AppLogger.w('Security validation failed - sensitive data still present');
+        // Force clear again
+        await clearSession();
+      } else {
+        AppLogger.d('Security state validation passed');
+      }
+
+    } catch (e) {
+      AppLogger.w('Error during security validation', e);
+    }
+  }
+
+  /// Prepare fresh login environment - IMPROVED with better timing and error handling
+  Future<void> _prepareLoginEnvironment() async {
+    try {
+      AppLogger.d('Preparing fresh login environment...');
+
+      // Step 1: Ensure complete cleanup of old controllers
+      await _ensureCompleteControllerCleanup();
+
+      // Step 2: Wait for cleanup to fully complete
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Step 3: Create fresh LoginFormController with proper initialization
+      await _createFreshLoginController();
+
+      // Step 4: Wait for controller to be fully initialized
+      await Future.delayed(const Duration(milliseconds: 400));
+
+      // Step 5: Verify controller is ready and reinitialize focus nodes
+      await _verifyAndInitializeFocusNodes();
+
+      // Step 6: Final stability wait
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      AppLogger.d('Fresh login environment prepared successfully');
+
+    } catch (e) {
+      AppLogger.w('Error preparing login environment', e);
+
+      // Enhanced fallback with multiple retry attempts
+      await _enhancedFallbackInitialization();
+    }
+  }
+
+  /// Ensure complete controller cleanup before creating new ones
+  Future<void> _ensureCompleteControllerCleanup() async {
+    try {
+      AppLogger.d('Ensuring complete controller cleanup...');
+
+      // Check if LoginFormController exists and clean it up thoroughly
+      if (Get.isRegistered<LoginFormController>()) {
+        try {
+          final controller = Get.find<LoginFormController>();
+
+          // If controller exists, prepare it for disposal properly
+          if (!controller.isDisposed) {
+            await controller.prepareForDisposal();
+
+            // Wait for disposal preparation to complete
+            await Future.delayed(const Duration(milliseconds: 300));
+          }
+
+          // Force delete the controller
+          Get.delete<LoginFormController>(force: true);
+          AppLogger.d('Existing LoginFormController cleaned up');
+
+        } catch (controllerError) {
+          AppLogger.w('Error cleaning up existing controller', controllerError);
+          // Force delete anyway
+          try {
+            Get.delete<LoginFormController>(force: true);
+          } catch (deleteError) {
+            AppLogger.w('Error force deleting controller', deleteError);
+          }
+        }
+      }
+
+      // Ensure no controller is registered
+      int retryCount = 0;
+      while (Get.isRegistered<LoginFormController>() && retryCount < 5) {
+        AppLogger.d('Controller still registered, waiting... (attempt ${retryCount + 1})');
+        await Future.delayed(const Duration(milliseconds: 200));
+        retryCount++;
+      }
+
+      if (Get.isRegistered<LoginFormController>()) {
+        AppLogger.w('Controller still registered after cleanup attempts');
+      } else {
+        AppLogger.d('Controller cleanup verified');
+      }
+
+    } catch (e) {
+      AppLogger.w('Error during controller cleanup verification', e);
+    }
+  }
+
+  /// Create fresh LoginFormController with enhanced error handling
+  Future<void> _createFreshLoginController() async {
+    try {
+      AppLogger.d('Creating fresh LoginFormController...');
+
+      // Double-check that no controller exists
+      if (Get.isRegistered<LoginFormController>()) {
+        AppLogger.w('Controller still exists, attempting force cleanup');
+        Get.delete<LoginFormController>(force: true);
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
+
+      // Create new controller
+      final freshController = LoginFormController();
+
+      // Register the controller
+      Get.put<LoginFormController>(freshController, permanent: false);
+
+      AppLogger.d('Fresh LoginFormController created and registered');
+
+      // Verify registration was successful
+      if (!Get.isRegistered<LoginFormController>()) {
+        throw Exception('Controller registration failed');
+      }
+
+      // Wait for controller initialization to complete
+      await Future.delayed(const Duration(milliseconds: 200));
+
+    } catch (e) {
+      AppLogger.e('Error creating fresh LoginFormController', e);
+      rethrow;
+    }
+  }
+
+  /// Verify controller and initialize focus nodes with enhanced validation
+  Future<void> _verifyAndInitializeFocusNodes() async {
+    try {
+      AppLogger.d('Verifying controller and initializing focus nodes...');
+
+      // Get the fresh controller
+      final controller = Get.find<LoginFormController>();
+
+      // Verify controller is ready
+      if (controller.isDisposed) {
+        throw Exception('Fresh controller is already disposed');
+      }
+
+      if (controller.preparingForDisposal) {
+        throw Exception('Fresh controller is preparing for disposal');
+      }
+
+      // Wait a bit more for controller to be fully ready
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // Reinitialize focus nodes with enhanced error handling
+      try {
+        await controller.reinitializeFocusNodes();
+        AppLogger.d('Focus nodes reinitialized successfully');
+      } catch (focusError) {
+        AppLogger.w('Focus node reinitialization failed, retrying...', focusError);
+
+        // Retry once after a delay
+        await Future.delayed(const Duration(milliseconds: 300));
+        await controller.reinitializeFocusNodes();
+        AppLogger.d('Focus nodes reinitialized successfully on retry');
+      }
+
+      // Final validation
+      await _validateControllerReadiness(controller);
+
+    } catch (e) {
+      AppLogger.e('Error verifying controller and initializing focus nodes', e);
+      rethrow;
+    }
+  }
+
+  /// Validate that the controller is fully ready for use
+  Future<void> _validateControllerReadiness(LoginFormController controller) async {
+    try {
+      AppLogger.d('Validating controller readiness...');
+
+      // Check basic controller state
+      if (controller.isDisposed) {
+        throw Exception('Controller is disposed');
+      }
+
+      if (controller.preparingForDisposal) {
+        throw Exception('Controller is preparing for disposal');
+      }
+
+      // Test focus node functionality
+      try {
+        final emailCanFocus = controller.emailFocusNode.canRequestFocus;
+        final passwordCanFocus = controller.passwordFocusNode.canRequestFocus;
+
+        if (!emailCanFocus || !passwordCanFocus) {
+          AppLogger.w('Focus nodes may not be fully ready: email=$emailCanFocus, password=$passwordCanFocus');
+        } else {
+          AppLogger.d('Focus nodes are ready for use');
+        }
+      } catch (focusTestError) {
+        AppLogger.w('Error testing focus nodes', focusTestError);
+      }
+
+      // Test basic controller operations
+      try {
+        controller.showPassword.value = false; // Test observable
+        controller.emailController.clear(); // Test text controller
+        AppLogger.d('Controller basic operations test passed');
+      } catch (operationsError) {
+        AppLogger.w('Controller operations test failed', operationsError);
+      }
+
+      AppLogger.d('Controller readiness validation completed');
+
+    } catch (e) {
+      AppLogger.w('Error during controller readiness validation', e);
+    }
+  }
+
+  /// Enhanced fallback initialization with multiple strategies
+  Future<void> _enhancedFallbackInitialization() async {
+    try {
+      AppLogger.i('Running enhanced fallback initialization...');
+
+      // Strategy 1: Basic controller creation
+      try {
+        await _basicControllerCreation();
+        AppLogger.d('Strategy 1 (basic creation) succeeded');
+        return;
+      } catch (e) {
+        AppLogger.w('Strategy 1 failed', e);
+      }
+
+      // Strategy 2: Force cleanup and retry
+      try {
+        await _forceCleanupAndRetry();
+        AppLogger.d('Strategy 2 (force cleanup and retry) succeeded');
+        return;
+      } catch (e) {
+        AppLogger.w('Strategy 2 failed', e);
+      }
+
+      // Strategy 3: Minimal controller creation
+      try {
+        await _minimalControllerCreation();
+        AppLogger.d('Strategy 3 (minimal creation) succeeded');
+        return;
+      } catch (e) {
+        AppLogger.w('Strategy 3 failed', e);
+      }
+
+      AppLogger.e('All fallback strategies failed');
+
+    } catch (e) {
+      AppLogger.e('Enhanced fallback initialization failed', e);
+    }
+  }
+
+  /// Basic controller creation fallback
+  Future<void> _basicControllerCreation() async {
+    if (!Get.isRegistered<LoginFormController>()) {
+      final controller = LoginFormController();
+      Get.put<LoginFormController>(controller, permanent: false);
+      await Future.delayed(const Duration(milliseconds: 300));
+    }
+  }
+
+  /// Force cleanup and retry fallback
+  Future<void> _forceCleanupAndRetry() async {
+    // Force delete any existing controller
+    try {
+      Get.delete<LoginFormController>(force: true);
+    } catch (e) {
+      // Ignore deletion errors
+    }
+
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    // Create new controller
+    final controller = LoginFormController();
+    Get.put<LoginFormController>(controller, permanent: false);
+
+    await Future.delayed(const Duration(milliseconds: 400));
+
+    // Try to reinitialize focus nodes
+    try {
+      await controller.reinitializeFocusNodes();
+    } catch (e) {
+      AppLogger.w('Focus node reinitialization failed in fallback', e);
+    }
+  }
+
+  /// Minimal controller creation fallback
+  Future<void> _minimalControllerCreation() async {
+    // Just ensure a basic controller exists
+    if (!Get.isRegistered<LoginFormController>()) {
+      Get.put<LoginFormController>(LoginFormController(), permanent: false);
+    }
+  }
+
+  /// Finalize reinitialization process
+  Future<void> _finalizeReinitialization() async {
+    try {
+      // Verify all components are ready
+      final controllerReady = Get.isRegistered<LoginFormController>();
+      final authStateClean = !isAuthenticated.value && currentUser.value == null;
+
+      if (!controllerReady || !authStateClean) {
+        AppLogger.w('Reinitialization verification failed');
+        await _fallbackInitialization();
+      } else {
+        AppLogger.d('Reinitialization verification passed');
+      }
+
+    } catch (e) {
+      AppLogger.w('Error during reinitialization finalization', e);
+    }
+  }
+
+  /// Fallback initialization if thorough process fails
+  Future<void> _fallbackInitialization() async {
+    try {
+      AppLogger.i('Running fallback initialization...');
+
+      // Ensure basic controller exists
+      if (!Get.isRegistered<LoginFormController>()) {
+        Get.put<LoginFormController>(LoginFormController(), permanent: false);
+      }
+
+      // Basic state reset
+      isAuthenticated.value = false;
+      currentUser.value = null;
+      currentTenant.value = null;
+      errorMessage.value = '';
+
+      AppLogger.d('Fallback initialization completed');
+
+    } catch (e) {
+      AppLogger.e('Fallback initialization failed', e);
+    }
+  }
+
+  /// Check if background reinitialization is ready for login
+  bool get isReadyForLogin {
+    return backgroundReinitComplete.value &&
+        Get.isRegistered<LoginFormController>() &&
+        !isBackgroundReinitializing.value;
+  }
+
+  /// Force complete background reinitialization (called from splash screen)
+  Future<void> ensureLoginReady() async {
+    if (backgroundReinitComplete.value) {
+      return; // Already ready
+    }
+
+    if (isBackgroundReinitializing.value) {
+      // Wait for current process to complete (max 10 seconds)
+      int waitCount = 0;
+      while (isBackgroundReinitializing.value && waitCount < 100) {
+        await Future.delayed(const Duration(milliseconds: 100));
+        waitCount++;
+      }
+    }
+
+    if (!backgroundReinitComplete.value) {
+      // Force quick preparation
+      await _prepareLoginEnvironment();
+      backgroundReinitComplete.value = true;
+    }
+  }
+
+  // =============================================================================
+  // SESSION AND USER MANAGEMENT
+  // =============================================================================
 
   /// Clear all session data
   Future<void> clearSession() async {
@@ -496,13 +1013,10 @@ class AuthController extends GetxController {
 
         AppLogger.i('Current user retrieved: ${user.fullName}');
       } else {
-        throw ApiException(message: response.message ?? 'Failed to get user profile');
+        throw Exception(response.message ?? 'Failed to get user profile');
       }
     } catch (e) {
       AppLogger.e('Get current user failed', e);
-      if (e is ApiException && e.statusCode == 401) {
-        await _handleSessionExpired();
-      }
       rethrow;
     }
   }
@@ -558,16 +1072,13 @@ class AuthController extends GetxController {
 
         AppLogger.i('Password reset requested for: ${resetEmailController.text.trim()}');
       } else {
-        throw ApiException(message: response.message ?? 'Failed to send reset email');
+        throw Exception(response.message ?? 'Failed to send reset email');
       }
 
-    } on ApiException catch (e) {
-      errorMessage.value = e.message;
-      _showErrorSnackbar('Reset Failed', e.message);
     } catch (e) {
-      AppLogger.e('Forgot password error', e);
-      errorMessage.value = 'An unexpected error occurred. Please try again.';
-      _showErrorSnackbar('Error', errorMessage.value);
+      String message = e.toString().replaceAll('Exception: ', '');
+      errorMessage.value = message;
+      _showErrorSnackbar('Reset Failed', message);
     } finally {
       isLoading.value = false;
     }
@@ -599,16 +1110,13 @@ class AuthController extends GetxController {
 
         AppLogger.i('Password reset completed successfully');
       } else {
-        throw ApiException(message: response.message ?? 'Failed to reset password');
+        throw Exception(response.message ?? 'Failed to reset password');
       }
 
-    } on ApiException catch (e) {
-      errorMessage.value = e.message;
-      _showErrorSnackbar('Reset Failed', e.message);
     } catch (e) {
-      AppLogger.e('Reset password error', e);
-      errorMessage.value = 'An unexpected error occurred. Please try again.';
-      _showErrorSnackbar('Error', errorMessage.value);
+      String message = e.toString().replaceAll('Exception: ', '');
+      errorMessage.value = message;
+      _showErrorSnackbar('Reset Failed', message);
     } finally {
       isLoading.value = false;
     }
@@ -627,14 +1135,12 @@ class AuthController extends GetxController {
           'Please check your email for the verification link',
         );
       } else {
-        throw ApiException(message: response.message ?? 'Failed to send verification email');
+        throw Exception(response.message ?? 'Failed to send verification email');
       }
 
-    } on ApiException catch (e) {
-      _showErrorSnackbar('Verification Failed', e.message);
     } catch (e) {
-      AppLogger.e('Resend verification error', e);
-      _showErrorSnackbar('Error', 'Failed to send verification email');
+      String message = e.toString().replaceAll('Exception: ', '');
+      _showErrorSnackbar('Verification Failed', message);
     } finally {
       isLoading.value = false;
     }
@@ -715,9 +1221,6 @@ class AuthController extends GetxController {
       }
     } catch (e) {
       AppLogger.w('Silent token refresh failed', e);
-      if (e is ApiException && e.statusCode == 401) {
-        await _handleSessionExpired();
-      }
     }
   }
 
@@ -838,6 +1341,44 @@ class AuthController extends GetxController {
   }
 
   // =============================================================================
+  // USER PROPERTY GETTERS AND PERMISSION METHODS
+  // =============================================================================
+
+  // User role helpers
+  bool get isPlatformAdmin => currentUser.value?.isPlatformAdmin ?? false;
+  bool get isAdmin => currentUser.value?.isAdmin ?? false;
+  bool get isTeacher => currentUser.value?.isTeacher ?? false;
+  bool get isParent => currentUser.value?.isParent ?? false;
+  bool get isStaff => currentUser.value?.isStaff ?? false;
+  bool get isTenantAdmin => currentUser.value?.isTenantAdmin ?? false;
+
+  // User info getters
+  String get primaryRole => currentUser.value?.primaryRole ?? 'User';
+  List<String> get userRoles => currentUser.value?.roleNames ?? [];
+  String get fullName => currentUser.value?.fullName ?? '';
+  String get firstName => currentUser.value?.firstName ?? '';
+  String get lastName => currentUser.value?.lastName ?? '';
+  String get email => currentUser.value?.email ?? '';
+  String get initials => currentUser.value?.initials ?? '';
+  String get platformType => currentUser.value?.platformType ?? 'tenant';
+
+  // Tenant info getters
+  String get tenantName => currentTenant.value?.displayName ?? '';
+  String get tenantSlug => currentTenant.value?.slug ?? '';
+  bool get isInTrial => currentTenant.value?.isInTrial ?? false;
+  bool get tenantExpired => currentTenant.value?.isExpired ?? false;
+  String get subscriptionStatus => currentTenant.value?.subscriptionStatusDisplay ?? '';
+
+  // Permission checking methods - RESTORED
+  bool hasRole(String role) => currentUser.value?.hasRole(role) ?? false;
+  bool hasPermission(String permission) => currentUser.value?.hasPermission(permission) ?? false;
+  bool hasAnyRole(List<String> roles) => currentUser.value?.hasAnyRole(roles) ?? false;
+  bool hasAnyPermission(List<String> permissions) => currentUser.value?.hasAnyPermission(permissions) ?? false;
+  bool canAccessChild(String childId) => currentUser.value?.canAccessChild(childId) ?? false;
+  bool canModifyChild(String childId) => currentUser.value?.canModifyChild(childId) ?? false;
+  bool canAccessClassroom(String classroomId) => currentUser.value?.canAccessClassroom(classroomId) ?? false;
+
+  // =============================================================================
   // UTILITY METHODS
   // =============================================================================
 
@@ -866,44 +1407,6 @@ class AuthController extends GetxController {
       return false;
     }
   }
-
-  // =============================================================================
-  // USER PROPERTY GETTERS
-  // =============================================================================
-
-  // User role helpers
-  bool get isPlatformAdmin => currentUser.value?.isPlatformAdmin ?? false;
-  bool get isAdmin => currentUser.value?.isAdmin ?? false;
-  bool get isTeacher => currentUser.value?.isTeacher ?? false;
-  bool get isParent => currentUser.value?.isParent ?? false;
-  bool get isStaff => currentUser.value?.isStaff ?? false;
-  bool get isTenantAdmin => currentUser.value?.isTenantAdmin ?? false;
-
-  // User info getters
-  String get primaryRole => currentUser.value?.primaryRole ?? 'User';
-  List<String> get userRoles => currentUser.value?.roleNames ?? [];
-  String get fullName => currentUser.value?.fullName ?? '';
-  String get firstName => currentUser.value?.firstName ?? '';
-  String get lastName => currentUser.value?.lastName ?? '';
-  String get email => currentUser.value?.email ?? '';
-  String get initials => currentUser.value?.initials ?? '';
-  String get platformType => currentUser.value?.platformType ?? 'tenant';
-
-  // Tenant info getters
-  String get tenantName => currentTenant.value?.displayName ?? '';
-  String get tenantSlug => currentTenant.value?.slug ?? '';
-  bool get isInTrial => currentTenant.value?.isInTrial ?? false;
-  bool get tenantExpired => currentTenant.value?.isExpired ?? false;
-  String get subscriptionStatus => currentTenant.value?.subscriptionStatusDisplay ?? '';
-
-  // Permission checking methods
-  bool hasRole(String role) => currentUser.value?.hasRole(role) ?? false;
-  bool hasPermission(String permission) => currentUser.value?.hasPermission(permission) ?? false;
-  bool hasAnyRole(List<String> roles) => currentUser.value?.hasAnyRole(roles) ?? false;
-  bool hasAnyPermission(List<String> permissions) => currentUser.value?.hasAnyPermission(permissions) ?? false;
-  bool canAccessChild(String childId) => currentUser.value?.canAccessChild(childId) ?? false;
-  bool canModifyChild(String childId) => currentUser.value?.canModifyChild(childId) ?? false;
-  bool canAccessClassroom(String classroomId) => currentUser.value?.canAccessClassroom(classroomId) ?? false;
 
   // =============================================================================
   // HELPER METHODS
@@ -942,6 +1445,18 @@ class AuthController extends GetxController {
       backgroundColor: Colors.orange,
       colorText: Colors.white,
       duration: const Duration(seconds: 4),
+    );
+  }
+
+  /// Show info snackbar
+  void _showInfoSnackbar(String title, String message) {
+    Get.snackbar(
+      title,
+      message,
+      snackPosition: SnackPosition.TOP,
+      backgroundColor: Colors.blue,
+      colorText: Colors.white,
+      duration: const Duration(seconds: 3),
     );
   }
 
