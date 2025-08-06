@@ -12,8 +12,8 @@ import '../../../core/services/api_service.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/config/env.dart';
 import '../../../utils/app_logger.dart';
-import 'login_form_controller.dart';
-import 'signup_form_controller.dart';
+import '../views/login/controllers/login_form_controller.dart';
+import '../views/sign_up/controllers/signup_form_controller.dart';
 
 class AuthController extends GetxController {
   // Services

@@ -1,8 +1,8 @@
 // lib/features/auth/bindings/auth_binding.dart
 import 'package:get/get.dart';
 import '../controllers/auth_controller.dart';
-import '../controllers/login_form_controller.dart';
-import '../controllers/signup_form_controller.dart';
+import '../views/login/controllers/login_form_controller.dart';
+import '../views/sign_up/controllers/signup_form_controller.dart';
 
 class AuthBinding extends Bindings {
   @override

@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../controllers/auth_controller.dart';
-import '../../../controllers/signup_form_controller.dart';
+import '../controllers/signup_form_controller.dart';
 import '../../../../../constants/app_strings.dart';
 import '../../../../../constants/app_colors.dart';
 import '../../../../../routes/app_routes.dart';

@@ -2,7 +2,7 @@
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
-import '../../../constants/app_strings.dart';
+import '../../../../../constants/app_strings.dart';
 
 class SignUpFormController extends GetxController with GetTickerProviderStateMixin {
   // Observable variables for signup form
