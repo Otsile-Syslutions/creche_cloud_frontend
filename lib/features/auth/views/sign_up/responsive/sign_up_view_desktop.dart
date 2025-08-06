@@ -1,6 +1,7 @@
 // lib/features/auth/views/sign_up/responsive/sign_up_view_desktop.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'dart:ui';
 import '../../../../../routes/app_routes.dart';
 import '../../../controllers/auth_controller.dart';
 import '../../../../../constants/app_colors.dart';
@@ -302,6 +303,74 @@ class SignUpViewDesktop extends GetView<AuthController> {
                         ),
                       ),
                     ],
+                  ),
+                ),
+              ),
+
+              // Frosted grey opaque rectangle below "For Parents" badge
+              Positioned(
+                left: screenWidth * 0.06,
+                top: screenHeight * 0.32 + (60 * scaleFactor).clamp(48.0, 72.0) + (16 * scaleFactor).clamp(12.0, 20.0),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular((12 * scaleFactor).clamp(9.0, 15.0)),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Container(
+                      width: (246 * scaleFactor).clamp(184.5, 307.5),
+                      height: (158 * scaleFactor).clamp(118.5, 197.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD0D0D0).withOpacity(0.4), // More transparent
+                        borderRadius: BorderRadius.circular((12 * scaleFactor).clamp(9.0, 15.0)),
+                      ),
+                      child: Stack(
+                        children: [
+                          // Purple square in top left
+                          Positioned(
+                            top: (8 * scaleFactor).clamp(6.0, 12.0),
+                            left: (8 * scaleFactor).clamp(6.0, 12.0),
+                            child: Container(
+                              width: (40 * scaleFactor).clamp(22.5, 37.5),
+                              height: (40 * scaleFactor).clamp(22.5, 37.5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF875DEC),
+                                borderRadius: BorderRadius.circular((8 * scaleFactor).clamp(6.0, 10.0)),
+                              ),
+                            ),
+                          ),
+
+                          // Teddy bear image stacked in front of the square
+                          Positioned(
+                            top: (8 * scaleFactor).clamp(6.0, 12.0),
+                            left: (8 * scaleFactor).clamp(6.0, 12.0),
+                            child: Image.asset(
+                              'assets/doodles/doodle_teddy.png',
+                              width: (56 * scaleFactor).clamp(42.0, 70.0),
+                              height: (56 * scaleFactor).clamp(42.0, 70.0),
+                            ),
+                          ),
+
+                          // Text at bottom
+                          Positioned(
+                            bottom: (12 * scaleFactor).clamp(9.0, 15.0),
+                            left: (12 * scaleFactor).clamp(9.0, 15.0),
+                            right: (12 * scaleFactor).clamp(9.0, 15.0),
+                            child: Text(
+                              "Every Step Of Your Child's Creche Journey!",
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: (12 * scaleFactor).clamp(9.0, 15.0),
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                                height: 1.2,
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
