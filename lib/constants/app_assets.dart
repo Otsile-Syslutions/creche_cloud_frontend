@@ -6,6 +6,8 @@ class AppAssets {
   static const String placeholder = 'assets/images/placeholder.png';
   static const String avatar = 'assets/images/avatar.png';
   static const String loginBackground = 'assets/images/login_bg.jpg';
+  static const String signupBackground = 'assets/images/signup_bg.png';
+
 
   // Logos
   static const String ccLogoFullColour = 'assets/logos/cc_logo_full_colour.png';
@@ -13,6 +15,7 @@ class AppAssets {
   // Doodles
   static const String doodlePinkSquiggleLines = 'assets/doodles/doodle_pink_squiggle_lines.png';
   static const String doodleYellowHalfCircle = 'assets/doodles/doodle_yellow_half_circle.png';
+  static const String doodlePowderBlue = 'assets/doodles/doodle_powder_blue.png';
   static const String pinkDot = 'assets/doodles/pink_dot.png';
   static const String yellowDot = 'assets/doodles/yellow_dot.png';
 
