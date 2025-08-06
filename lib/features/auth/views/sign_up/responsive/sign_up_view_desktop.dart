@@ -4,9 +4,9 @@ import 'package:get/get.dart';
 import 'dart:ui';
 import 'dart:math' as math;
 import '../../../../../routes/app_routes.dart';
-import '../../../controllers/auth_controller.dart';
 import '../../../../../constants/app_colors.dart';
 import '../../../../../constants/app_assets.dart';
+import '../../login/controllers/login_form_controller.dart';
 import '../components/sign_up_role_buttons.dart';
 
 class SignUpViewDesktop extends StatefulWidget {
@@ -177,7 +177,33 @@ class _SignUpViewDesktopState extends State<SignUpViewDesktop>
                                         ),
                                         SizedBox(width: 8 * scaleFactor),
                                         TextButton(
-                                          onPressed: () => Get.toNamed(AppRoutes.login),
+                                          onPressed: () {
+                                            final navigationFuture = Get.toNamed(AppRoutes.login);
+                                            if (navigationFuture != null) {
+                                              navigationFuture.then((_) {
+                                                // Focus email field after navigation completes
+                                                Future.delayed(const Duration(milliseconds: 100), () {
+                                                  try {
+                                                    // Try to get the login form controller and focus email field
+                                                    final loginController = Get.find<LoginFormController>();
+                                                    loginController.focusEmailField();
+                                                  } catch (e) {
+                                                    print('Could not focus email field: $e');
+                                                  }
+                                                });
+                                              });
+                                            } else {
+                                              // Fallback: try to focus after a longer delay if navigation was immediate
+                                              Future.delayed(const Duration(milliseconds: 300), () {
+                                                try {
+                                                  final loginController = Get.find<LoginFormController>();
+                                                  loginController.focusEmailField();
+                                                } catch (e) {
+                                                  print('Could not focus email field in fallback: $e');
+                                                }
+                                              });
+                                            }
+                                          },
                                           child: Text(
                                             "Login!",
                                             style: TextStyle(

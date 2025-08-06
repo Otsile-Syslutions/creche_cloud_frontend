@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import '../../../../../constants/app_strings.dart';
+import '../../../../../utils/app_logger.dart';
 
 class SignUpFormController extends GetxController with GetTickerProviderStateMixin {
   // Observable variables for signup form
@@ -32,8 +33,8 @@ class SignUpFormController extends GetxController with GetTickerProviderStateMix
   final TextEditingController signUpPasswordController = TextEditingController();
   final TextEditingController confirmSignUpPasswordController = TextEditingController();
 
-  // Form key
-  final GlobalKey<FormState> signUpFormKey = GlobalKey<FormState>();
+  // Form key - No longer needed, handled directly in widget
+  // late GlobalKey<FormState> signUpFormKey;
 
   // Animation controllers for shake effect
   AnimationController? firstNameShakeController;
@@ -50,8 +51,11 @@ class SignUpFormController extends GetxController with GetTickerProviderStateMix
   @override
   void onInit() {
     super.onInit();
+
     _initializeAnimations();
     _setupTextListeners();
+
+    AppLogger.d('SignUpFormController initialized successfully');
   }
 
   void _initializeAnimations() {

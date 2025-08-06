@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../controllers/auth_controller.dart';
 import '../controllers/signup_form_controller.dart';
+import '../../login/controllers/login_form_controller.dart';
 import '../../../../../constants/app_strings.dart';
 import '../../../../../constants/app_colors.dart';
 import '../../../../../routes/app_routes.dart';
@@ -35,264 +36,274 @@ class SignUpForm extends GetView<SignUpFormController> {
         final regularBorderRadius = 12.0.responsive(context);
         final contentPadding = EdgeInsets.symmetric(horizontal: 16, vertical: 24).responsive(context);
 
-        return Form(
-          key: controller.signUpFormKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // First Name Field
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: centerPadding),
-                child: SizedBox(
-                  height: fieldHeight,
-                  child: _buildAnimatedField(
-                    animation: controller.firstNameShakeAnimation,
-                    child: _buildTextFormField(
-                      context: context,
-                      controller: controller.firstNameController,
-                      errorObservable: controller.firstNameError,
-                      labelText: 'First Name',
-                      hintText: 'Enter your first name',
-                      keyboardType: TextInputType.name,
-                      focusColor: focusColor,
-                      errorColor: errorColor,
-                      fontSize: fontSize,
-                      borderRadius: borderRadius,
-                      regularBorderRadius: regularBorderRadius,
-                      contentPadding: contentPadding,
+        // CRITICAL FIX: Generate unique GlobalKey in build method instead of controller
+        return Builder(
+          builder: (context) {
+            // Generate a fresh GlobalKey every time this widget builds
+            final formKey = GlobalKey<FormState>(
+                debugLabel: 'signUpForm_${DateTime.now().millisecondsSinceEpoch}_${DateTime.now().microsecond}_${context.hashCode}'
+            );
+
+            return Form(
+              key: formKey, // Always gets a completely fresh unique key
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // First Name Field
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: centerPadding),
+                    child: SizedBox(
+                      height: fieldHeight,
+                      child: _buildAnimatedField(
+                        animation: controller.firstNameShakeAnimation,
+                        child: _buildTextFormField(
+                          context: context,
+                          controller: controller.firstNameController,
+                          errorObservable: controller.firstNameError,
+                          labelText: 'First Name',
+                          hintText: 'Enter your first name',
+                          keyboardType: TextInputType.name,
+                          focusColor: focusColor,
+                          errorColor: errorColor,
+                          fontSize: fontSize,
+                          borderRadius: borderRadius,
+                          regularBorderRadius: regularBorderRadius,
+                          contentPadding: contentPadding,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
 
-              SizedBox(height: verticalSpacing),
+                  SizedBox(height: verticalSpacing),
 
-              // Last Name Field
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: centerPadding),
-                child: SizedBox(
-                  height: fieldHeight,
-                  child: _buildAnimatedField(
-                    animation: controller.lastNameShakeAnimation,
-                    child: _buildTextFormField(
-                      context: context,
-                      controller: controller.lastNameController,
-                      errorObservable: controller.lastNameError,
-                      labelText: 'Last Name',
-                      hintText: 'Enter your last name',
-                      keyboardType: TextInputType.name,
-                      focusColor: focusColor,
-                      errorColor: errorColor,
-                      fontSize: fontSize,
-                      borderRadius: borderRadius,
-                      regularBorderRadius: regularBorderRadius,
-                      contentPadding: contentPadding,
+                  // Last Name Field
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: centerPadding),
+                    child: SizedBox(
+                      height: fieldHeight,
+                      child: _buildAnimatedField(
+                        animation: controller.lastNameShakeAnimation,
+                        child: _buildTextFormField(
+                          context: context,
+                          controller: controller.lastNameController,
+                          errorObservable: controller.lastNameError,
+                          labelText: 'Last Name',
+                          hintText: 'Enter your last name',
+                          keyboardType: TextInputType.name,
+                          focusColor: focusColor,
+                          errorColor: errorColor,
+                          fontSize: fontSize,
+                          borderRadius: borderRadius,
+                          regularBorderRadius: regularBorderRadius,
+                          contentPadding: contentPadding,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
 
-              SizedBox(height: verticalSpacing),
+                  SizedBox(height: verticalSpacing),
 
-              // Email Field
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: centerPadding),
-                child: SizedBox(
-                  height: fieldHeight,
-                  child: _buildAnimatedField(
-                    animation: controller.signUpEmailShakeAnimation,
-                    child: _buildTextFormField(
-                      context: context,
-                      controller: controller.signUpEmailController,
-                      errorObservable: controller.signUpEmailError,
-                      labelText: AppStrings.email,
-                      hintText: 'Enter your email address',
-                      keyboardType: TextInputType.emailAddress,
-                      focusColor: focusColor,
-                      errorColor: errorColor,
-                      fontSize: fontSize,
-                      borderRadius: borderRadius,
-                      regularBorderRadius: regularBorderRadius,
-                      contentPadding: contentPadding,
+                  // Email Field
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: centerPadding),
+                    child: SizedBox(
+                      height: fieldHeight,
+                      child: _buildAnimatedField(
+                        animation: controller.signUpEmailShakeAnimation,
+                        child: _buildTextFormField(
+                          context: context,
+                          controller: controller.signUpEmailController,
+                          errorObservable: controller.signUpEmailError,
+                          labelText: AppStrings.email,
+                          hintText: 'Enter your email address',
+                          keyboardType: TextInputType.emailAddress,
+                          focusColor: focusColor,
+                          errorColor: errorColor,
+                          fontSize: fontSize,
+                          borderRadius: borderRadius,
+                          regularBorderRadius: regularBorderRadius,
+                          contentPadding: contentPadding,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
 
-              SizedBox(height: verticalSpacing),
+                  SizedBox(height: verticalSpacing),
 
-              // Password Field
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: centerPadding),
-                child: SizedBox(
-                  height: fieldHeight,
-                  child: _buildAnimatedField(
-                    animation: controller.signUpPasswordShakeAnimation,
-                    child: _buildPasswordField(
-                      context: context,
-                      controller: controller.signUpPasswordController,
-                      errorObservable: controller.signUpPasswordError,
-                      showPasswordObservable: controller.showSignUpPassword,
-                      onToggleVisibility: controller.toggleSignUpPasswordVisibility,
-                      labelText: AppStrings.password,
-                      hintText: 'Enter a secure password',
-                      focusColor: focusColor,
-                      errorColor: errorColor,
-                      fontSize: fontSize,
-                      borderRadius: borderRadius,
-                      regularBorderRadius: regularBorderRadius,
-                      contentPadding: contentPadding,
+                  // Password Field
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: centerPadding),
+                    child: SizedBox(
+                      height: fieldHeight,
+                      child: _buildAnimatedField(
+                        animation: controller.signUpPasswordShakeAnimation,
+                        child: _buildPasswordField(
+                          context: context,
+                          controller: controller.signUpPasswordController,
+                          errorObservable: controller.signUpPasswordError,
+                          showPasswordObservable: controller.showSignUpPassword,
+                          onToggleVisibility: controller.toggleSignUpPasswordVisibility,
+                          labelText: AppStrings.password,
+                          hintText: 'Enter a secure password',
+                          focusColor: focusColor,
+                          errorColor: errorColor,
+                          fontSize: fontSize,
+                          borderRadius: borderRadius,
+                          regularBorderRadius: regularBorderRadius,
+                          contentPadding: contentPadding,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
 
-              SizedBox(height: verticalSpacing),
+                  SizedBox(height: verticalSpacing),
 
-              // Confirm Password Field
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: centerPadding),
-                child: SizedBox(
-                  height: fieldHeight,
-                  child: _buildAnimatedField(
-                    animation: controller.confirmSignUpPasswordShakeAnimation,
-                    child: _buildPasswordField(
-                      context: context,
-                      controller: controller.confirmSignUpPasswordController,
-                      errorObservable: controller.confirmSignUpPasswordError,
-                      showPasswordObservable: controller.showConfirmSignUpPassword,
-                      onToggleVisibility: controller.toggleConfirmSignUpPasswordVisibility,
-                      labelText: 'Confirm Password',
-                      hintText: 'Confirm your password',
-                      focusColor: focusColor,
-                      errorColor: errorColor,
-                      fontSize: fontSize,
-                      borderRadius: borderRadius,
-                      regularBorderRadius: regularBorderRadius,
-                      contentPadding: contentPadding,
+                  // Confirm Password Field
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: centerPadding),
+                    child: SizedBox(
+                      height: fieldHeight,
+                      child: _buildAnimatedField(
+                        animation: controller.confirmSignUpPasswordShakeAnimation,
+                        child: _buildPasswordField(
+                          context: context,
+                          controller: controller.confirmSignUpPasswordController,
+                          errorObservable: controller.confirmSignUpPasswordError,
+                          showPasswordObservable: controller.showConfirmSignUpPassword,
+                          onToggleVisibility: controller.toggleConfirmSignUpPasswordVisibility,
+                          labelText: 'Confirm Password',
+                          hintText: 'Confirm your password',
+                          focusColor: focusColor,
+                          errorColor: errorColor,
+                          fontSize: fontSize,
+                          borderRadius: borderRadius,
+                          regularBorderRadius: regularBorderRadius,
+                          contentPadding: contentPadding,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
 
-              SizedBox(height: 16.0.responsivePadding(context)),
+                  SizedBox(height: 16.0.responsivePadding(context)),
 
-              // Terms and Conditions
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: centerPadding),
-                child: Row(
-                  children: [
-                    Obx(() => Transform.scale(
-                      scale: ResponsiveLayoutHelper.scale(context, 0.8, minValue: 0.6, maxValue: 1.0),
-                      child: Checkbox(
-                        value: controller.acceptTerms.value,
-                        onChanged: (value) => controller.toggleAcceptTerms(),
-                        activeColor: AppColors.signupPink,
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  // Terms and Conditions
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: centerPadding),
+                    child: Row(
+                      children: [
+                        Obx(() => Transform.scale(
+                          scale: ResponsiveLayoutHelper.scale(context, 0.8, minValue: 0.6, maxValue: 1.0),
+                          child: Checkbox(
+                            value: controller.acceptTerms.value,
+                            onChanged: (value) => controller.toggleAcceptTerms(),
+                            activeColor: AppColors.signupPink,
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        )),
+                        SizedBox(width: 8.0.responsivePadding(context)),
+                        Expanded(
+                          child: RichText(
+                            text: TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: 'I accept the ',
+                                  style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 14.0.responsiveFont(context),
+                                    color: AppColors.black,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: 'Terms and Conditions',
+                                  style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 14.0.responsiveFont(context),
+                                    color: AppColors.signupPink,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  SizedBox(height: 32.0.responsivePadding(context)),
+
+                  // Sign Up Button
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: centerPadding),
+                    child: Obx(() => SizedBox(
+                      width: double.infinity,
+                      height: buttonHeight,
+                      child: ElevatedButton(
+                        onPressed: authController.isLoading.value ? null : () {
+                          authController.signUp();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.signupPink,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(regularBorderRadius),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: authController.isLoading.value
+                            ? SizedBox(
+                          width: 20.0.responsiveIcon(context),
+                          height: 20.0.responsiveIcon(context),
+                          child: const CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                            : Text(
+                          'Sign Up',
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 16.0.responsiveFont(context),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     )),
-                    SizedBox(width: 8.0.responsivePadding(context)),
-                    Expanded(
-                      child: RichText(
-                        text: TextSpan(
-                          children: [
-                            TextSpan(
-                              text: 'I accept the ',
-                              style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 14.0.responsiveFont(context),
-                                color: AppColors.black,
-                              ),
-                            ),
-                            TextSpan(
-                              text: 'Terms and Conditions',
-                              style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 14.0.responsiveFont(context),
-                                color: AppColors.signupPink,
-                                decoration: TextDecoration.underline,
-                              ),
-                            ),
-                          ],
+                  ),
+
+                  SizedBox(height: 24.0.responsivePadding(context)),
+
+                  // Back to Login
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: centerPadding),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          "Already have an account?",
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 14.0.responsiveFont(context),
+                            color: AppColors.black,
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              SizedBox(height: 32.0.responsivePadding(context)),
-
-              // Sign Up Button
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: centerPadding),
-                child: Obx(() => SizedBox(
-                  width: double.infinity,
-                  height: buttonHeight,
-                  child: ElevatedButton(
-                    onPressed: authController.isLoading.value ? null : () {
-                      authController.signUp();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.signupPink,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(regularBorderRadius),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: authController.isLoading.value
-                        ? SizedBox(
-                      width: 20.0.responsiveIcon(context),
-                      height: 20.0.responsiveIcon(context),
-                      child: const CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                    )
-                        : Text(
-                      'Sign Up',
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 16.0.responsiveFont(context),
-                        fontWeight: FontWeight.w600,
-                      ),
+                        SizedBox(width: 8.0.responsivePadding(context)),
+                        TextButton(
+                          onPressed: () => Get.toNamed(AppRoutes.login),
+                          child: Text(
+                            'Login',
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 14.0.responsiveFont(context),
+                              color: AppColors.loginButton,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                )),
+                ],
               ),
-
-              SizedBox(height: 24.0.responsivePadding(context)),
-
-              // Back to Login
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: centerPadding),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      "Already have an account?",
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 14.0.responsiveFont(context),
-                        color: AppColors.black,
-                      ),
-                    ),
-                    SizedBox(width: 8.0.responsivePadding(context)),
-                    TextButton(
-                      onPressed: () => Get.toNamed(AppRoutes.login),
-                      child: Text(
-                        'Login',
-                        style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 14.0.responsiveFont(context),
-                          color: AppColors.loginButton,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -407,6 +418,32 @@ class SignUpForm extends GetView<SignUpFormController> {
         },
       ),
     );
+  }
+
+  /// Navigate back to login with proper focus management
+  void _navigateBackToLogin() {
+    // Navigate to login
+    Get.toNamed(AppRoutes.login);
+
+    // Focus email field when returning to login
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 100), () {
+        try {
+          // Get the login controller and call onReturnToView
+          final loginController = Get.find<LoginFormController>();
+          loginController.onReturnToView();
+        } catch (e) {
+          // Controller might not be ready yet, fallback to direct focus
+          Future.delayed(const Duration(milliseconds: 200), () {
+            try {
+              Get.find<LoginFormController>().focusEmailField();
+            } catch (e) {
+              // Ignore if controller is not available
+            }
+          });
+        }
+      });
+    });
   }
 
   Widget _buildPasswordField({

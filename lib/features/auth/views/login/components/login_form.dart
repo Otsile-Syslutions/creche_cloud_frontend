@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../../controllers/auth_controller.dart';
-import '../../../controllers/login_form_controller.dart';
+import '../controllers/login_form_controller.dart';
 import '../../../../../constants/app_strings.dart';
 import '../../../../../constants/app_colors.dart';
 import '../../../../../routes/app_routes.dart';
@@ -455,13 +455,17 @@ class LoginForm extends GetView<LoginFormController> {
                     ),
                   ),
 
-                  // Recover Password Link
+                  // Recover Password Link - Updated to call navigation tracking
                   FocusTraversalOrder(
                     order: const NumericFocusOrder(4),
                     child: Focus(
                       focusNode: controller.recoverPasswordFocusNode,
                       child: _RecoverPasswordButton(
-                        onPressed: () => Get.toNamed(AppRoutes.forgotPassword),
+                        onPressed: () {
+                          // Set navigation flag before navigating
+                          controller.setNavigatingToRecoverPassword();
+                          Get.toNamed(AppRoutes.forgotPassword);
+                        },
                         fontSize: socialButtonFontSize,
                       ),
                     ),
@@ -663,20 +667,30 @@ class LoginForm extends GetView<LoginFormController> {
             policy: OrderedTraversalPolicy(),
             child: AutofillGroup(
               onDisposeAction: AutofillContextAction.commit,
-              child: Form(
-                key: controller.loginFormKey,
-                onChanged: () {
-                  // Trigger autofill save when remember me is enabled
-                  if (controller.rememberMe.value) {
-                    Form.of(context).save();
-                  }
+              // CRITICAL FIX: Generate unique GlobalKey in build method instead of controller
+              child: Builder(
+                builder: (context) {
+                  // Generate a fresh GlobalKey every time this widget builds
+                  final formKey = GlobalKey<FormState>(
+                      debugLabel: 'loginForm_${DateTime.now().millisecondsSinceEpoch}_${DateTime.now().microsecond}_${context.hashCode}'
+                  );
+
+                  return Form(
+                    key: formKey, // Always gets a completely fresh unique key
+                    onChanged: () {
+                      // Trigger autofill save when remember me is enabled
+                      if (controller.rememberMe.value) {
+                        Form.of(context).save();
+                      }
+                    },
+                    child: needsScrollView
+                        ? SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: formContent,
+                    )
+                        : formContent,
+                  );
                 },
-                child: needsScrollView
-                    ? SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  child: formContent,
-                )
-                    : formContent,
               ),
             ));
       },

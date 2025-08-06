@@ -3,9 +3,9 @@ import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
-import '../../../constants/app_strings.dart';
-import '../../../utils/app_logger.dart';
-import 'auth_controller.dart';
+import '../../../../../constants/app_strings.dart';
+import '../../../../../utils/app_logger.dart';
+import '../../../controllers/auth_controller.dart';
 
 class LoginFormController extends GetxController with GetTickerProviderStateMixin {
   // Add a disposed flag to prevent operations on disposed controllers
@@ -19,6 +19,13 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
   // Add ready flag for initialization check
   bool _isReady = false;
   bool get isReady => _isReady;
+
+  // Navigation tracking flags to prevent validation during navigation
+  bool _isNavigatingToSignup = false;
+  bool _isNavigatingToRecoverPassword = false;
+
+  // Timer for delayed error display
+  Timer? _validationDelayTimer;
 
   // Observable variables for login form
   final RxBool showPassword = false.obs;
@@ -37,8 +44,37 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
-  // Form key
-  final GlobalKey<FormState> loginFormKey = GlobalKey<FormState>();
+  // Form key - No longer needed, handled directly in widget
+  // late GlobalKey<FormState> loginFormKey;
+
+  /// Method to call when returning to login view to ensure proper state and focus
+  void onReturnToView() {
+    if (_isDisposed || _preparingForDisposal || !_isReady) {
+      AppLogger.w('Cannot handle return to view - controller not ready');
+      return;
+    }
+
+    AppLogger.d('Returning to login view - resetting state and focusing email field');
+
+    // Clear any existing errors and reset form state
+    emailError.value = '';
+    passwordError.value = '';
+    hasValidationErrors.value = false;
+    _cancelAllTimers();
+
+    // Clear focus from any currently focused field
+    _clearAllFocus();
+
+    // Focus email field after a small delay to ensure widget tree is ready
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 150), () {
+        if (!_isDisposed && !_preparingForDisposal && _isReady) {
+          focusEmailField();
+          AppLogger.d('Email field focused on return to login view');
+        }
+      });
+    });
+  }
 
   // Focus nodes for keyboard navigation
   late FocusNode emailFocusNode;
@@ -125,6 +161,43 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
       AppLogger.e('Error in LoginFormController.onClose()', e);
       super.onClose();
     }
+  }
+
+  // =============================================================================
+  // NAVIGATION TRACKING METHODS
+  // =============================================================================
+
+  /// Set flag when user is navigating to signup page
+  void setNavigatingToSignup() {
+    _isNavigatingToSignup = true;
+    _cancelValidationDelay();
+    AppLogger.d('Navigation to signup detected - validation suppressed');
+
+    // Clear the flag after navigation should be complete
+    Timer(const Duration(seconds: 3), () {
+      _isNavigatingToSignup = false;
+    });
+  }
+
+  /// Set flag when user is navigating to recover password page
+  void setNavigatingToRecoverPassword() {
+    _isNavigatingToRecoverPassword = true;
+    _cancelValidationDelay();
+    AppLogger.d('Navigation to recover password detected - validation suppressed');
+
+    // Clear the flag after navigation should be complete
+    Timer(const Duration(seconds: 3), () {
+      _isNavigatingToRecoverPassword = false;
+    });
+  }
+
+  /// Check if navigation is in progress
+  bool get _isNavigating => _isNavigatingToSignup || _isNavigatingToRecoverPassword;
+
+  /// Cancel any pending validation delay timer
+  void _cancelValidationDelay() {
+    _validationDelayTimer?.cancel();
+    _validationDelayTimer = null;
   }
 
   // =============================================================================
@@ -548,7 +621,7 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
   }
 
   // =============================================================================
-  // FOCUS LISTENERS
+  // FOCUS LISTENERS - UPDATED WITH NAVIGATION DETECTION AND DELAY
   // =============================================================================
 
   void _onEmailFocusChanged() {
@@ -557,17 +630,29 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
     try {
       if (emailFocusNode.hasFocus) {
         AppLogger.d('Email field gained focus');
+        // Cancel any pending validation when field gains focus
+        _cancelValidationDelay();
       } else {
         AppLogger.d('Email field lost focus');
-        // Email field lost focus - validate it
-        if (emailController.text.isEmpty) {
-          setEmailError(AppStrings.emailRequired);
-        } else {
-          final emailValidation = validateEmail(emailController.text);
-          if (emailValidation != null) {
-            setEmailError(emailValidation);
-          }
+        // Check if navigation is in progress
+        if (_isNavigating) {
+          AppLogger.d('Navigation detected - skipping email validation');
+          return;
         }
+
+        // Use delayed validation to allow time for navigation
+        _scheduleValidation(() {
+          if (!_isDisposed && !_preparingForDisposal && !_isNavigating) {
+            if (emailController.text.isEmpty) {
+              setEmailError(AppStrings.emailRequired);
+            } else {
+              final emailValidation = validateEmail(emailController.text);
+              if (emailValidation != null) {
+                setEmailError(emailValidation);
+              }
+            }
+          }
+        });
       }
     } catch (e) {
       AppLogger.w('Error in email focus change listener', e);
@@ -580,21 +665,44 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
     try {
       if (passwordFocusNode.hasFocus) {
         AppLogger.d('Password field gained focus');
+        // Cancel any pending validation when field gains focus
+        _cancelValidationDelay();
       } else {
         AppLogger.d('Password field lost focus');
-        // Password field lost focus - validate it
-        if (passwordController.text.isEmpty) {
-          setPasswordError(AppStrings.passwordRequired);
-        } else {
-          final passwordValidation = validatePassword(passwordController.text);
-          if (passwordValidation != null) {
-            setPasswordError(passwordValidation);
-          }
+        // Check if navigation is in progress
+        if (_isNavigating) {
+          AppLogger.d('Navigation detected - skipping password validation');
+          return;
         }
+
+        // Use delayed validation to allow time for navigation
+        _scheduleValidation(() {
+          if (!_isDisposed && !_preparingForDisposal && !_isNavigating) {
+            if (passwordController.text.isEmpty) {
+              setPasswordError(AppStrings.passwordRequired);
+            } else {
+              final passwordValidation = validatePassword(passwordController.text);
+              if (passwordValidation != null) {
+                setPasswordError(passwordValidation);
+              }
+            }
+          }
+        });
       }
     } catch (e) {
       AppLogger.w('Error in password focus change listener', e);
     }
+  }
+
+  /// Schedule validation with delay to allow navigation
+  void _scheduleValidation(VoidCallback validationCallback) {
+    _cancelValidationDelay();
+
+    _validationDelayTimer = Timer(const Duration(milliseconds: 120), () {
+      if (!_isDisposed && !_preparingForDisposal) {
+        validationCallback();
+      }
+    });
   }
 
   // =============================================================================
@@ -617,6 +725,7 @@ class LoginFormController extends GetxController with GetTickerProviderStateMixi
   void _cancelAllTimers() {
     emailErrorTimer?.cancel();
     passwordErrorTimer?.cancel();
+    _cancelValidationDelay();
   }
 
   void _disposeControllers() {

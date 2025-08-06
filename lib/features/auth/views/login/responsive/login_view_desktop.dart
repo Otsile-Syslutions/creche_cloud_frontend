@@ -6,7 +6,7 @@ import '../../../../../routes/app_routes.dart';
 import '../../../controllers/auth_controller.dart';
 import '../../../../../constants/app_colors.dart';
 import '../../../../../constants/app_assets.dart';
-import '../../../controllers/login_form_controller.dart';
+import '../controllers/login_form_controller.dart';
 import '../components/login_form.dart';
 import '../components/promotional_slider.dart';
 
@@ -377,7 +377,11 @@ class _AnimatedLoginViewState extends State<_AnimatedLoginView>
                         child: Focus(
                           focusNode: loginFormController.signupLinkFocusNode,
                           child: _SignUpButton(
-                            onPressed: () => Get.toNamed(AppRoutes.signup),
+                            onPressed: () {
+                              // Set navigation flag before navigating
+                              loginFormController.setNavigatingToSignup();
+                              Get.toNamed(AppRoutes.signup);
+                            },
                             fontSize: signupFontSize,
                           ),
                         ),
@@ -385,7 +389,16 @@ class _AnimatedLoginViewState extends State<_AnimatedLoginView>
                     } catch (e) {
 // Fallback if controller not available
                       return _SignUpButton(
-                        onPressed: () => Get.toNamed(AppRoutes.signup),
+                        onPressed: () {
+                          // Try to find controller and set navigation flag
+                          try {
+                            final loginFormController = Get.find<LoginFormController>();
+                            loginFormController.setNavigatingToSignup();
+                          } catch (e) {
+                            // If controller not found, just navigate
+                          }
+                          Get.toNamed(AppRoutes.signup);
+                        },
                         fontSize: signupFontSize,
                       );
                     }
@@ -450,7 +463,7 @@ class _AnimatedLoginViewState extends State<_AnimatedLoginView>
   }
 }
 
-// Custom Sign Up Button with hover state
+// Custom Sign Up Button with hover state - Updated to call navigation tracking
 class _SignUpButton extends StatefulWidget {
   final VoidCallback onPressed;
   final double fontSize;
