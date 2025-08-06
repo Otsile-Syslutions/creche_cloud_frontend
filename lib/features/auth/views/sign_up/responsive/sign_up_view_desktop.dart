@@ -69,7 +69,7 @@ class SignUpViewDesktop extends GetView<AuthController> {
                                 mainAxisAlignment: MainAxisAlignment.end,
                                 children: [
                                   Text(
-                                    "Do you have an account?",
+                                    "Already have an account?",
                                     style: TextStyle(
                                       fontFamily: 'Poppins',
                                       fontSize: linkFontSize,
@@ -80,7 +80,7 @@ class SignUpViewDesktop extends GetView<AuthController> {
                                   TextButton(
                                     onPressed: () => Get.toNamed(AppRoutes.login),
                                     child: Text(
-                                      "Login",
+                                      "Login!",
                                       style: TextStyle(
                                         fontFamily: 'Poppins',
                                         fontSize: linkFontSize,
@@ -238,7 +238,7 @@ class SignUpViewDesktop extends GetView<AuthController> {
               // Pink squiggle lines doodle positioned to the right of divider line
               Positioned(
                 right: -(200 * scaleFactor), // Bleed off the right edge - half the doodle shows
-                top: (screenHeight * 0.02 + logoHeight + (verticalSpacing * 0.8) + titleFontSize + (verticalSpacing * 1.5)) * 0.7, // Moved up 30%
+                top: (screenHeight * 0.02 + logoHeight + (verticalSpacing * 0.8) + titleFontSize + (verticalSpacing * 1.5)) * 0.7,
                 child: Image.asset(
                   AppAssets.doodlePinkSquiggleLines,
                   width: (400 * scaleFactor).clamp(200.0, 600.0),
@@ -248,12 +248,109 @@ class SignUpViewDesktop extends GetView<AuthController> {
 
               // Yellow dot doodle in bottom right of plain background
               Positioned(
-                right: (80 * scaleFactor).clamp(60.0, 120.0), // Moved more left from right edge
-                bottom: (120 * scaleFactor).clamp(80.0, 180.0), // Moved higher from bottom
+                right: (80 * scaleFactor).clamp(60.0, 120.0),
+                bottom: (120 * scaleFactor).clamp(80.0, 180.0),
                 child: Image.asset(
                   AppAssets.yellowDot,
                   width: (80 * scaleFactor).clamp(40.0, 120.0),
                   height: (80 * scaleFactor).clamp(40.0, 120.0),
+                ),
+              ),
+
+              // For Parents badge in the left middle of signup background
+              Positioned(
+                left: screenWidth * 0.06,
+                top: screenHeight * 0.32,
+                child: Container(
+                  height: (60 * scaleFactor).clamp(48.0, 72.0),
+                  padding: EdgeInsets.only(
+                    left: (9.6 * scaleFactor).clamp(7.2, 14.4),
+                    right: (56.0 * scaleFactor).clamp(42.0, 70.0),
+                    top: (4.8 * scaleFactor).clamp(3.6, 7.2),
+                    bottom: (4.8 * scaleFactor).clamp(3.6, 7.2),
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFBB3AE3), // Rectangle hex color
+                    borderRadius: BorderRadius.circular((30 * scaleFactor).clamp(24.0, 36.0)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Circle with lightning icon
+                      Container(
+                        width: (50.4 * scaleFactor).clamp(38.4, 62.4),
+                        height: (50.4 * scaleFactor).clamp(38.4, 62.4),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF702388), // Circle hex color
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.flash_on,
+                          color: const Color(0xFF000000), // Black lightning icon
+                          size: (28.8 * scaleFactor).clamp(21.6, 36.0),
+                        ),
+                      ),
+                      SizedBox(width: (14.4 * scaleFactor).clamp(10.8, 18.0)),
+                      // Text
+                      Text(
+                        'For Parents',
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: (15.0 * scaleFactor).clamp(12.5, 19.0),
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Teachers badge positioned above the purple circle dot doodle -
+              Positioned(
+                left: screenWidth * 0.37, // Centered above the purple circle dot doodle
+                bottom: (232 * scaleFactor).clamp(168.0, 336.0),
+                child: Container(
+                  height: (65 * scaleFactor).clamp(52.0, 78.0),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: (10.4 * scaleFactor).clamp(7.8, 15.6),
+                    vertical: (5.2 * scaleFactor).clamp(3.9, 7.8),
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6D70F1),
+                    borderRadius: BorderRadius.circular((32.5 * scaleFactor).clamp(26.0, 39.0)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Circle with lightning icon
+                      Container(
+                        width: (54.6 * scaleFactor).clamp(41.6, 67.6),
+                        height: (54.6 * scaleFactor).clamp(41.6, 67.6),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFA7A9F7),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.flash_on,
+                          color: Colors.white,
+                          size: (31.2 * scaleFactor).clamp(23.4, 39.0),
+                        ),
+                      ),
+                      SizedBox(width: (15.6 * scaleFactor).clamp(10.4, 20.8)),
+                      // Text
+                      Text(
+                        'For Teachers',
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: (18.2 * scaleFactor).clamp(15.6, 23.4),
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                      SizedBox(width: (10.4 * scaleFactor).clamp(7.8, 15.6)),
+                    ],
+                  ),
                 ),
               ),
 
@@ -264,7 +361,7 @@ class SignUpViewDesktop extends GetView<AuthController> {
                 child: Transform.rotate(
                   angle: 3.14159, // 180 degrees rotation
                   child: Image.asset(
-                    'assets/doodles/doodle_purple_circle_dot.png',
+                    AppAssets.doodlePurpleCircleDot,
                     width: (250 * scaleFactor).clamp(60.0, 180.0),
                     height: (250 * scaleFactor).clamp(60.0, 180.0),
                   ),
