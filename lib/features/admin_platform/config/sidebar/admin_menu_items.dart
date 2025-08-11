@@ -4,36 +4,53 @@ import 'package:sidebarx/sidebarx.dart';
 import 'package:get/get.dart';
 import '../../../../shared/components/sidebar/app_sidebar.dart';
 import '../../../auth/controllers/auth_controller.dart';
+import '../../../../utils/app_logger.dart';
 
 class AdminMenuItems {
   static List<SidebarXItem> getMenuItems(List<String> userRoles) {
+    // Enhanced debug logging
+    AppLogger.d('=== ADMIN MENU GENERATION ===');
+    AppLogger.d('Received roles: $userRoles');
+    AppLogger.d('Roles count: ${userRoles.length}');
+
+    // Also check AuthController directly for debugging
+    try {
+      final authController = Get.find<AuthController>();
+      final currentUser = authController.currentUser.value;
+      AppLogger.d('Current user from controller: ${currentUser?.fullName}');
+      AppLogger.d('User roles from controller: ${currentUser?.roleNames}');
+      AppLogger.d('Is platform admin from controller: ${currentUser?.isPlatformAdmin}');
+      AppLogger.d('Platform type from controller: ${currentUser?.platformType}');
+    } catch (e) {
+      AppLogger.w('Could not access AuthController in getMenuItems: $e');
+    }
+
     final items = <SidebarXItem>[
       // Dashboard - Available to all admin roles
       SidebarXItem(
         icon: Icons.dashboard,
         label: 'Dashboard',
         onTap: () {
+          AppLogger.d('Admin Dashboard tapped');
           // Navigate to admin home
           // Get.toNamed(AppRoutes.adminHome);
         },
       ),
     ];
 
-    // Check for platform admin role (flexible matching)
-    final isPlatformAdmin = userRoles.any((role) =>
-    role == 'platform_admin' ||
-        role == 'platform_administrator' ||
-        role.toLowerCase() == 'platform_admin' ||
-        (role.toLowerCase().contains('platform') && role.toLowerCase().contains('admin'))
-    );
+    // More flexible role checking
+    final isPlatformAdmin = _isPlatformAdmin(userRoles);
+    AppLogger.d('Is platform admin result: $isPlatformAdmin');
 
     // Platform Admin only features
     if (isPlatformAdmin) {
+      AppLogger.d('✅ Adding platform admin menu items');
       items.addAll([
         SidebarXItem(
           icon: Icons.business,
           label: 'Tenants',
           onTap: () {
+            AppLogger.d('Tenants menu tapped');
             // Navigate to tenants management
             // Get.toNamed(AppRoutes.adminTenants);
           },
@@ -42,28 +59,28 @@ class AdminMenuItems {
           icon: Icons.people,
           label: 'Users',
           onTap: () {
+            AppLogger.d('Users menu tapped');
             // Navigate to user management
             // Get.toNamed(AppRoutes.adminUsers);
           },
         ),
       ]);
+    } else {
+      AppLogger.d('❌ Not adding platform admin items - user is not platform admin');
     }
 
-    // Check for support/admin roles (flexible matching)
-    final hasReportsAccess = userRoles.any((role) =>
-    role == 'platform_admin' ||
-        role == 'platform_support' ||
-        role.toLowerCase().contains('admin') ||
-        role.toLowerCase().contains('support')
-    );
+    // Reports and Analytics
+    final hasReportsAccess = _hasReportsAccess(userRoles);
+    AppLogger.d('Has reports access result: $hasReportsAccess');
 
-    // Reports and Analytics - Available to both platform_admin and platform_support
     if (hasReportsAccess) {
+      AppLogger.d('✅ Adding reports and analytics menu items');
       items.addAll([
         SidebarXItem(
           icon: Icons.analytics,
           label: 'Reports',
           onTap: () {
+            AppLogger.d('Reports menu tapped');
             // Navigate to reports
             // Get.toNamed(AppRoutes.adminReports);
           },
@@ -72,20 +89,25 @@ class AdminMenuItems {
           icon: Icons.bar_chart,
           label: 'Analytics',
           onTap: () {
+            AppLogger.d('Analytics menu tapped');
             // Navigate to analytics
             // Get.toNamed(AppRoutes.adminAnalytics);
           },
         ),
       ]);
+    } else {
+      AppLogger.d('❌ Not adding reports items - user does not have reports access');
     }
 
     // Platform Admin only - Settings
     if (isPlatformAdmin) {
+      AppLogger.d('✅ Adding settings menu item');
       items.add(
         SidebarXItem(
           icon: Icons.settings,
           label: 'Settings',
           onTap: () {
+            AppLogger.d('Settings menu tapped');
             // Navigate to settings
             // Get.toNamed(AppRoutes.adminSettings);
           },
@@ -93,56 +115,211 @@ class AdminMenuItems {
       );
     }
 
+    AppLogger.d('Total admin menu items generated: ${items.length}');
+    AppLogger.d('Menu items: ${items.map((e) => e.label).toList()}');
+    AppLogger.d('=============================');
+
     return items;
   }
 
-  static Widget buildHeader() {
-    return GetBuilder<AuthController>(
-      builder: (authController) {
+  /// Enhanced platform admin checking
+  static bool _isPlatformAdmin(List<String> userRoles) {
+    if (userRoles.isEmpty) {
+      AppLogger.w('No user roles provided to _isPlatformAdmin');
+
+      // Fallback: Try to get from AuthController directly
+      try {
+        final authController = Get.find<AuthController>();
         final user = authController.currentUser.value;
-        final userRoles = user?.roleNames ?? [];
-
-        // Determine the subtitle based on role
-        String subtitle = 'Platform Admin';
-        if (userRoles.any((role) => role.toLowerCase().contains('platform') && role.toLowerCase().contains('admin'))) {
-          subtitle = 'Platform Administrator';
-        } else if (userRoles.any((role) => role.toLowerCase().contains('support'))) {
-          subtitle = 'Platform Support';
+        if (user != null) {
+          AppLogger.d('Using fallback from AuthController');
+          AppLogger.d('User isPlatformAdmin: ${user.isPlatformAdmin}');
+          return user.isPlatformAdmin;
         }
+      } catch (e) {
+        AppLogger.w('Fallback failed: $e');
+      }
 
-        return AppSidebarHeader(
-          title: 'Creche Cloud',
-          subtitle: subtitle,
-          icon: Icons.admin_panel_settings,
-        );
-      },
-    );
+      return false;
+    }
+
+    // Check for exact matches first
+    const platformAdminRoles = [
+      'platform_admin',
+      'platform_administrator',
+      'super_admin',
+      'superadmin',
+    ];
+
+    for (final role in userRoles) {
+      final normalizedRole = role.toLowerCase().trim();
+
+      // Debug each role check
+      AppLogger.d('Checking role: "$role" (normalized: "$normalizedRole")');
+
+      // Exact match check
+      if (platformAdminRoles.contains(normalizedRole)) {
+        AppLogger.d('✅ Found exact platform admin role: $role');
+        return true;
+      }
+
+      // Partial match check for variations
+      if (normalizedRole.contains('platform') && normalizedRole.contains('admin')) {
+        AppLogger.d('✅ Found platform admin role by pattern: $role');
+        return true;
+      }
+
+      if (normalizedRole.contains('super') && normalizedRole.contains('admin')) {
+        AppLogger.d('✅ Found super admin role by pattern: $role');
+        return true;
+      }
+    }
+
+    AppLogger.d('❌ No platform admin role found in: $userRoles');
+    return false;
+  }
+
+  /// Enhanced reports access checking
+  static bool _hasReportsAccess(List<String> userRoles) {
+    if (userRoles.isEmpty) {
+      AppLogger.w('No user roles provided to _hasReportsAccess');
+
+      // Fallback: Try to get from AuthController directly
+      try {
+        final authController = Get.find<AuthController>();
+        final user = authController.currentUser.value;
+        if (user != null && (user.isPlatformAdmin || user.hasRole('platform_support'))) {
+          AppLogger.d('Using fallback from AuthController for reports access');
+          return true;
+        }
+      } catch (e) {
+        AppLogger.w('Fallback failed: $e');
+      }
+
+      return false;
+    }
+
+    // If user is platform admin, they automatically have reports access
+    if (_isPlatformAdmin(userRoles)) {
+      AppLogger.d('✅ Has reports access via platform admin role');
+      return true;
+    }
+
+    // Check for support roles
+    const supportRoles = [
+      'platform_support',
+      'platform_support_agent',
+      'support',
+      'support_admin',
+    ];
+
+    for (final role in userRoles) {
+      final normalizedRole = role.toLowerCase().trim();
+
+      // Exact match check
+      if (supportRoles.contains(normalizedRole)) {
+        AppLogger.d('✅ Found support role: $role');
+        return true;
+      }
+
+      // Pattern matching for support roles
+      if (normalizedRole.contains('support') &&
+          (normalizedRole.contains('platform') || normalizedRole.contains('admin'))) {
+        AppLogger.d('✅ Found support role by pattern: $role');
+        return true;
+      }
+    }
+
+    AppLogger.d('❌ No reports access role found in: $userRoles');
+    return false;
+  }
+
+  static Widget buildHeader() {
+    return Obx(() {
+      final authController = Get.find<AuthController>();
+      final user = authController.currentUser.value;
+
+      // Enhanced debugging
+      AppLogger.d('=== ADMIN HEADER BUILD ===');
+      AppLogger.d('User exists: ${user != null}');
+      AppLogger.d('User name: ${user?.fullName}');
+      AppLogger.d('User roles: ${user?.roleNames}');
+      AppLogger.d('Is platform admin: ${user?.isPlatformAdmin}');
+      AppLogger.d('Platform type: ${user?.platformType}');
+
+      final userRoles = user?.roleNames ?? [];
+
+      // Determine the subtitle based on role
+      String subtitle = 'Platform User';
+      IconData headerIcon = Icons.admin_panel_settings;
+
+      // Use both roleNames and isPlatformAdmin flag for determination
+      if (user?.isPlatformAdmin == true || _isPlatformAdmin(userRoles)) {
+        subtitle = 'Platform Administrator';
+        headerIcon = Icons.admin_panel_settings;
+        AppLogger.d('✅ Header: Platform Administrator');
+      } else if (_hasReportsAccess(userRoles)) {
+        subtitle = 'Platform Support';
+        headerIcon = Icons.support_agent;
+        AppLogger.d('✅ Header: Platform Support');
+      } else {
+        AppLogger.d('✅ Header: Platform User (default)');
+      }
+
+      AppLogger.d('Admin header subtitle: $subtitle');
+      AppLogger.d('=========================');
+
+      return AppSidebarHeader(
+        title: 'Creche Cloud',
+        subtitle: subtitle,
+        icon: headerIcon,
+      );
+    });
   }
 
   static Widget buildFooter() {
-    return GetBuilder<AuthController>(
-      builder: (authController) {
-        final user = authController.currentUser.value;
-        final userRoles = user?.roleNames ?? [];
+    return Obx(() {
+      final authController = Get.find<AuthController>();
+      final user = authController.currentUser.value;
 
-        // Show different status based on role
-        String statusText = 'Platform Online';
-        bool isActive = true;
-        IconData statusIcon = Icons.check_circle;
+      // Enhanced debugging
+      AppLogger.d('=== ADMIN FOOTER BUILD ===');
+      AppLogger.d('User exists: ${user != null}');
+      AppLogger.d('User name: ${user?.fullName}');
+      AppLogger.d('User roles: ${user?.roleNames}');
+      AppLogger.d('Is platform admin: ${user?.isPlatformAdmin}');
 
-        if (userRoles.any((role) => role.toLowerCase().contains('platform') && role.toLowerCase().contains('admin'))) {
-          statusText = 'Full Access';
-        } else if (userRoles.any((role) => role.toLowerCase().contains('support'))) {
-          statusText = 'Support Access';
-          statusIcon = Icons.support_agent;
-        }
+      final userRoles = user?.roleNames ?? [];
 
-        return AppSidebarFooter(
-          statusText: statusText,
-          isActive: isActive,
-          statusIcon: statusIcon,
-        );
-      },
-    );
+      // Show different status based on role
+      String statusText = 'Platform Online';
+      bool isActive = true;
+      IconData statusIcon = Icons.check_circle;
+
+      // Use both roleNames and isPlatformAdmin flag for determination
+      if (user?.isPlatformAdmin == true || _isPlatformAdmin(userRoles)) {
+        statusText = 'Full Access';
+        statusIcon = Icons.admin_panel_settings;
+        AppLogger.d('✅ Footer: Full Access');
+      } else if (_hasReportsAccess(userRoles)) {
+        statusText = 'Support Access';
+        statusIcon = Icons.support_agent;
+        AppLogger.d('✅ Footer: Support Access');
+      } else {
+        statusText = 'Limited Access';
+        statusIcon = Icons.info;
+        isActive = false;
+        AppLogger.d('✅ Footer: Limited Access');
+      }
+
+      AppLogger.d('Admin footer status: $statusText');
+      AppLogger.d('=========================');
+
+      return AppSidebarFooter(
+        statusText: statusText,
+        isActive: isActive,
+        statusIcon: statusIcon,
+      );
+    });
   }
 }

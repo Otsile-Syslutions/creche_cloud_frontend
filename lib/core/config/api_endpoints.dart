@@ -54,6 +54,9 @@ class ApiEndpoints {
   /// GET /auth/validate-token - Validate current token
   static const String validateToken = '$_auth/validate-token';
 
+  /// GET /auth/debug-user - Debug user data and roles (development only)
+  static const String debugUser = '$_auth/debug-user';
+
   // =============================================================================
   // USER MANAGEMENT ENDPOINTS (matching backend)
   // =============================================================================
@@ -250,6 +253,7 @@ class ApiEndpoints {
     'resendVerification': resendVerification,
     'checkAuth': checkAuth,
     'validateToken': validateToken,
+    'debugUser': debugUser,
 
     // User endpoints
     'getUsers': getUsers,

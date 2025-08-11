@@ -1,6 +1,7 @@
 // lib/routes/app_pages.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../features/admin_platform/home/bindings/admin_home_binding.dart';
 import '../features/auth/bindings/auth_binding.dart';
 import '../features/auth/controllers/auth_controller.dart';
 import 'app_routes.dart';
@@ -44,7 +45,7 @@ class AppPages {
     GetPage(
       name: AppRoutes.adminHome,
       page: () => const AdminHomeView(),
-      binding: AuthBinding(), // Using AuthBinding for now, create AdminBinding later if needed
+      binding: AdminBinding(), // CHANGED FROM AuthBinding TO AdminBinding
       middlewares: [
         AuthMiddleware(priority: 1),
         RoleMiddleware(
@@ -56,7 +57,7 @@ class AppPages {
     GetPage(
       name: AppRoutes.parentHome,
       page: () => const ParentHomeView(),
-      binding: AuthBinding(), // Using AuthBinding for now, create ParentBinding later if needed
+      binding: AuthBinding(), // Create ParentBinding later if needed
       middlewares: [
         AuthMiddleware(priority: 1),
         RoleMiddleware(
@@ -68,7 +69,7 @@ class AppPages {
     GetPage(
       name: AppRoutes.tenantHome,
       page: () => const TenantHomeView(),
-      binding: AuthBinding(), // Using AuthBinding for now, create TenantBinding later if needed
+      binding: AuthBinding(), // Create TenantBinding later if needed
       middlewares: [
         AuthMiddleware(priority: 1),
         RoleMiddleware(

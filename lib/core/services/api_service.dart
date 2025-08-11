@@ -7,6 +7,140 @@ import '../config/api_endpoints.dart';
 import 'storage_service.dart';
 import '../../utils/app_logger.dart';
 
+// =============================================================================
+// API RESPONSE MODELS
+// =============================================================================
+
+class ApiResponse<T> {
+  final bool success;
+  final String? message;
+  final T? data;
+  final int statusCode;
+  final Map<String, dynamic>? errors;
+
+  ApiResponse({
+    required this.success,
+    this.message,
+    this.data,
+    required this.statusCode,
+    this.errors,
+  });
+
+  factory ApiResponse.fromResponse(Response response) {
+    final data = response.data;
+
+    // Debug logging for response structure (safe version)
+    try {
+      AppLogger.d('=== API RESPONSE DEBUG ===');
+      AppLogger.d('Response status: ${response.statusCode}');
+      AppLogger.d('Response data type: ${data.runtimeType}');
+      if (data is Map<String, dynamic>) {
+        AppLogger.d('Has success field: ${data.containsKey('success')}');
+        AppLogger.d('Has data field: ${data.containsKey('data')}');
+        AppLogger.d('Data field type: ${data['data']?.runtimeType}');
+        if (data.containsKey('data') && data['data'] is Map<String, dynamic>) {
+          final innerData = data['data'] as Map<String, dynamic>;
+          AppLogger.d('Inner data keys: ${innerData.keys.toList()}');
+        }
+      }
+      AppLogger.d('=========================');
+    } catch (e) {
+      AppLogger.w('Debug logging failed: $e');
+    }
+
+    return ApiResponse<T>(
+      success: data['success'] ?? (response.statusCode! >= 200 && response.statusCode! < 300),
+      message: data['message'],
+      data: data['data'] ?? data,
+      statusCode: response.statusCode!,
+      errors: data['errors'],
+    );
+  }
+
+  factory ApiResponse.error(String message, int statusCode, {Map<String, dynamic>? errors}) {
+    return ApiResponse<T>(
+      success: false,
+      message: message,
+      data: null,
+      statusCode: statusCode,
+      errors: errors,
+    );
+  }
+
+  @override
+  String toString() {
+    return 'ApiResponse{success: $success, message: $message, statusCode: $statusCode}';
+  }
+}
+
+class ApiException implements Exception {
+  final String message;
+  final int statusCode;
+  final Map<String, dynamic>? errors;
+
+  ApiException({
+    required this.message,
+    required this.statusCode,
+    this.errors,
+  });
+
+  factory ApiException.fromDioException(DioException e) {
+    String message = 'Network error occurred';
+    int statusCode = 500;
+    Map<String, dynamic>? errors;
+
+    if (e.response != null) {
+      statusCode = e.response!.statusCode!;
+      final data = e.response!.data;
+
+      if (data is Map<String, dynamic>) {
+        message = data['message'] ?? 'Server error';
+        errors = data['errors'];
+      } else {
+        message = 'Server returned invalid response';
+      }
+    } else {
+      switch (e.type) {
+        case DioExceptionType.connectionTimeout:
+          message = 'Connection timeout';
+          break;
+        case DioExceptionType.sendTimeout:
+          message = 'Send timeout';
+          break;
+        case DioExceptionType.receiveTimeout:
+          message = 'Receive timeout';
+          break;
+        case DioExceptionType.badCertificate:
+          message = 'Certificate error';
+          break;
+        case DioExceptionType.connectionError:
+          message = 'Connection error';
+          break;
+        case DioExceptionType.unknown:
+          message = 'Network error: ${e.message}';
+          break;
+        default:
+          message = 'Unknown error occurred';
+      }
+    }
+
+    return ApiException(
+      message: message,
+      statusCode: statusCode,
+      errors: errors,
+    );
+  }
+
+  @override
+  String toString() {
+    return 'ApiException{message: $message, statusCode: $statusCode}';
+  }
+}
+
+// =============================================================================
+// API SERVICE
+// =============================================================================
+
 class ApiService extends getx.GetxService {
   static ApiService get to => getx.Get.find();
 
@@ -66,7 +200,6 @@ class ApiService extends getx.GetxService {
   /// Load stored access and refresh tokens
   Future<void> _loadStoredTokens() async {
     try {
-      // These are now async calls - need await
       final accessToken = await StorageService.to.getString('access_token');
       final refreshToken = await StorageService.to.getString('refresh_token');
 
@@ -125,40 +258,90 @@ class ApiService extends getx.GetxService {
     handler.next(error);
   }
 
-  /// Handle token expiration by attempting refresh
+  /// Handle token expiration by refreshing
   Future<bool> _handleTokenExpiration() async {
-    if (_refreshToken == null || _refreshToken!.isEmpty) {
-      await clearTokens();
+    try {
+      if (_refreshToken == null) return false;
+
+      final response = await refreshTokenRequest();
+      return response.success;
+    } catch (e) {
+      AppLogger.e('Token refresh failed', e);
       return false;
     }
+  }
 
-    try {
-      final response = await _dio.post(
-        ApiEndpoints.refreshToken,
-        data: {'refreshToken': _refreshToken},
-      );
+  // =============================================================================
+  // TOKEN EXTRACTION HELPERS
+  // =============================================================================
 
-      if (response.statusCode == 200 && response.data['success'] == true) {
-        final data = response.data['data'];
-        final newAccessToken = data['accessToken'];
-        final newRefreshToken = data['refreshToken'];
+  /// Helper method to safely extract string values from any dynamic type
+  String? _extractStringValue(dynamic value) {
+    if (value == null) return null;
 
-        if (newAccessToken != null) {
-          await setAccessToken(newAccessToken);
-          if (newRefreshToken != null) {
-            await setRefreshToken(newRefreshToken);
-          }
-          return true;
-        }
-      }
-    } catch (e) {
-      AppLogger.w('Token refresh failed', e);
+    if (value is String) {
+      return value.isNotEmpty ? value : null;
     }
 
-    // Refresh failed, clear tokens
-    await clearTokens();
-    return false;
+    if (value is Map<String, dynamic>) {
+      // If it's a nested object, try to extract common token field names
+      final tokenValue = value['token'] ??
+          value['value'] ??
+          value['access_token'] ??
+          value['accessToken'] ??
+          value['refresh_token'] ??
+          value['refreshToken'];
+
+      if (tokenValue is String && tokenValue.isNotEmpty) {
+        return tokenValue;
+      }
+    }
+
+    // Convert to string as last resort, but only if it's not an empty object
+    if (value is! Map || (value as Map).isNotEmpty) {
+      final stringValue = value.toString();
+      return stringValue.isNotEmpty && stringValue != 'null' ? stringValue : null;
+    }
+
+    return null;
   }
+
+  /// Helper method to safely extract tokens from response data
+  /// Handles the actual backend response structure: { success, message, data: { access_token, refresh_token, ... } }
+  Map<String, String?> _extractTokens(Map<String, dynamic> responseData) {
+    AppLogger.d('=== TOKEN EXTRACTION DEBUG ===');
+    AppLogger.d('Response data keys: ${responseData.keys.toList()}');
+    AppLogger.d('Response data structure: ${responseData.runtimeType}');
+
+    String? accessToken;
+    String? refreshToken;
+
+    // The backend returns tokens in the responseData directly (which is the 'data' field from the API)
+    // Try both field name variations that the backend provides
+
+    // Extract access token - backend provides both access_token and accessToken
+    final accessTokenRaw = responseData['access_token'] ?? responseData['accessToken'];
+    accessToken = _extractStringValue(accessTokenRaw);
+
+    // Extract refresh token - backend provides both refresh_token and refreshToken
+    final refreshTokenRaw = responseData['refresh_token'] ?? responseData['refreshToken'];
+    refreshToken = _extractStringValue(refreshTokenRaw);
+
+    AppLogger.d('Raw access token type: ${accessTokenRaw?.runtimeType}');
+    AppLogger.d('Raw refresh token type: ${refreshTokenRaw?.runtimeType}');
+    AppLogger.d('Extracted access token: ${accessToken != null ? '[PRESENT]' : '[MISSING]'}');
+    AppLogger.d('Extracted refresh token: ${refreshToken != null ? '[PRESENT]' : '[MISSING]'}');
+    AppLogger.d('==============================');
+
+    return {
+      'accessToken': accessToken,
+      'refreshToken': refreshToken,
+    };
+  }
+
+  // =============================================================================
+  // TOKEN MANAGEMENT
+  // =============================================================================
 
   /// Set access token
   Future<void> setAccessToken(String token) async {
@@ -183,8 +366,8 @@ class ApiService extends getx.GetxService {
   /// Get current access token
   String? get accessToken => _accessToken;
 
-  /// Check if user is authenticated (has valid token)
-  bool get isAuthenticated => _accessToken != null && _accessToken!.isNotEmpty;
+  /// Get current refresh token
+  String? get refreshTokenValue => _refreshToken;
 
   // =============================================================================
   // HTTP METHODS
@@ -204,6 +387,7 @@ class ApiService extends getx.GetxService {
         options: Options(headers: headers),
         cancelToken: cancelToken,
       );
+
       return ApiResponse<T>.fromResponse(response);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
@@ -226,6 +410,7 @@ class ApiService extends getx.GetxService {
         options: Options(headers: headers),
         cancelToken: cancelToken,
       );
+
       return ApiResponse<T>.fromResponse(response);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
@@ -248,6 +433,7 @@ class ApiService extends getx.GetxService {
         options: Options(headers: headers),
         cancelToken: cancelToken,
       );
+
       return ApiResponse<T>.fromResponse(response);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
@@ -270,13 +456,37 @@ class ApiService extends getx.GetxService {
         options: Options(headers: headers),
         cancelToken: cancelToken,
       );
+
       return ApiResponse<T>.fromResponse(response);
     } on DioException catch (e) {
       throw ApiException.fromDioException(e);
     }
   }
 
-  /// Upload file
+  /// Generic PATCH request
+  Future<ApiResponse<T>> patch<T>(
+      String endpoint, {
+        dynamic data,
+        Map<String, dynamic>? queryParameters,
+        Map<String, dynamic>? headers,
+        CancelToken? cancelToken,
+      }) async {
+    try {
+      final response = await _dio.patch(
+        endpoint,
+        data: data,
+        queryParameters: queryParameters,
+        options: Options(headers: headers),
+        cancelToken: cancelToken,
+      );
+
+      return ApiResponse<T>.fromResponse(response);
+    } on DioException catch (e) {
+      throw ApiException.fromDioException(e);
+    }
+  }
+
+  /// File upload with progress
   Future<ApiResponse<T>> uploadFile<T>(
       String endpoint,
       File file, {
@@ -309,7 +519,7 @@ class ApiService extends getx.GetxService {
   // AUTHENTICATION METHODS (matching backend API)
   // =============================================================================
 
-  /// Login user
+  /// Login user - UPDATED with improved token extraction
   Future<ApiResponse<Map<String, dynamic>>> login({
     required String email,
     required String password,
@@ -333,12 +543,32 @@ class ApiService extends getx.GetxService {
 
     // Store tokens if login successful
     if (response.success && response.data != null) {
-      final responseData = response.data!;
-      if (responseData['accessToken'] != null) {
-        await setAccessToken(responseData['accessToken']);
-      }
-      if (responseData['refreshToken'] != null) {
-        await setRefreshToken(responseData['refreshToken']);
+      try {
+        final responseData = response.data!;
+
+        // Extract tokens using the helper method
+        final tokens = _extractTokens(responseData);
+
+        final accessTokenValue = tokens['accessToken'];
+        final refreshTokenValue = tokens['refreshToken'];
+
+        if (accessTokenValue != null && accessTokenValue.isNotEmpty) {
+          await setAccessToken(accessTokenValue);
+          AppLogger.d('Access token stored successfully');
+        } else {
+          AppLogger.e('No valid access token found in response');
+          AppLogger.e('Full response data: ${responseData.toString()}');
+        }
+
+        if (refreshTokenValue != null && refreshTokenValue.isNotEmpty) {
+          await setRefreshToken(refreshTokenValue);
+          AppLogger.d('Refresh token stored successfully');
+        } else {
+          AppLogger.w('No refresh token found in response');
+        }
+      } catch (e) {
+        AppLogger.e('Error during token extraction: $e');
+        // Don't throw here - login might still be successful even if token storage fails
       }
     }
 
@@ -370,10 +600,10 @@ class ApiService extends getx.GetxService {
     );
   }
 
-  /// Refresh access token
-  Future<ApiResponse<Map<String, dynamic>>> refreshToken() async {
+  /// Refresh access token - UPDATED with improved token extraction
+  Future<ApiResponse<Map<String, dynamic>>> refreshTokenRequest() async {
     if (_refreshToken == null) {
-      throw ApiException(message: 'No refresh token available');
+      throw ApiException(message: 'No refresh token available', statusCode: 401);
     }
 
     final response = await post<Map<String, dynamic>>(
@@ -383,12 +613,30 @@ class ApiService extends getx.GetxService {
 
     // Update stored tokens if refresh successful
     if (response.success && response.data != null) {
-      final responseData = response.data!;
-      if (responseData['accessToken'] != null) {
-        await setAccessToken(responseData['accessToken']);
-      }
-      if (responseData['refreshToken'] != null) {
-        await setRefreshToken(responseData['refreshToken']);
+      try {
+        final responseData = response.data!;
+
+        // Extract tokens using the helper method
+        final tokens = _extractTokens(responseData);
+
+        final accessTokenValue = tokens['accessToken'];
+        final refreshTokenValue = tokens['refreshToken'];
+
+        if (accessTokenValue != null && accessTokenValue.isNotEmpty) {
+          await setAccessToken(accessTokenValue);
+          AppLogger.d('Access token refreshed and stored successfully');
+        } else {
+          AppLogger.e('No valid access token found in refresh response');
+          AppLogger.e('Full response data: ${responseData.toString()}');
+        }
+
+        if (refreshTokenValue != null && refreshTokenValue.isNotEmpty) {
+          await setRefreshToken(refreshTokenValue);
+          AppLogger.d('Refresh token updated and stored successfully');
+        }
+      } catch (e) {
+        AppLogger.e('Error during token refresh extraction: $e');
+        // Don't throw here - the refresh might still be successful
       }
     }
 
@@ -415,6 +663,11 @@ class ApiService extends getx.GetxService {
   /// Get current tenant
   Future<ApiResponse<Map<String, dynamic>>> getCurrentTenant() async {
     return await get<Map<String, dynamic>>(ApiEndpoints.getCurrentTenant);
+  }
+
+  /// Debug user data and roles (development only)
+  Future<ApiResponse<Map<String, dynamic>>> debugUser() async {
+    return await get<Map<String, dynamic>>(ApiEndpoints.debugUser);
   }
 
   /// Forgot password
@@ -479,15 +732,18 @@ class ApiService extends getx.GetxService {
     String? status,
     String? search,
   }) async {
+    final queryParams = <String, dynamic>{
+      'page': page,
+      'limit': limit,
+    };
+
+    if (role != null) queryParams['role'] = role;
+    if (status != null) queryParams['status'] = status;
+    if (search != null) queryParams['search'] = search;
+
     return await get<Map<String, dynamic>>(
       ApiEndpoints.getUsers,
-      queryParameters: {
-        'page': page,
-        'limit': limit,
-        if (role != null) 'role': role,
-        if (status != null) 'status': status,
-        if (search != null) 'search': search,
-      },
+      queryParameters: queryParams,
     );
   }
 
@@ -497,19 +753,21 @@ class ApiService extends getx.GetxService {
     required String lastName,
     required String email,
     required String password,
-    required String roleId,
+    required String role,
     String? phoneNumber,
-    Map<String, dynamic>? additionalData,
+    Map<String, dynamic>? address,
   }) async {
-    final data = {
+    // FIXED: Explicitly declare as Map<String, dynamic>
+    final Map<String, dynamic> data = {
       'firstName': firstName,
       'lastName': lastName,
       'email': email,
       'password': password,
-      'roleId': roleId,
-      if (phoneNumber != null) 'phoneNumber': phoneNumber,
-      ...?additionalData,
+      'role': role,
     };
+
+    if (phoneNumber != null) data['phoneNumber'] = phoneNumber;
+    if (address != null) data['address'] = address;
 
     return await post<Map<String, dynamic>>(
       ApiEndpoints.createUser,
@@ -535,15 +793,8 @@ class ApiService extends getx.GetxService {
     );
   }
 
-  /// Get user by ID
-  Future<ApiResponse<Map<String, dynamic>>> getUserById(String userId) async {
-    return await get<Map<String, dynamic>>(
-      ApiEndpoints.getUserById(userId),
-    );
-  }
-
   // =============================================================================
-  // TENANT MANAGEMENT METHODS
+  // TENANT MANAGEMENT METHODS (matching backend)
   // =============================================================================
 
   /// Get tenants (platform admin only)
@@ -553,34 +804,41 @@ class ApiService extends getx.GetxService {
     String? status,
     String? search,
   }) async {
+    final queryParams = <String, dynamic>{
+      'page': page,
+      'limit': limit,
+    };
+
+    if (status != null) queryParams['status'] = status;
+    if (search != null) queryParams['search'] = search;
+
     return await get<Map<String, dynamic>>(
       ApiEndpoints.getTenants,
-      queryParameters: {
-        'page': page,
-        'limit': limit,
-        if (status != null) 'status': status,
-        if (search != null) 'search': search,
-      },
+      queryParameters: queryParams,
     );
   }
 
-  /// Create tenant (platform admin only)
+  /// Create new tenant
   Future<ApiResponse<Map<String, dynamic>>> createTenant({
     required String name,
     required String slug,
-    required String adminEmail,
-    required String adminPassword,
+    String? displayName,
+    String? description,
     Map<String, dynamic>? settings,
   }) async {
+    // FIXED: Explicitly declare as Map<String, dynamic>
+    final Map<String, dynamic> data = {
+      'name': name,
+      'slug': slug,
+    };
+
+    if (displayName != null) data['displayName'] = displayName;
+    if (description != null) data['description'] = description;
+    if (settings != null) data['settings'] = settings;
+
     return await post<Map<String, dynamic>>(
       ApiEndpoints.createTenant,
-      data: {
-        'name': name,
-        'slug': slug,
-        'adminEmail': adminEmail,
-        'adminPassword': adminPassword,
-        if (settings != null) 'settings': settings,
-      },
+      data: data,
     );
   }
 
@@ -594,142 +852,70 @@ class ApiService extends getx.GetxService {
       data: updateData,
     );
   }
-}
 
-// =============================================================================
-// RESPONSE MODELS (updated to match backend format)
-// =============================================================================
-
-/// API Response wrapper matching backend response structure
-class ApiResponse<T> {
-  final bool success;
-  final String? message;
-  final T? data;
-  final Map<String, dynamic>? errors;
-  final String? code;
-  final int statusCode;
-
-  ApiResponse({
-    required this.success,
-    this.message,
-    this.data,
-    this.errors,
-    this.code,
-    required this.statusCode,
-  });
-
-  factory ApiResponse.fromResponse(Response response) {
-    final responseData = response.data;
-
-    return ApiResponse<T>(
-      success: responseData['success'] ?? false,
-      message: responseData['message'],
-      data: responseData['data'],
-      errors: responseData['errors'],
-      code: responseData['code'],
-      statusCode: response.statusCode ?? 0,
+  /// Delete tenant
+  Future<ApiResponse<Map<String, dynamic>>> deleteTenant(String tenantId) async {
+    return await delete<Map<String, dynamic>>(
+      ApiEndpoints.deleteTenant(tenantId),
     );
   }
 
-  factory ApiResponse.success({
-    String? message,
-    T? data,
-    int statusCode = 200,
-  }) {
-    return ApiResponse<T>(
-      success: true,
-      message: message,
-      data: data,
-      statusCode: statusCode,
-    );
-  }
+  // =============================================================================
+  // DEBUG METHODS
+  // =============================================================================
 
-  factory ApiResponse.error({
-    String? message,
-    Map<String, dynamic>? errors,
-    String? code,
-    int statusCode = 500,
-  }) {
-    return ApiResponse<T>(
-      success: false,
-      message: message,
-      errors: errors,
-      code: code,
-      statusCode: statusCode,
-    );
-  }
-}
+  /// Debug login response structure
+  Future<void> debugLoginResponse() async {
+    try {
+      final response = await post<Map<String, dynamic>>(
+        ApiEndpoints.login,
+        data: {
+          'email': 'test@example.com',
+          'password': 'testpassword'
+        },
+      );
 
-/// API Exception for handling errors (updated to match backend error format)
-class ApiException implements Exception {
-  final String message;
-  final int? statusCode;
-  final String? code;
-  final Map<String, dynamic>? errors;
+      AppLogger.d('=== FULL LOGIN RESPONSE DEBUG ===');
+      AppLogger.d('Success: ${response.success}');
+      AppLogger.d('Status Code: ${response.statusCode}');
+      AppLogger.d('Message: ${response.message}');
+      AppLogger.d('Data Type: ${response.data.runtimeType}');
+      AppLogger.d('Full Data: ${response.data}');
 
-  ApiException({
-    required this.message,
-    this.statusCode,
-    this.code,
-    this.errors,
-  });
-
-  factory ApiException.fromDioException(DioException dioException) {
-    String message = 'An unexpected error occurred';
-    int? statusCode;
-    String? code;
-    Map<String, dynamic>? errors;
-
-    switch (dioException.type) {
-      case DioExceptionType.connectionTimeout:
-      case DioExceptionType.sendTimeout:
-      case DioExceptionType.receiveTimeout:
-        message = 'Connection timeout. Please check your internet connection.';
-        code = 'TIMEOUT_ERROR';
-        break;
-
-      case DioExceptionType.badResponse:
-        statusCode = dioException.response?.statusCode;
-        final responseData = dioException.response?.data;
-
-        if (responseData is Map<String, dynamic>) {
-          message = responseData['message'] ?? message;
-          code = responseData['code'];
-          errors = responseData['errors'];
-        }
-        break;
-
-      case DioExceptionType.cancel:
-        message = 'Request was cancelled';
-        code = 'REQUEST_CANCELLED';
-        break;
-
-      case DioExceptionType.connectionError:
-        message = 'No internet connection. Please check your network.';
-        code = 'CONNECTION_ERROR';
-        break;
-
-      case DioExceptionType.badCertificate:
-        message = 'Security certificate error';
-        code = 'CERTIFICATE_ERROR';
-        break;
-
-      case DioExceptionType.unknown:
-        message = dioException.message ?? message;
-        code = 'UNKNOWN_ERROR';
-        break;
+      if (response.data != null) {
+        response.data!.forEach((key, value) {
+          AppLogger.d('Key: $key, Type: ${value.runtimeType}, Value: $value');
+        });
+      }
+    } catch (e) {
+      AppLogger.e('Debug login error: $e');
     }
-
-    return ApiException(
-      message: message,
-      statusCode: statusCode,
-      code: code,
-      errors: errors,
-    );
   }
 
-  @override
-  String toString() {
-    return 'ApiException: $message (Status: $statusCode, Code: $code)';
+  /// Debug user endpoint
+  Future<void> debugUserEndpoint() async {
+    try {
+      final response = await get<Map<String, dynamic>>(ApiEndpoints.debugUser);
+      AppLogger.d('Debug user response: ${response.data}');
+    } catch (e) {
+      AppLogger.e('Debug user error: $e');
+    }
   }
+
+  // =============================================================================
+  // UTILITY METHODS
+  // =============================================================================
+
+  /// Get headers for authenticated requests
+  Map<String, String> get authHeaders => {
+    'Authorization': 'Bearer $_accessToken',
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  };
+
+  /// Check if user is authenticated
+  bool get isAuthenticated => _accessToken != null && _accessToken!.isNotEmpty;
+
+  /// Get API base URL
+  String get baseUrl => _dio.options.baseUrl;
 }

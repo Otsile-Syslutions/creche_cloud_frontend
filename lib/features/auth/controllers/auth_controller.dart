@@ -169,35 +169,78 @@ class AuthController extends GetxController {
     }
   }
 
-  /// Handle successful login
+  /// Handle successful login - ENHANCED with comprehensive debugging
   Future<void> _handleSuccessfulLogin(Map<String, dynamic> data, LoginFormController formController) async {
     try {
       AppLogger.d('Processing login response data: $data');
 
       final userData = data['user'];
-      final accessToken = data['access_token'] ?? data['accessToken'];
-      final refreshToken = data['refresh_token'] ?? data['refreshToken'];
+
+      // Handle both field name variations for compatibility with safe type checking
+      String? accessToken;
+      String? refreshToken;
+
+      final accessTokenRaw = data['access_token'] ?? data['accessToken'];
+      final refreshTokenRaw = data['refresh_token'] ?? data['refreshToken'];
+
+      if (accessTokenRaw != null) {
+        if (accessTokenRaw is String) {
+          accessToken = accessTokenRaw;
+        } else {
+          accessToken = accessTokenRaw.toString();
+        }
+      }
+
+      if (refreshTokenRaw != null) {
+        if (refreshTokenRaw is String) {
+          refreshToken = refreshTokenRaw;
+        } else {
+          refreshToken = refreshTokenRaw.toString();
+        }
+      }
 
       if (userData == null) {
         throw Exception('User data not found in response');
       }
 
-      if (accessToken == null) {
+      if (accessToken == null || accessToken.isEmpty) {
         throw Exception('Access token not found in response');
       }
+
+      // ENHANCED: Comprehensive debug logging for login response
+      AppLogger.d('=== LOGIN RESPONSE DEBUG ===');
+      AppLogger.d('User data from backend: $userData');
+      AppLogger.d('User roles in response: ${userData['roles']}');
+      AppLogger.d('User roleNames in response: ${userData['roleNames']}');
+      AppLogger.d('User isPlatformAdmin: ${userData['isPlatformAdmin']}');
+      AppLogger.d('User platformType: ${userData['platformType']}');
+      AppLogger.d('Access token field: ${data['access_token'] != null ? 'access_token' : 'accessToken'}');
+      AppLogger.d('Refresh token field: ${data['refresh_token'] != null ? 'refresh_token' : 'refreshToken'}');
+      AppLogger.d('Access token value: ${accessToken.substring(0, 10)}...');
+      AppLogger.d('===========================');
 
       // Store authentication data
       await _storageService.setString('access_token', accessToken);
       await _storageService.setString('user_data', jsonEncode(userData));
 
-      if (refreshToken != null) {
+      if (refreshToken != null && refreshToken.isNotEmpty) {
         await _storageService.setString('refresh_token', refreshToken);
       }
 
-      // Create user model with null safety
+      // Create user model with enhanced role processing
       final user = UserModel.fromJson(userData);
       currentUser.value = user;
       isAuthenticated.value = true;
+
+      // ENHANCED: Comprehensive debug logging for user model
+      AppLogger.d('=== USER MODEL DEBUG ===');
+      AppLogger.d('Created user model with roles: ${user.roleNames}');
+      AppLogger.d('User platform type: ${user.platformType}');
+      AppLogger.d('User is platform admin: ${user.isPlatformAdmin}');
+      AppLogger.d('User primary role: ${user.primaryRole}');
+      AppLogger.d('User full name: ${user.fullName}');
+      AppLogger.d('User permissions count: ${user.permissions.length}');
+      AppLogger.d('========================');
 
       // Update tenant ID and load tenant data
       if (user.tenantId != null && user.tenantId!.isNotEmpty) {
@@ -215,23 +258,162 @@ class AuthController extends GetxController {
       // Start session management
       _startSessionManagement();
 
-      AppLogger.i('Login successful for user: ${user.fullName}');
+      AppLogger.i('Login successful for user: ${user.fullName} with roles: ${user.roleNames}');
 
-      // Navigate to appropriate platform
+      // Navigate to appropriate platform based on roles
       final homeRoute = AppRoutes.getHomeRouteForRoles(user.roleNames);
+      AppLogger.d('Navigating to home route: $homeRoute for platform type: ${user.platformType}');
+
       Get.offAllNamed(homeRoute);
 
       _showSuccessSnackbar('Welcome Back', 'Hello ${user.firstName}!');
 
-      // Log the successful login
+      // Log the successful login with enhanced data
       _logAuthEvent('login_success', {
         'user_id': user.id,
         'tenant_id': currentTenantId.value,
+        'roles': user.roleNames,
+        'platform_type': user.platformType,
+        'is_platform_admin': user.isPlatformAdmin,
       });
+
+      // ENHANCED: Debug admin menu generation in background
+      await _debugAdminMenuGeneration();
 
     } catch (e) {
       AppLogger.e('Error processing successful login response', e);
       throw Exception('Login processing failed: ${e.toString()}');
+    }
+  }
+
+  /// Debug admin menu generation - ENHANCED METHOD
+  Future<void> _debugAdminMenuGeneration() async {
+    try {
+      final user = currentUser.value;
+      if (user == null) return;
+
+      AppLogger.d('=== ADMIN MENU GENERATION DEBUG ===');
+      AppLogger.d('User roles for menu: ${user.roleNames}');
+      AppLogger.d('Is platform admin: ${user.isPlatformAdmin}');
+      AppLogger.d('Platform type: ${user.platformType}');
+
+      // Test role checking patterns
+      final isPlatformAdminCheck1 = user.roleNames.any((role) =>
+      role == 'platform_admin' ||
+          role == 'platform_administrator' ||
+          role.toLowerCase() == 'platform_admin' ||
+          (role.toLowerCase().contains('platform') && role.toLowerCase().contains('admin'))
+      );
+
+      AppLogger.d('Platform admin check (pattern matching): $isPlatformAdminCheck1');
+
+      // Test if this would generate admin menu items
+      if (user.platformType == 'admin') {
+        AppLogger.d('✅ User should see admin platform');
+        AppLogger.d('Expected menu items: Dashboard, Tenants, Users, Reports, Analytics, Settings');
+      } else {
+        AppLogger.d('❌ User should see ${user.platformType} platform instead of admin');
+      }
+
+      // Test individual role variations
+      for (final role in user.roleNames) {
+        final normalizedRole = role.toLowerCase();
+        final isPlatformAdmin = normalizedRole == 'platform_admin' ||
+            normalizedRole == 'super_admin' ||
+            normalizedRole == 'platform_administrator' ||
+            (normalizedRole.contains('platform') && normalizedRole.contains('admin'));
+        AppLogger.d('Role: "$role" -> Platform Admin: $isPlatformAdmin');
+      }
+
+      AppLogger.d('==================================');
+
+    } catch (e) {
+      AppLogger.w('Error during admin menu debug', e);
+    }
+  }
+
+  /// Comprehensive debug user data method - ENHANCED
+  Future<void> debugUserData() async {
+    try {
+      final user = currentUser.value;
+      if (user == null) {
+        AppLogger.e('No current user for debug');
+        return;
+      }
+
+      AppLogger.d('=== COMPREHENSIVE USER DEBUG INFO ===');
+      AppLogger.d('User ID: ${user.id}');
+      AppLogger.d('Email: ${user.email}');
+      AppLogger.d('Full Name: ${user.fullName}');
+      AppLogger.d('First Name: ${user.firstName}');
+      AppLogger.d('Last Name: ${user.lastName}');
+      AppLogger.d('Profile Image: ${user.profileImage}');
+      AppLogger.d('Phone: ${user.metadata?.phoneNumber}');
+      AppLogger.d('Is Active: ${user.isActive}');
+      AppLogger.d('Email Verified: ${user.isEmailVerified}');
+      AppLogger.d('Last Login: ${user.lastLoginAt}');
+      AppLogger.d('Created At: ${user.createdAt}');
+      AppLogger.d('Updated At: ${user.updatedAt}');
+      AppLogger.d('Tenant ID: ${user.tenantId}');
+      AppLogger.d('Children: ${user.children}');
+      AppLogger.d('--- ROLES & PERMISSIONS ---');
+      AppLogger.d('Roles Object: ${user.roles}');
+      AppLogger.d('Role Names Array: ${user.roleNames}');
+      AppLogger.d('Primary Role: ${user.primaryRole}');
+      AppLogger.d('Is Platform Admin: ${user.isPlatformAdmin}');
+      AppLogger.d('Platform Type: ${user.platformType}');
+      AppLogger.d('Is Admin: ${user.isAdmin}');
+      AppLogger.d('Is Teacher: ${user.isTeacher}');
+      AppLogger.d('Is Parent: ${user.isParent}');
+      AppLogger.d('Is Staff: ${user.isStaff}');
+      AppLogger.d('Is Tenant Admin: ${user.isTenantAdmin}');
+      AppLogger.d('Permissions: ${user.permissions}');
+      AppLogger.d('Permissions Count: ${user.permissions.length}');
+
+      // Test specific permission checks
+      AppLogger.d('--- PERMISSION TESTS ---');
+      AppLogger.d('Has role "platform_admin": ${user.hasRole("platform_admin")}');
+      AppLogger.d('Has role "super_admin": ${user.hasRole("super_admin")}');
+      AppLogger.d('Has role "school_admin": ${user.hasRole("school_admin")}');
+      AppLogger.d('Has permission "user:read": ${user.hasPermission("user:read")}');
+      AppLogger.d('Has any admin role: ${user.hasAnyRole(["platform_admin", "super_admin", "school_admin"])}');
+
+      AppLogger.d('=====================================');
+
+      // Call backend debug API endpoint
+      try {
+        AppLogger.d('Calling backend debug endpoint...');
+        final response = await _apiService.debugUser();
+        if (response.success) {
+          AppLogger.d('=== BACKEND DEBUG RESPONSE ===');
+          final debugData = response.data?['debug'];
+          if (debugData != null) {
+            AppLogger.d('Backend user ID: ${debugData['userId']}');
+            AppLogger.d('Backend email: ${debugData['email']}');
+            AppLogger.d('Backend full name: ${debugData['fullName']}');
+            AppLogger.d('Backend raw roles: ${debugData['rawRoles']}');
+            AppLogger.d('Backend role names: ${debugData['roleNames']}');
+            AppLogger.d('Backend isPlatformAdmin: ${debugData['isPlatformAdmin']}');
+            AppLogger.d('Backend platformType: ${debugData['platformType']}');
+            AppLogger.d('Backend roles populated: ${debugData['rolesPopulated']}');
+            AppLogger.d('Backend permissions count: ${debugData['permissionsCount']}');
+            AppLogger.d('Backend has role test: ${debugData['hasRoleTest']}');
+
+            // Compare frontend vs backend
+            AppLogger.d('--- FRONTEND vs BACKEND COMPARISON ---');
+            AppLogger.d('Role names match: ${user.roleNames.toString() == debugData['roleNames'].toString()}');
+            AppLogger.d('Platform admin match: ${user.isPlatformAdmin == debugData['isPlatformAdmin']}');
+            AppLogger.d('Platform type match: ${user.platformType == debugData['platformType']}');
+          }
+          AppLogger.d('==============================');
+        } else {
+          AppLogger.w('Debug endpoint returned error: ${response.message}');
+        }
+      } catch (e) {
+        AppLogger.d('Debug endpoint not available or failed: $e');
+      }
+    } catch (e) {
+      AppLogger.e('Debug failed', e);
     }
   }
 
@@ -436,7 +618,7 @@ class AuthController extends GetxController {
       // Phase 1: Controller cleanup
       backgroundReinitStatus.value = 'Cleaning up form controllers...';
       await _thoroughControllerCleanup();
-      await Future.delayed(const Duration(milliseconds: 400)); // Increased delay
+      await Future.delayed(const Duration(milliseconds: 400));
 
       // Phase 2: Memory optimization
       backgroundReinitStatus.value = 'Optimizing memory usage...';
@@ -456,7 +638,7 @@ class AuthController extends GetxController {
       // Phase 5: Pre-initialize fresh controllers
       backgroundReinitStatus.value = 'Preparing fresh login environment...';
       await _prepareLoginEnvironment();
-      await Future.delayed(const Duration(milliseconds: 600)); // Increased delay
+      await Future.delayed(const Duration(milliseconds: 600));
 
       // Phase 6: Final validation
       backgroundReinitStatus.value = 'Finalizing reinitialization...';
@@ -501,7 +683,7 @@ class AuthController extends GetxController {
             AppLogger.d('Preparing controller for disposal...');
             await controller.prepareForDisposal();
 
-            // Extended wait for thorough cleanup - INCREASED from 500ms
+            // Extended wait for thorough cleanup
             await Future.delayed(const Duration(milliseconds: 800));
           }
 
@@ -527,7 +709,7 @@ class AuthController extends GetxController {
         }
       }
 
-      // Cleanup SignUpFormController (unchanged)
+      // Cleanup SignUpFormController
       if (Get.isRegistered<SignUpFormController>()) {
         try {
           Get.delete<SignUpFormController>(force: true);
@@ -537,7 +719,7 @@ class AuthController extends GetxController {
         }
       }
 
-      // Extended wait for cleanup to complete - INCREASED from 300ms
+      // Extended wait for cleanup to complete
       await Future.delayed(const Duration(milliseconds: 500));
 
       AppLogger.d('Thorough controller cleanup completed');
@@ -991,13 +1173,19 @@ class AuthController extends GetxController {
     }
   }
 
-  /// Get current user profile
+  /// Get current user profile - ENHANCED with role debugging
   Future<void> getCurrentUser() async {
     try {
       final response = await _apiService.getCurrentUser();
 
       if (response.success && response.data != null) {
         final userData = response.data!['user'] ?? response.data!;
+
+        // ENHANCED: Debug current user API response
+        AppLogger.d('Current user API response: $userData');
+        AppLogger.d('User roles in getCurrentUser: ${userData['roles']}');
+        AppLogger.d('User roleNames in getCurrentUser: ${userData['roleNames']}');
+
         final user = UserModel.fromJson(userData);
         currentUser.value = user;
         isAuthenticated.value = true;
@@ -1011,7 +1199,7 @@ class AuthController extends GetxController {
           await _storageService.setString('current_tenant_id', user.tenantId!);
         }
 
-        AppLogger.i('Current user retrieved: ${user.fullName}');
+        AppLogger.i('Current user retrieved: ${user.fullName} with roles: ${user.roleNames}');
       } else {
         throw Exception(response.message ?? 'Failed to get user profile');
       }
@@ -1192,22 +1380,45 @@ class AuthController extends GetxController {
   /// Refresh token silently in background
   Future<void> _refreshTokenSilently() async {
     try {
-      final refreshToken = await _storageService.getString('refresh_token');
-      if (refreshToken == null) return;
+      final refreshTokenValue = await _storageService.getString('refresh_token');
+      if (refreshTokenValue == null) return;
 
-      final response = await _apiService.refreshToken();
+      final response = await _apiService.refreshTokenRequest();
 
       if (response.success && response.data != null) {
         final data = response.data!;
 
-        // Update stored tokens
-        if (data['accessToken'] != null) {
-          await _storageService.setString('access_token', data['accessToken']);
-          await _apiService.setAccessToken(data['accessToken']);
+        // Handle both field name variations for compatibility with safe type checking
+        String? accessToken;
+        String? refreshToken;
+
+        final accessTokenRaw = data['access_token'] ?? data['accessToken'];
+        final refreshTokenRaw = data['refresh_token'] ?? data['refreshToken'];
+
+        if (accessTokenRaw != null) {
+          if (accessTokenRaw is String) {
+            accessToken = accessTokenRaw;
+          } else {
+            accessToken = accessTokenRaw.toString();
+          }
         }
 
-        if (data['refreshToken'] != null) {
-          await _storageService.setString('refresh_token', data['refreshToken']);
+        if (refreshTokenRaw != null) {
+          if (refreshTokenRaw is String) {
+            refreshToken = refreshTokenRaw;
+          } else {
+            refreshToken = refreshTokenRaw.toString();
+          }
+        }
+
+        // Update stored tokens
+        if (accessToken != null && accessToken.isNotEmpty) {
+          await _storageService.setString('access_token', accessToken);
+          await _apiService.setAccessToken(accessToken);
+        }
+
+        if (refreshToken != null && refreshToken.isNotEmpty) {
+          await _storageService.setString('refresh_token', refreshToken);
         }
 
         // Update user data if provided
@@ -1369,7 +1580,7 @@ class AuthController extends GetxController {
   bool get tenantExpired => currentTenant.value?.isExpired ?? false;
   String get subscriptionStatus => currentTenant.value?.subscriptionStatusDisplay ?? '';
 
-  // Permission checking methods - RESTORED
+  // Permission checking methods
   bool hasRole(String role) => currentUser.value?.hasRole(role) ?? false;
   bool hasPermission(String permission) => currentUser.value?.hasPermission(permission) ?? false;
   bool hasAnyRole(List<String> roles) => currentUser.value?.hasAnyRole(roles) ?? false;
@@ -1478,9 +1689,10 @@ class AuthController extends GetxController {
       final rememberMe = await _storageService.getBool('remember_me') ?? false;
       if (rememberMe) {
         final rememberedEmail = await _storageService.getString('remembered_email');
-        if (rememberedEmail != null && loginFormController != null) {
-          loginFormController!.emailController.text = rememberedEmail;
-          loginFormController!.rememberMe.value = true;
+        final controller = loginFormController;
+        if (rememberedEmail != null && controller != null) {
+          controller.emailController.text = rememberedEmail;
+          controller.rememberMe.value = true;
         }
       }
     } catch (e) {
