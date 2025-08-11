@@ -1,258 +1,294 @@
 // lib/features/admin_platform/home/views/responsive/admin_home_view_desktop.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:sidebarx/sidebarx.dart';
 import '../../../../../features/auth/controllers/auth_controller.dart';
 import '../../../../../routes/app_routes.dart';
+import '../../../../../shared/components/sidebar/app_sidebar.dart';
+import '../../../../../constants/app_colors.dart';
+import '../../../config/sidebar/admin_menu_items.dart';
+
 
 class AdminHomeViewDesktop extends GetView<AuthController> {
   const AdminHomeViewDesktop({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final sidebarController = SidebarXController(selectedIndex: 0, extended: true);
+
     return Scaffold(
-      backgroundColor: const Color(0xFF1E3A8A), // Deep blue background
-      appBar: AppBar(
-        title: const Text(
-          'Creche Cloud - Platform Administration',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        backgroundColor: const Color(0xFF1E40AF), // Slightly lighter blue
-        elevation: 0,
-        actions: [
-          // User info
+      body: Row(
+        children: [
           Obx(() {
             final user = controller.currentUser.value;
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Row(
-                children: [
-                  Text(
-                    user?.fullName ?? 'Platform Admin',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  CircleAvatar(
-                    backgroundColor: Colors.white,
-                    radius: 18,
-                    child: Text(
-                      user?.initials ?? 'PA',
-                      style: const TextStyle(
-                        color: Color(0xFF1E3A8A),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            final userRoles = user?.roleNames ?? [];
+
+            return AppSidebar(
+              controller: sidebarController,
+              items: AdminMenuItems.getMenuItems(userRoles),
+              header: AdminMenuItems.buildHeader(),
+              footer: AdminMenuItems.buildFooter(),
             );
           }),
-          // Logout button
-          IconButton(
-            onPressed: () async {
-              try {
-                // Get the controller first and hold a reference
-                final authController = Get.find<AuthController>();
-                await authController.logout();
-              } catch (e) {
-                // If controller is not available, navigate directly to login
-                Get.offAllNamed(AppRoutes.login);
-              }
-            },
-            icon: const Icon(
-              Icons.logout,
-              color: Colors.white,
-            ),
-            tooltip: 'Logout',
-          ),
-        ],
-      ),
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              const Color(0xFF1E3A8A), // Deep blue
-              const Color(0xFF2563EB), // Medium blue
-              const Color(0xFF3B82F6), // Lighter blue
-            ],
-          ),
-        ),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Main title
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 24),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.3),
-                    width: 2,
-                  ),
-                ),
-                child: const Text(
-                  'Admin Platform',
+          Expanded(
+            child: Scaffold(
+              backgroundColor: AppColors.background,
+              appBar: AppBar(
+                title: const Text(
+                  'Platform Administration',
                   style: TextStyle(
-                    fontSize: 48,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: 1.2,
+                    color: AppColors.textPrimary,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-              ),
-
-              const SizedBox(height: 32),
-
-              // Subtitle
-              Text(
-                'Platform Administration Dashboard',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.white.withOpacity(0.9),
-                  letterSpacing: 0.5,
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // Role indicator
-              Obx(() {
-                final user = controller.currentUser.value;
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  child: Text(
-                    'Role: ${user?.primaryRole ?? 'Platform Administrator'}',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
+                backgroundColor: AppColors.surface,
+                elevation: 0,
+                automaticallyImplyLeading: false,
+                actions: [
+                  // User info
+                  Obx(() {
+                    final user = controller.currentUser.value;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Row(
+                        children: [
+                          Text(
+                            user?.fullName ?? 'Platform Admin',
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          CircleAvatar(
+                            backgroundColor: AppColors.loginButton,
+                            radius: 18,
+                            child: Text(
+                              user?.initials ?? 'PA',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                  // Logout button
+                  IconButton(
+                    onPressed: () async {
+                      try {
+                        final authController = Get.find<AuthController>();
+                        await authController.logout();
+                      } catch (e) {
+                        Get.offAllNamed(AppRoutes.login);
+                      }
+                    },
+                    icon: const Icon(
+                      Icons.logout,
+                      color: AppColors.textSecondary,
                     ),
-                  ),
-                );
-              }),
-
-              const SizedBox(height: 48),
-
-              // Feature indicators
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildFeatureCard(
-                    icon: Icons.business,
-                    title: 'Tenant Management',
-                    subtitle: 'Manage Schools',
-                  ),
-                  const SizedBox(width: 32),
-                  _buildFeatureCard(
-                    icon: Icons.people,
-                    title: 'User Management',
-                    subtitle: 'Platform Users',
-                  ),
-                  const SizedBox(width: 32),
-                  _buildFeatureCard(
-                    icon: Icons.analytics,
-                    title: 'Analytics',
-                    subtitle: 'Platform Insights',
+                    tooltip: 'Logout',
                   ),
                 ],
               ),
+              body: Container(
+                width: double.infinity,
+                height: double.infinity,
+                color: AppColors.background,
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Welcome message
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 24),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const Column(
+                          children: [
+                            Text(
+                              'Welcome to Admin Platform',
+                              style: TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            SizedBox(height: 12),
+                            Text(
+                              'Platform Administration Dashboard',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
 
-              const SizedBox(height: 48),
+                      const SizedBox(height: 48),
 
-              // Status indicator
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: Colors.green.withOpacity(0.5),
-                    width: 1,
+                      // Quick stats - role-based
+                      Obx(() {
+                        final user = controller.currentUser.value;
+                        final userRoles = user?.roleNames ?? [];
+
+                        if (userRoles.contains('platform_admin')) {
+                          // Full admin stats
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _buildStatCard(
+                                title: 'Total Tenants',
+                                value: '24',
+                                icon: Icons.business,
+                                color: AppColors.info,
+                              ),
+                              const SizedBox(width: 24),
+                              _buildStatCard(
+                                title: 'Active Users',
+                                value: '1,247',
+                                icon: Icons.people,
+                                color: AppColors.success,
+                              ),
+                              const SizedBox(width: 24),
+                              _buildStatCard(
+                                title: 'System Health',
+                                value: '98.5%',
+                                icon: Icons.health_and_safety,
+                                color: AppColors.warning,
+                              ),
+                            ],
+                          );
+                        } else if (userRoles.contains('platform_support')) {
+                          // Support-focused stats
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _buildStatCard(
+                                title: 'Open Tickets',
+                                value: '12',
+                                icon: Icons.support_agent,
+                                color: AppColors.warning,
+                              ),
+                              const SizedBox(width: 24),
+                              _buildStatCard(
+                                title: 'System Health',
+                                value: '98.5%',
+                                icon: Icons.health_and_safety,
+                                color: AppColors.success,
+                              ),
+                              const SizedBox(width: 24),
+                              _buildStatCard(
+                                title: 'Active Schools',
+                                value: '22',
+                                icon: Icons.school,
+                                color: AppColors.info,
+                              ),
+                            ],
+                          );
+                        } else {
+                          // Default minimal stats
+                          return _buildStatCard(
+                            title: 'Platform Status',
+                            value: 'Online',
+                            icon: Icons.check_circle,
+                            color: AppColors.success,
+                          );
+                        }
+                      }),
+
+                      const SizedBox(height: 32),
+
+                      // Action message - role-based
+                      Obx(() {
+                        final user = controller.currentUser.value;
+                        final userRoles = user?.roleNames ?? [];
+
+                        String message = 'Use the sidebar to navigate through the platform administration features.';
+
+                        if (userRoles.contains('platform_admin')) {
+                          message = 'Use the sidebar to manage tenants, users, and platform settings.';
+                        } else if (userRoles.contains('platform_support')) {
+                          message = 'Use the sidebar to access reports, analytics, and support tools.';
+                        }
+
+                        return Text(
+                          message,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: AppColors.textSecondary,
+                          ),
+                          textAlign: TextAlign.center,
+                        );
+                      }),
+                    ],
                   ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.check_circle,
-                      color: Colors.green[300],
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Platform Online',
-                      style: TextStyle(
-                        color: Colors.green[300],
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildFeatureCard({
-    required IconData icon,
+  Widget _buildStatCard({
     required String title,
-    required String subtitle,
+    required String value,
+    required IconData icon,
+    required Color color,
   }) {
     return Container(
       width: 160,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.2),
-          width: 1,
-        ),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         children: [
           Icon(
             icon,
             size: 32,
-            color: Colors.white,
+            color: color,
           ),
           const SizedBox(height: 12),
           Text(
-            title,
+            value,
             style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
             ),
-            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 4),
           Text(
-            subtitle,
-            style: TextStyle(
+            title,
+            style: const TextStyle(
               fontSize: 12,
-              color: Colors.white.withOpacity(0.8),
+              color: AppColors.textSecondary,
             ),
             textAlign: TextAlign.center,
           ),

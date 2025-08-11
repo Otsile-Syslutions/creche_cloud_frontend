@@ -27,7 +27,7 @@ dependencies:
   google_fonts: ^6.1.0
   cupertino_icons: ^1.0.8
   get_storage: ^2.1.1
-
+  sidebarx: ^0.17.2
 
 
 dev_dependencies:
