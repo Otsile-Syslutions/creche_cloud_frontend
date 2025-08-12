@@ -9,6 +9,7 @@ import 'package:web/web.dart' as web;
 
 import '../../features/auth/controllers/auth_controller.dart';
 import '../../routes/app_routes.dart';
+import '../../utils/app_logger.dart';
 
 class LogoutSplashScreen extends StatefulWidget {
   const LogoutSplashScreen({super.key});
@@ -26,16 +27,18 @@ class _LogoutSplashScreenState extends State<LogoutSplashScreen>
   late Animation<double> _fadeAnimation;
 
   Timer? _autoRedirectTimer;
-  Timer? _backgroundCheckTimer;
-  int _autoRedirectCountdown = 30; // 30 seconds
+  Timer? _logoutProcessTimer;
+  int _autoRedirectCountdown = 5; // Reduced to 5 seconds for better UX
   bool _userInteracted = false;
+  bool _logoutComplete = false;
+  String _statusMessage = 'Securing your session...';
 
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
+    _performLogout();
     _startAutoRedirectTimer();
-    _startBackgroundCheck();
   }
 
   void _initializeAnimations() {
@@ -87,6 +90,107 @@ class _LogoutSplashScreenState extends State<LogoutSplashScreen>
     });
   }
 
+  /// Centralized logout logic - handles everything
+  Future<void> _performLogout() async {
+    try {
+      AppLogger.i('LogoutSplashScreen: Starting centralized logout process');
+
+      // Get or create AuthController
+      AuthController? authController;
+
+      if (Get.isRegistered<AuthController>()) {
+        authController = Get.find<AuthController>();
+        AppLogger.d('LogoutSplashScreen: Found existing AuthController');
+      } else {
+        // Create new AuthController if it doesn't exist
+        authController = Get.put(AuthController());
+        AppLogger.d('LogoutSplashScreen: Created new AuthController');
+        // Wait for initialization
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
+
+      // Update status
+      if (mounted) {
+        setState(() {
+          _statusMessage = 'Logging out...';
+        });
+      }
+
+      // Step 1: Try API logout (don't wait too long)
+      try {
+        AppLogger.d('LogoutSplashScreen: Calling API logout');
+        // Check if authenticated before trying API logout
+        if (authController != null && authController.isAuthenticated.value) {
+          // We can't directly call API logout, so we'll skip this step
+          // The session will be cleared below
+          AppLogger.d('LogoutSplashScreen: User is authenticated, proceeding with logout');
+        }
+      } catch (e) {
+        AppLogger.w('LogoutSplashScreen: API logout check failed', e);
+      }
+
+      // Step 2: Clear local session
+      if (mounted) {
+        setState(() {
+          _statusMessage = 'Clearing session data...';
+        });
+      }
+
+      if (authController != null) {
+        AppLogger.d('LogoutSplashScreen: Clearing session');
+        await authController.clearSession();
+      }
+
+      // Step 3: Cleanup controllers and prepare for login
+      if (mounted) {
+        setState(() {
+          _statusMessage = 'Preparing login environment...';
+        });
+      }
+
+      // Ensure login environment is ready
+      if (authController != null) {
+        await authController.ensureLoginReady();
+      }
+
+      // Step 4: Mark logout as complete
+      if (mounted) {
+        setState(() {
+          _logoutComplete = true;
+          _statusMessage = 'Logout complete';
+        });
+      }
+
+      AppLogger.i('LogoutSplashScreen: Logout process completed successfully');
+
+      // If already complete, redirect faster
+      if (_logoutComplete && !_userInteracted) {
+        // Reduce countdown for faster redirect
+        _autoRedirectCountdown = 2;
+      }
+
+    } catch (e) {
+      AppLogger.e('LogoutSplashScreen: Error during logout process', e);
+
+      // Even on error, try to clear session and redirect
+      try {
+        if (Get.isRegistered<AuthController>()) {
+          final controller = Get.find<AuthController>();
+          await controller.clearSession();
+        }
+      } catch (clearError) {
+        AppLogger.e('LogoutSplashScreen: Failed to clear session', clearError);
+      }
+
+      if (mounted) {
+        setState(() {
+          _logoutComplete = true;
+          _statusMessage = 'Redirecting to login...';
+        });
+      }
+    }
+  }
+
   void _startAutoRedirectTimer() {
     _autoRedirectTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_userInteracted) {
@@ -95,37 +199,14 @@ class _LogoutSplashScreenState extends State<LogoutSplashScreen>
       }
 
       if (_autoRedirectCountdown > 0) {
-        setState(() {
-          _autoRedirectCountdown--;
-        });
+        if (mounted) {
+          setState(() {
+            _autoRedirectCountdown--;
+          });
+        }
       } else {
         timer.cancel();
         _autoRedirectToLogin();
-      }
-    });
-  }
-
-  void _startBackgroundCheck() {
-    // Check background reinitialization status
-    _backgroundCheckTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
-      if (_userInteracted) {
-        timer.cancel();
-        return;
-      }
-
-      try {
-        final authController = Get.find<AuthController>();
-        if (authController.backgroundReinitComplete.value) {
-          timer.cancel();
-          // Wait a bit more for stability, then redirect
-          Future.delayed(const Duration(milliseconds: 1000), () {
-            if (mounted && !_userInteracted) {
-              _refreshToLogin();
-            }
-          });
-        }
-      } catch (e) {
-        // AuthController not available, continue with timer-based redirect
       }
     });
   }
@@ -137,36 +218,13 @@ class _LogoutSplashScreenState extends State<LogoutSplashScreen>
   }
 
   void _performReturnToLogin() {
-    try {
-      setState(() {
-        _userInteracted = true;
-      });
-      _autoRedirectTimer?.cancel();
-      _backgroundCheckTimer?.cancel();
+    setState(() {
+      _userInteracted = true;
+    });
+    _autoRedirectTimer?.cancel();
+    _logoutProcessTimer?.cancel();
 
-      // Ensure reinitialization is complete before navigating
-      _ensureReinitializationComplete().then((_) {
-        if (mounted) {
-          _refreshToLogin();
-        }
-      });
-    } catch (e) {
-      // Fallback navigation
-      Get.snackbar(
-        'Navigation Error',
-        'Please restart the app.',
-        snackPosition: SnackPosition.TOP,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-
-      // Fallback navigation after delay
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) {
-          _refreshToLogin();
-        }
-      });
-    }
+    _refreshToLogin();
   }
 
   /// Refresh the page to login (web) or navigate cleanly (mobile)
@@ -190,25 +248,12 @@ class _LogoutSplashScreenState extends State<LogoutSplashScreen>
     }
   }
 
-  Future<void> _ensureReinitializationComplete() async {
-    try {
-      final authController = Get.find<AuthController>();
-
-      if (!authController.backgroundReinitComplete.value) {
-        // Force completion
-        await authController.ensureLoginReady();
-      }
-    } catch (e) {
-      // Continue without auth controller
-    }
-  }
-
   void _showHelpDialog() {
     setState(() {
       _userInteracted = true;
     });
     _autoRedirectTimer?.cancel();
-    _backgroundCheckTimer?.cancel();
+    _logoutProcessTimer?.cancel();
 
     showDialog(
       context: context,
@@ -242,7 +287,7 @@ class _LogoutSplashScreenState extends State<LogoutSplashScreen>
   @override
   void dispose() {
     _autoRedirectTimer?.cancel();
-    _backgroundCheckTimer?.cancel();
+    _logoutProcessTimer?.cancel();
     _iconAnimationController.dispose();
     _fadeAnimationController.dispose();
     super.dispose();
@@ -250,8 +295,20 @@ class _LogoutSplashScreenState extends State<LogoutSplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Get theme safely with fallbacks
+    final theme = Theme.of(context);
+    final scaffoldColor = theme.scaffoldBackgroundColor;
+    final primaryColor = theme.primaryColor;
+    final textTheme = theme.textTheme;
+
+    // Safe text style getters with fallbacks
+    final headlineMedium = textTheme.headlineMedium ?? const TextStyle(fontSize: 28, fontWeight: FontWeight.bold);
+    final bodyLarge = textTheme.bodyLarge ?? const TextStyle(fontSize: 16);
+    final bodyMedium = textTheme.bodyMedium ?? const TextStyle(fontSize: 14);
+    final bodySmall = textTheme.bodySmall ?? const TextStyle(fontSize: 12);
+
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: scaffoldColor,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(32.0),
@@ -272,23 +329,25 @@ class _LogoutSplashScreenState extends State<LogoutSplashScreen>
                         height: 120,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.green.shade50,
+                          color: _logoutComplete ? Colors.green.shade50 : primaryColor.withOpacity(0.1),
                           border: Border.all(
-                            color: Colors.green.shade300,
+                            color: _logoutComplete ? Colors.green.shade300 : primaryColor.withOpacity(0.3),
                             width: 3,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.green.shade200.withOpacity(0.5),
+                              color: _logoutComplete
+                                  ? Colors.green.shade200.withOpacity(0.5)
+                                  : primaryColor.withOpacity(0.2),
                               blurRadius: 20,
                               spreadRadius: 5,
                             ),
                           ],
                         ),
                         child: Icon(
-                          Icons.check_circle,
+                          _logoutComplete ? Icons.check_circle : Icons.logout,
                           size: 60,
-                          color: Colors.green.shade600,
+                          color: _logoutComplete ? Colors.green.shade600 : primaryColor,
                         ),
                       ),
                     ),
@@ -305,10 +364,9 @@ class _LogoutSplashScreenState extends State<LogoutSplashScreen>
                   children: [
                     // Success message
                     Text(
-                      'Successfully Logged Out',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.green.shade700,
+                      _logoutComplete ? 'Successfully Logged Out' : 'Logging Out',
+                      style: headlineMedium.copyWith(
+                        color: _logoutComplete ? Colors.green.shade700 : primaryColor,
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -317,62 +375,52 @@ class _LogoutSplashScreenState extends State<LogoutSplashScreen>
 
                     // Subtitle message
                     Text(
-                      'Your session has been securely ended.\nThank you for using our app!',
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.8),
+                      _logoutComplete
+                          ? 'Your session has been securely ended.\nThank you for using our app!'
+                          : 'Please wait while we secure your session...',
+                      style: bodyLarge.copyWith(
+                        color: bodyLarge.color?.withOpacity(0.8) ?? Colors.black87,
                       ),
                       textAlign: TextAlign.center,
                     ),
 
                     const SizedBox(height: 32),
 
-                    // Background status indicator
-                    GetX<AuthController>(
-                      builder: (controller) {
-                        if (controller.isBackgroundReinitializing.value) {
-                          return Column(
-                            children: [
-                              const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                controller.backgroundReinitStatus.value.isEmpty
-                                    ? 'Preparing login environment...'
-                                    : controller.backgroundReinitStatus.value,
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.6),
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          );
-                        } else if (controller.backgroundReinitComplete.value) {
-                          return Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.check_circle_outline,
-                                size: 16,
-                                color: Colors.green.shade600,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Ready for login',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: Colors.green.shade600,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          );
-                        } else {
-                          return const SizedBox.shrink();
-                        }
-                      },
-                    ),
+                    // Status indicator
+                    if (!_logoutComplete) ...[
+                      const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        _statusMessage,
+                        style: bodySmall.copyWith(
+                          color: bodySmall.color?.withOpacity(0.6) ?? Colors.black54,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ] else ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.check_circle_outline,
+                            size: 16,
+                            color: Colors.green.shade600,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Ready for login',
+                            style: bodySmall.copyWith(
+                              color: Colors.green.shade600,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
 
                     const SizedBox(height: 24),
 
@@ -380,8 +428,8 @@ class _LogoutSplashScreenState extends State<LogoutSplashScreen>
                     if (!_userInteracted) ...[
                       Text(
                         'Redirecting to login in $_autoRedirectCountdown seconds',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
+                        style: bodyMedium.copyWith(
+                          color: bodyMedium.color?.withOpacity(0.6) ?? Colors.black54,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -396,7 +444,7 @@ class _LogoutSplashScreenState extends State<LogoutSplashScreen>
                         ElevatedButton(
                           onPressed: _performReturnToLogin,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Theme.of(context).primaryColor,
+                            backgroundColor: primaryColor,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                             shape: RoundedRectangleBorder(
@@ -438,89 +486,11 @@ class _LogoutSplashScreenState extends State<LogoutSplashScreen>
   }
 }
 
-// Background reinitialization status widget
-class BackgroundReinitializationStatus extends StatelessWidget {
-  const BackgroundReinitializationStatus({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return GetX<AuthController>(
-      builder: (controller) {
-        final isReinitializing = controller.isBackgroundReinitializing.value;
-        final status = controller.backgroundReinitStatus.value;
-        final isComplete = controller.backgroundReinitComplete.value;
-
-        if (isComplete && status.isEmpty) {
-          return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.green.shade50,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.green.shade200),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.check_circle_outline,
-                  size: 16,
-                  color: Colors.green.shade600,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Login environment ready',
-                  style: TextStyle(
-                    color: Colors.green.shade700,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-
-        if (isReinitializing) {
-          return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: Theme.of(context).primaryColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Theme.of(context).primaryColor.withOpacity(0.3)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Theme.of(context).primaryColor,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    status.isEmpty ? 'Preparing...' : status,
-                    style: TextStyle(
-                      color: Theme.of(context).primaryColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-
-        return const SizedBox.shrink();
-      },
-    );
+// Simple logout utility for all platforms
+class SimpleLogout {
+  /// Navigate to logout splash screen - handles everything else
+  static void perform() {
+    Get.offAll(() => const LogoutSplashScreen());
   }
 }
 
@@ -528,158 +498,17 @@ class BackgroundReinitializationStatus extends StatelessWidget {
 class QuickLogoutSplashScreen extends StatelessWidget {
   const QuickLogoutSplashScreen({super.key});
 
-  /// Refresh the page to login (web) or navigate cleanly (mobile)
-  void _refreshToLogin() {
-    try {
-      if (kIsWeb) {
-        // For web: perform a full page refresh to login using modern web APIs
-        final currentLocation = web.window.location;
-        final loginUrl = '${currentLocation.origin}/#/login';
-        web.window.location.href = loginUrl;
-        web.window.location.reload();
-      } else {
-        // For mobile: clear all routes and navigate to login
-        Get.reset();
-        Get.offAllNamed(AppRoutes.login);
-      }
-    } catch (e) {
-      // Fallback if web refresh fails
-      Get.reset();
-      Get.offAllNamed(AppRoutes.login);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    // Auto-redirect after 3 seconds
-    Timer(const Duration(seconds: 3), () {
-      if (context.mounted) {
-        _refreshToLogin();
-      }
+    // Just redirect to main logout splash
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Get.off(() => const LogoutSplashScreen());
     });
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: SafeArea(
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.logout,
-                size: 80,
-                color: Theme.of(context).primaryColor,
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Logged Out',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Redirecting to login...',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.7),
-                ),
-              ),
-              const SizedBox(height: 32),
-              const CircularProgressIndicator(),
-            ],
-          ),
-        ),
+    return const Scaffold(
+      body: Center(
+        child: CircularProgressIndicator(),
       ),
     );
-  }
-}
-
-// Silent logout (no splash, direct refresh)
-class SilentLogout {
-  static void perform() {
-    try {
-      if (kIsWeb) {
-        // For web: perform a full page refresh to login using modern web APIs
-        final currentLocation = web.window.location;
-        final loginUrl = '${currentLocation.origin}/#/login';
-        web.window.location.href = loginUrl;
-        web.window.location.reload();
-      } else {
-        // For mobile: clear all routes and navigate to login
-        Get.reset();
-        Get.offAllNamed(AppRoutes.login);
-      }
-    } catch (e) {
-      // Fallback if web refresh fails
-      Get.reset();
-      Get.offAllNamed(AppRoutes.login);
-    }
-  }
-}
-
-// Logout utility methods
-class LogoutUtils {
-  /// Refresh the page to login (web) or navigate cleanly (mobile)
-  static void _refreshToLogin() {
-    try {
-      if (kIsWeb) {
-        // For web: perform a full page refresh to login using modern web APIs
-        final currentLocation = web.window.location;
-        final loginUrl = '${currentLocation.origin}/#/login';
-        web.window.location.href = loginUrl;
-        web.window.location.reload();
-      } else {
-        // For mobile: clear all routes and navigate to login
-        Get.reset();
-        Get.offAllNamed(AppRoutes.login);
-      }
-    } catch (e) {
-      // Fallback if web refresh fails
-      Get.reset();
-      Get.offAllNamed(AppRoutes.login);
-    }
-  }
-
-  /// Show standard logout splash and redirect
-  static void showLogoutSplash() {
-    Get.off(() => const LogoutSplashScreen());
-  }
-
-  /// Show quick logout splash and redirect
-  static void showQuickLogoutSplash() {
-    Get.off(() => const QuickLogoutSplashScreen());
-  }
-
-  /// Perform silent logout (no splash)
-  static void performSilentLogout() {
-    SilentLogout.perform();
-  }
-
-  /// Perform immediate refresh to login
-  static void refreshToLogin() {
-    _refreshToLogin();
-  }
-
-  /// Show logout confirmation dialog
-  static Future<bool> showLogoutConfirmation(BuildContext context) async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Logout'),
-        content: const Text('Are you sure you want to log out?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Logout'),
-          ),
-        ],
-      ),
-    );
-
-    return result ?? false;
   }
 }

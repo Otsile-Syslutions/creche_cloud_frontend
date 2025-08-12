@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:sidebarx/sidebarx.dart';
 import '../../../../../features/auth/controllers/auth_controller.dart';
 import '../../../../../shared/components/sidebar/app_sidebar.dart';
+import '../../../../../shared/widgets/logout_splash_screen.dart';
 import '../../../../../constants/app_colors.dart';
 import '../../../config/sidebar/parent_menu_items.dart';
 
@@ -72,7 +73,7 @@ class ParentHomeViewDesktop extends GetView<AuthController> {
                   }),
                   // Logout button
                   IconButton(
-                    onPressed: () => controller.logout(),
+                    onPressed: () => Get.offAll(() => const LogoutSplashScreen()),
                     icon: const Icon(
                       Icons.logout,
                       color: AppColors.textSecondary,
