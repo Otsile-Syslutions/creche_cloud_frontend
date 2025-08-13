@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:sidebarx/sidebarx.dart';
 import 'package:get/get.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../../shared/components/sidebar/app_sidebar.dart';
 import '../../../auth/controllers/auth_controller.dart';
 
@@ -9,7 +10,11 @@ class TenantMenuItems {
   static List<SidebarXItem> getMenuItems(List<String> userRoles) {
     final items = <SidebarXItem>[
       SidebarXItem(
-        icon: Icons.dashboard,
+        iconBuilder: (selected, hovered) => HugeIcon(
+          icon: HugeIcons.strokeRoundedDashboardSquare01,
+          color: selected ? Colors.white : const Color(0xFF6B7280),
+          size: 22,
+        ),
         label: 'Dashboard',
         onTap: () {
           // Navigate to tenant home
@@ -27,7 +32,11 @@ class TenantMenuItems {
     ].contains(role.toLowerCase()))) {
       items.addAll([
         SidebarXItem(
-          icon: Icons.child_care,
+          iconBuilder: (selected, hovered) => HugeIcon(
+            icon: HugeIcons.strokeRoundedBaby01,
+            color: selected ? Colors.white : const Color(0xFF6B7280),
+            size: 22,
+          ),
           label: 'Children',
           onTap: () {
             // Navigate to children management
@@ -35,7 +44,11 @@ class TenantMenuItems {
           },
         ),
         SidebarXItem(
-          icon: Icons.how_to_reg,
+          iconBuilder: (selected, hovered) => HugeIcon(
+            icon: HugeIcons.strokeRoundedUserCheck01,
+            color: selected ? Colors.white : const Color(0xFF6B7280),
+            size: 22,
+          ),
           label: 'Attendance',
           onTap: () {
             // Navigate to attendance
@@ -43,7 +56,11 @@ class TenantMenuItems {
           },
         ),
         SidebarXItem(
-          icon: Icons.restaurant,
+          iconBuilder: (selected, hovered) => HugeIcon(
+            icon: HugeIcons.strokeRoundedDish01,
+            color: selected ? Colors.white : const Color(0xFF6B7280),
+            size: 22,
+          ),
           label: 'Meals',
           onTap: () {
             // Navigate to meals
@@ -51,7 +68,11 @@ class TenantMenuItems {
           },
         ),
         SidebarXItem(
-          icon: Icons.sports,
+          iconBuilder: (selected, hovered) => HugeIcon(
+            icon: HugeIcons.strokeRoundedBasketball01,
+            color: selected ? Colors.white : const Color(0xFF6B7280),
+            size: 22,
+          ),
           label: 'Activities',
           onTap: () {
             // Navigate to activities
@@ -59,7 +80,11 @@ class TenantMenuItems {
           },
         ),
         SidebarXItem(
-          icon: Icons.message,
+          iconBuilder: (selected, hovered) => HugeIcon(
+            icon: HugeIcons.strokeRoundedMessage01,
+            color: selected ? Colors.white : const Color(0xFF6B7280),
+            size: 22,
+          ),
           label: 'Messages',
           onTap: () {
             // Navigate to messages
@@ -76,7 +101,11 @@ class TenantMenuItems {
     ].contains(role.toLowerCase()))) {
       items.addAll([
         SidebarXItem(
-          icon: Icons.people,
+          iconBuilder: (selected, hovered) => HugeIcon(
+            icon: HugeIcons.strokeRoundedUserMultiple,
+            color: selected ? Colors.white : const Color(0xFF6B7280),
+            size: 22,
+          ),
           label: 'Staff',
           onTap: () {
             // Navigate to staff management
@@ -84,7 +113,11 @@ class TenantMenuItems {
           },
         ),
         SidebarXItem(
-          icon: Icons.analytics,
+          iconBuilder: (selected, hovered) => HugeIcon(
+            icon: HugeIcons.strokeRoundedChartLineData01,
+            color: selected ? Colors.white : const Color(0xFF6B7280),
+            size: 22,
+          ),
           label: 'Reports',
           onTap: () {
             // Navigate to reports
@@ -98,7 +131,11 @@ class TenantMenuItems {
     if (userRoles.any((role) => role.toLowerCase() == 'school_admin')) {
       items.addAll([
         SidebarXItem(
-          icon: Icons.manage_accounts,
+          iconBuilder: (selected, hovered) => HugeIcon(
+            icon: HugeIcons.strokeRoundedUserSettings01,
+            color: selected ? Colors.white : const Color(0xFF6B7280),
+            size: 22,
+          ),
           label: 'Users',
           onTap: () {
             // Navigate to user management
@@ -106,7 +143,11 @@ class TenantMenuItems {
           },
         ),
         SidebarXItem(
-          icon: Icons.payment,
+          iconBuilder: (selected, hovered) => HugeIcon(
+            icon: HugeIcons.strokeRoundedInvoice,
+            color: selected ? Colors.white : const Color(0xFF6B7280),
+            size: 22,
+          ),
           label: 'Billing',
           onTap: () {
             // Navigate to billing
@@ -114,7 +155,11 @@ class TenantMenuItems {
           },
         ),
         SidebarXItem(
-          icon: Icons.settings,
+          iconBuilder: (selected, hovered) => HugeIcon(
+            icon: HugeIcons.strokeRoundedSettings01,
+            color: selected ? Colors.white : const Color(0xFF6B7280),
+            size: 22,
+          ),
           label: 'Settings',
           onTap: () {
             // Navigate to settings
@@ -127,16 +172,9 @@ class TenantMenuItems {
     return items;
   }
 
-  static Widget buildHeader() {
-    return GetBuilder<AuthController>(
-      builder: (authController) {
-        final tenant = authController.currentTenant.value;
-        return AppSidebarHeader(
-          title: 'Creche Cloud',
-          subtitle: tenant?.name ?? 'School Management',
-          icon: Icons.school,
-        );
-      },
+  static Widget buildHeader({SidebarXController? controller}) {
+    return AppSidebarHeader(
+      controller: controller,
     );
   }
 

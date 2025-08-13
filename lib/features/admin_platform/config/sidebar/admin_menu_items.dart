@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:sidebarx/sidebarx.dart';
 import 'package:get/get.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../../shared/components/sidebar/app_sidebar.dart';
 import '../../../auth/controllers/auth_controller.dart';
 import '../../../../utils/app_logger.dart';
@@ -28,7 +29,11 @@ class AdminMenuItems {
     final items = <SidebarXItem>[
       // Dashboard - Available to all admin roles
       SidebarXItem(
-        icon: Icons.dashboard,
+        iconBuilder: (selected, hovered) => HugeIcon(
+          icon: HugeIcons.strokeRoundedDashboardSquare01,
+          color: selected ? Colors.white : const Color(0xFF6B7280),
+          size: 22,
+        ),
         label: 'Dashboard',
         onTap: () {
           AppLogger.d('Admin Dashboard tapped');
@@ -47,7 +52,11 @@ class AdminMenuItems {
       AppLogger.d('✅ Adding platform admin menu items');
       items.addAll([
         SidebarXItem(
-          icon: Icons.business,
+          iconBuilder: (selected, hovered) => HugeIcon(
+            icon: HugeIcons.strokeRoundedBuilding01,
+            color: selected ? Colors.white : const Color(0xFF6B7280),
+            size: 22,
+          ),
           label: 'Tenants',
           onTap: () {
             AppLogger.d('Tenants menu tapped');
@@ -56,7 +65,11 @@ class AdminMenuItems {
           },
         ),
         SidebarXItem(
-          icon: Icons.people,
+          iconBuilder: (selected, hovered) => HugeIcon(
+            icon: HugeIcons.strokeRoundedUserMultiple,
+            color: selected ? Colors.white : const Color(0xFF6B7280),
+            size: 22,
+          ),
           label: 'Users',
           onTap: () {
             AppLogger.d('Users menu tapped');
@@ -77,7 +90,11 @@ class AdminMenuItems {
       AppLogger.d('✅ Adding reports and analytics menu items');
       items.addAll([
         SidebarXItem(
-          icon: Icons.analytics,
+          iconBuilder: (selected, hovered) => HugeIcon(
+            icon: HugeIcons.strokeRoundedFile02,
+            color: selected ? Colors.white : const Color(0xFF6B7280),
+            size: 22,
+          ),
           label: 'Reports',
           onTap: () {
             AppLogger.d('Reports menu tapped');
@@ -86,7 +103,11 @@ class AdminMenuItems {
           },
         ),
         SidebarXItem(
-          icon: Icons.bar_chart,
+          iconBuilder: (selected, hovered) => HugeIcon(
+            icon: HugeIcons.strokeRoundedChartLineData01,
+            color: selected ? Colors.white : const Color(0xFF6B7280),
+            size: 22,
+          ),
           label: 'Analytics',
           onTap: () {
             AppLogger.d('Analytics menu tapped');
@@ -104,7 +125,11 @@ class AdminMenuItems {
       AppLogger.d('✅ Adding settings menu item');
       items.add(
         SidebarXItem(
-          icon: Icons.settings,
+          iconBuilder: (selected, hovered) => HugeIcon(
+            icon: HugeIcons.strokeRoundedSettings01,
+            color: selected ? Colors.white : const Color(0xFF6B7280),
+            size: 22,
+          ),
           label: 'Settings',
           onTap: () {
             AppLogger.d('Settings menu tapped');
@@ -234,47 +259,10 @@ class AdminMenuItems {
     return false;
   }
 
-  static Widget buildHeader() {
-    return Obx(() {
-      final authController = Get.find<AuthController>();
-      final user = authController.currentUser.value;
-
-      // Enhanced debugging
-      AppLogger.d('=== ADMIN HEADER BUILD ===');
-      AppLogger.d('User exists: ${user != null}');
-      AppLogger.d('User name: ${user?.fullName}');
-      AppLogger.d('User roles: ${user?.roleNames}');
-      AppLogger.d('Is platform admin: ${user?.isPlatformAdmin}');
-      AppLogger.d('Platform type: ${user?.platformType}');
-
-      final userRoles = user?.roleNames ?? [];
-
-      // Determine the subtitle based on role
-      String subtitle = 'Platform User';
-      IconData headerIcon = Icons.admin_panel_settings;
-
-      // Use both roleNames and isPlatformAdmin flag for determination
-      if (user?.isPlatformAdmin == true || _isPlatformAdmin(userRoles)) {
-        subtitle = 'Platform Administrator';
-        headerIcon = Icons.admin_panel_settings;
-        AppLogger.d('✅ Header: Platform Administrator');
-      } else if (_hasReportsAccess(userRoles)) {
-        subtitle = 'Platform Support';
-        headerIcon = Icons.support_agent;
-        AppLogger.d('✅ Header: Platform Support');
-      } else {
-        AppLogger.d('✅ Header: Platform User (default)');
-      }
-
-      AppLogger.d('Admin header subtitle: $subtitle');
-      AppLogger.d('=========================');
-
-      return AppSidebarHeader(
-        title: 'Creche Cloud',
-        subtitle: subtitle,
-        icon: headerIcon,
-      );
-    });
+  static Widget buildHeader({SidebarXController? controller}) {
+    return AppSidebarHeader(
+      controller: controller,
+    );
   }
 
   static Widget buildFooter() {

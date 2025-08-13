@@ -8,9 +8,9 @@ class AppAssets {
   static const String loginBackground = 'assets/images/login_bg.jpg';
   static const String signupBackground = 'assets/images/signup_bg.png';
 
-
   // Logos
   static const String ccLogoFullColour = 'assets/logos/cc_logo_full_colour.png';
+  static const String ccLogoFullColourCollapsed = 'assets/logos/cc_logo_full_colour_collapsed.png'; // Favicon version
 
   // Doodles
   static const String doodlePinkSquiggleLines = 'assets/doodles/doodle_pink_squiggle_lines.png';

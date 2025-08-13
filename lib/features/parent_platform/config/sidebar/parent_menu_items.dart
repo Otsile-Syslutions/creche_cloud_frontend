@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:sidebarx/sidebarx.dart';
 import 'package:get/get.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../../../../shared/components/sidebar/app_sidebar.dart';
 import '../../../auth/controllers/auth_controller.dart';
 
@@ -9,7 +10,11 @@ class ParentMenuItems {
   static List<SidebarXItem> getMenuItems() {
     return [
       SidebarXItem(
-        icon: Icons.home,
+        iconBuilder: (selected, hovered) => HugeIcon(
+          icon: HugeIcons.strokeRoundedHome01,
+          color: selected ? Colors.white : const Color(0xFF6B7280),
+          size: 22,
+        ),
         label: 'Home',
         onTap: () {
           // Navigate to parent home
@@ -17,7 +22,11 @@ class ParentMenuItems {
         },
       ),
       SidebarXItem(
-        icon: Icons.child_care,
+        iconBuilder: (selected, hovered) => HugeIcon(
+          icon: HugeIcons.strokeRoundedBaby01,
+          color: selected ? Colors.white : const Color(0xFF6B7280),
+          size: 22,
+        ),
         label: 'My Children',
         onTap: () {
           // Navigate to children
@@ -25,7 +34,11 @@ class ParentMenuItems {
         },
       ),
       SidebarXItem(
-        icon: Icons.photo_library,
+        iconBuilder: (selected, hovered) => HugeIcon(
+          icon: HugeIcons.strokeRoundedImage01,
+          color: selected ? Colors.white : const Color(0xFF6B7280),
+          size: 22,
+        ),
         label: 'Daily Photos',
         onTap: () {
           // Navigate to photos/activities
@@ -33,7 +46,11 @@ class ParentMenuItems {
         },
       ),
       SidebarXItem(
-        icon: Icons.message,
+        iconBuilder: (selected, hovered) => HugeIcon(
+          icon: HugeIcons.strokeRoundedMessage01,
+          color: selected ? Colors.white : const Color(0xFF6B7280),
+          size: 22,
+        ),
         label: 'Messages',
         onTap: () {
           // Navigate to messages
@@ -41,7 +58,11 @@ class ParentMenuItems {
         },
       ),
       SidebarXItem(
-        icon: Icons.assessment,
+        iconBuilder: (selected, hovered) => HugeIcon(
+          icon: HugeIcons.strokeRoundedFile02,
+          color: selected ? Colors.white : const Color(0xFF6B7280),
+          size: 22,
+        ),
         label: 'Reports',
         onTap: () {
           // Navigate to reports
@@ -49,7 +70,11 @@ class ParentMenuItems {
         },
       ),
       SidebarXItem(
-        icon: Icons.payment,
+        iconBuilder: (selected, hovered) => HugeIcon(
+          icon: HugeIcons.strokeRoundedInvoice,
+          color: selected ? Colors.white : const Color(0xFF6B7280),
+          size: 22,
+        ),
         label: 'Billing',
         onTap: () {
           // Navigate to billing
@@ -59,11 +84,9 @@ class ParentMenuItems {
     ];
   }
 
-  static Widget buildHeader() {
-    return const AppSidebarHeader(
-      title: 'Creche Cloud',
-      subtitle: 'Parent Portal',
-      icon: Icons.family_restroom,
+  static Widget buildHeader({SidebarXController? controller}) {
+    return AppSidebarHeader(
+      controller: controller,
     );
   }
 
