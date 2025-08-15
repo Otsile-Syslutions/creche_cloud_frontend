@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:sidebarx/sidebarx.dart';
 import '../../../constants/app_colors.dart';
 import '../../../constants/app_assets.dart';
+import '../../../utils/app_logger.dart';
 import 'app_sidebar_controller.dart';
 import 'collapsed_sidebar.dart';
 import 'expanded_sidebar.dart';
@@ -38,33 +39,50 @@ class AppSidebar extends StatefulWidget {
 
 class _AppSidebarState extends State<AppSidebar> {
   late AppSidebarController _controller;
+  late String _controllerTag;
 
   @override
   void initState() {
     super.initState();
 
-    // Initialize controller
-    _controller = Get.put(
-      AppSidebarController(),
-      tag: 'sidebar_${DateTime.now().millisecondsSinceEpoch}',
-    );
+    // Create a unique tag for this controller instance
+    _controllerTag = 'sidebar_${UniqueKey().toString()}';
 
-    // Set initial values
-    _controller.isExpanded.value = widget.startExpanded;
-    _controller.selectedIndex.value = widget.selectedIndex ?? 0;
-    _controller.sidebarWidth.value = widget.expandedWidth;
-    _controller.collapsedWidth.value = widget.collapsedWidth;
+    // Initialize controller with try-catch for safety
+    try {
+      _controller = Get.put(
+        AppSidebarController(),
+        tag: _controllerTag,
+      );
 
-    // Initialize focus nodes for keyboard navigation
-    _controller.initializeFocusNodes(widget.items.length);
+      // Set initial values
+      _controller.isExpanded.value = widget.startExpanded;
+      _controller.selectedIndex.value = widget.selectedIndex ?? 0;
+      _controller.sidebarWidth.value = widget.expandedWidth;
+      _controller.collapsedWidth.value = widget.collapsedWidth;
+
+      // Initialize focus nodes for keyboard navigation
+      _controller.initializeFocusNodes(widget.items.length);
+    } catch (e) {
+      AppLogger.e('Error initializing AppSidebar controller', e);
+      // Initialize with a fallback controller if needed
+      _controller = AppSidebarController();
+    }
   }
 
   @override
   void dispose() {
-    // Clean up controller
-    Get.delete<AppSidebarController>(
-      tag: 'sidebar_${_controller.hashCode}',
-    );
+    // Clean up controller safely
+    try {
+      if (Get.isRegistered<AppSidebarController>(tag: _controllerTag)) {
+        Get.delete<AppSidebarController>(
+          tag: _controllerTag,
+          force: true,
+        );
+      }
+    } catch (e) {
+      AppLogger.e('Error disposing AppSidebar controller', e);
+    }
     super.dispose();
   }
 

@@ -1,10 +1,8 @@
 // lib/features/parent_platform/config/sidebar/parent_menu_items.dart
 import 'package:flutter/material.dart';
 import 'package:sidebarx/sidebarx.dart';
-import 'package:get/get.dart';
 import 'package:hugeicons/hugeicons.dart';
 import '../../../../shared/components/sidebar/app_sidebar.dart';
-import '../../../auth/controllers/auth_controller.dart';
 
 class ParentMenuItems {
   static List<SidebarXItem> getMenuItems() {
@@ -91,19 +89,22 @@ class ParentMenuItems {
   }
 
   static Widget buildFooter() {
-    return GetBuilder<AuthController>(
-      builder: (authController) {
-        final user = authController.currentUser.value;
-        final childCount = user?.children.length ?? 0;
+    // Simple static footer without GetBuilder
+    return const AppSidebarFooter(
+      statusText: 'Parent Portal',
+      isActive: true,
+      statusIcon: Icons.child_care,
+    );
+  }
 
-        return AppSidebarFooter(
-          statusText: childCount > 0
-              ? '$childCount ${childCount == 1 ? 'Child' : 'Children'}'
-              : 'No Children',
-          isActive: childCount > 0,
-          statusIcon: Icons.child_care,
-        );
-      },
+  // New method to build dynamic footer (to be called from parent widget that has access to AuthController)
+  static Widget buildDynamicFooter({required int childCount}) {
+    return AppSidebarFooter(
+      statusText: childCount > 0
+          ? '$childCount ${childCount == 1 ? 'Child' : 'Children'}'
+          : 'No Children',
+      isActive: childCount > 0,
+      statusIcon: Icons.child_care,
     );
   }
 }

@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../shared/responsive/responsive_layout.dart';
+import '../../../../features/auth/controllers/auth_controller.dart';
+import '../../../../utils/app_logger.dart';
 import 'responsive/admin_home_view_desktop.dart';
 import '../controllers/admin_home_controller.dart';
 
@@ -10,8 +12,20 @@ class AdminHomeView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Initialize controller here as a failsafe
+    // Ensure AuthController is available first
+    if (!Get.isRegistered<AuthController>()) {
+      AppLogger.w('AuthController not registered, initializing...');
+      try {
+        Get.put(AuthController());
+        AppLogger.i('AuthController initialized successfully');
+      } catch (e) {
+        AppLogger.e('Failed to initialize AuthController', e);
+      }
+    }
+
+    // Initialize AdminHomeController after AuthController
     if (!Get.isRegistered<AdminHomeController>()) {
+      AppLogger.d('Initializing AdminHomeController');
       Get.put(AdminHomeController());
     }
 

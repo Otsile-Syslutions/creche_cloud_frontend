@@ -1,7 +1,6 @@
 // lib/shared/components/sidebar/collapsed_sidebar.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:hugeicons/hugeicons.dart';
 import '../../../constants/app_colors.dart';
 import '../../../constants/app_assets.dart';
 import 'app_sidebar_controller.dart';

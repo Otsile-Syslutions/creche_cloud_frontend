@@ -1,10 +1,8 @@
 // lib/features/admin_platform/config/sidebar/admin_menu_items.dart
 import 'package:flutter/material.dart';
 import 'package:sidebarx/sidebarx.dart';
-import 'package:get/get.dart';
 import 'package:hugeicons/hugeicons.dart';
 import '../../../../shared/components/sidebar/app_sidebar.dart';
-import '../../../auth/controllers/auth_controller.dart';
 import '../../../../utils/app_logger.dart';
 
 class AdminMenuItems {
@@ -227,51 +225,42 @@ class AdminMenuItems {
   }
 
   static Widget buildFooter() {
-    // Use GetBuilder instead of Obx to avoid the controller not found issue
-    return GetBuilder<AuthController>(
-      init: Get.isRegistered<AuthController>() ? null : AuthController(),
-      builder: (authController) {
-        final user = authController.currentUser.value;
+    // Simple static footer without GetBuilder
+    return const AppSidebarFooter(
+      statusText: 'Platform Online',
+      isActive: true,
+      statusIcon: Icons.admin_panel_settings,
+    );
+  }
 
-        // Enhanced debugging
-        AppLogger.d('=== ADMIN FOOTER BUILD ===');
-        AppLogger.d('User exists: ${user != null}');
-        AppLogger.d('User name: ${user?.fullName}');
-        AppLogger.d('User roles: ${user?.roleNames}');
-        AppLogger.d('Is platform admin: ${user?.isPlatformAdmin}');
+  // New method to build dynamic footer based on roles (to be called from parent widget that has access to AuthController)
+  static Widget buildDynamicFooter(List<String> userRoles, {bool? isPlatformAdminFlag}) {
+    String statusText = 'Platform Online';
+    bool isActive = true;
+    IconData statusIcon = Icons.check_circle;
 
-        final userRoles = user?.roleNames ?? [];
+    // Use both roleNames and isPlatformAdmin flag for determination
+    if (isPlatformAdminFlag == true || _isPlatformAdmin(userRoles)) {
+      statusText = 'Full Access';
+      statusIcon = Icons.admin_panel_settings;
+      AppLogger.d('✅ Footer: Full Access');
+    } else if (_hasReportsAccess(userRoles)) {
+      statusText = 'Support Access';
+      statusIcon = Icons.support_agent;
+      AppLogger.d('✅ Footer: Support Access');
+    } else {
+      statusText = 'Limited Access';
+      statusIcon = Icons.info;
+      isActive = false;
+      AppLogger.d('✅ Footer: Limited Access');
+    }
 
-        // Show different status based on role
-        String statusText = 'Platform Online';
-        bool isActive = true;
-        IconData statusIcon = Icons.check_circle;
+    AppLogger.d('Admin footer status: $statusText');
 
-        // Use both roleNames and isPlatformAdmin flag for determination
-        if (user?.isPlatformAdmin == true || _isPlatformAdmin(userRoles)) {
-          statusText = 'Full Access';
-          statusIcon = Icons.admin_panel_settings;
-          AppLogger.d('✅ Footer: Full Access');
-        } else if (_hasReportsAccess(userRoles)) {
-          statusText = 'Support Access';
-          statusIcon = Icons.support_agent;
-          AppLogger.d('✅ Footer: Support Access');
-        } else {
-          statusText = 'Limited Access';
-          statusIcon = Icons.info;
-          isActive = false;
-          AppLogger.d('✅ Footer: Limited Access');
-        }
-
-        AppLogger.d('Admin footer status: $statusText');
-        AppLogger.d('=========================');
-
-        return AppSidebarFooter(
-          statusText: statusText,
-          isActive: isActive,
-          statusIcon: statusIcon,
-        );
-      },
+    return AppSidebarFooter(
+      statusText: statusText,
+      isActive: isActive,
+      statusIcon: statusIcon,
     );
   }
 }

@@ -1,10 +1,9 @@
 // lib/features/tenant_platform/config/sidebar/tenant_menu_items.dart
 import 'package:flutter/material.dart';
 import 'package:sidebarx/sidebarx.dart';
-import 'package:get/get.dart';
+
 import 'package:hugeicons/hugeicons.dart';
 import '../../../../shared/components/sidebar/app_sidebar.dart';
-import '../../../auth/controllers/auth_controller.dart';
 
 class TenantMenuItems {
   static List<SidebarXItem> getMenuItems(List<String> userRoles) {
@@ -179,17 +178,20 @@ class TenantMenuItems {
   }
 
   static Widget buildFooter() {
-    return GetBuilder<AuthController>(
-      builder: (authController) {
-        final tenant = authController.currentTenant.value;
-        final isActive = tenant?.checkSubscriptionStatus() ?? false;
+    // Simple static footer without GetBuilder
+    return const AppSidebarFooter(
+      statusText: 'School Active',
+      isActive: true,
+      statusIcon: Icons.check_circle,
+    );
+  }
 
-        return AppSidebarFooter(
-          statusText: isActive ? 'School Active' : 'Check Status',
-          isActive: isActive,
-          statusIcon: isActive ? Icons.check_circle : Icons.warning,
-        );
-      },
+  // New method to build dynamic footer (to be called from parent widget that has access to AuthController)
+  static Widget buildDynamicFooter({required bool isActive, String? tenantName}) {
+    return AppSidebarFooter(
+      statusText: isActive ? 'School Active' : 'Check Status',
+      isActive: isActive,
+      statusIcon: isActive ? Icons.check_circle : Icons.warning,
     );
   }
 }

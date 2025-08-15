@@ -2,28 +2,30 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../../features/auth/controllers/auth_controller.dart';
-
 import '../../../../../constants/app_colors.dart';
 import '../../../../../shared/layouts/desktop_app_layout.dart';
 import '../../../config/sidebar/admin_menu_items.dart';
 
-class AdminHomeViewDesktop extends GetView<AuthController> {
+class AdminHomeViewDesktop extends StatelessWidget {
   const AdminHomeViewDesktop({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Obx(() {
-      final user = controller.currentUser.value;
-      final userRoles = user?.roleNames ?? [];
+    // Safely get the AuthController if it exists
+    final AuthController? authController = Get.isRegistered<AuthController>()
+        ? Get.find<AuthController>()
+        : null;
 
-      return AdminDesktopLayout(
-        sidebarItems: AdminMenuItems.getMenuItems(userRoles),
-        sidebarHeader: AdminMenuItems.buildHeader(),
-        sidebarFooter: AdminMenuItems.buildFooter(),
-        selectedIndex: 0,
-        body: _buildBody(context),
-      );
-    });
+    final user = authController?.currentUser.value;
+    final userRoles = user?.roleNames ?? [];
+
+    return AdminDesktopLayout(
+      sidebarItems: AdminMenuItems.getMenuItems(userRoles),
+      sidebarHeader: AdminMenuItems.buildHeader(),
+      sidebarFooter: AdminMenuItems.buildFooter(),
+      selectedIndex: 0,
+      body: _buildBody(context),
+    );
   }
 
   Widget _buildBody(BuildContext context) {
@@ -116,24 +118,7 @@ class AdminHomeViewDesktop extends GetView<AuthController> {
           const SizedBox(height: 16),
 
           // Compact role indicator
-          Obx(() {
-            final user = controller.currentUser.value;
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.loginButton.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                'Role: ${user?.primaryRole ?? 'Administrator'}',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.loginButton,
-                ),
-              ),
-            );
-          }),
+          _buildCompactRoleIndicator(),
 
           const SizedBox(height: 24),
 
@@ -183,8 +168,15 @@ class AdminHomeViewDesktop extends GetView<AuthController> {
   }
 
   Widget _buildRoleIndicator() {
+    // Check if AuthController exists before using it
+    if (!Get.isRegistered<AuthController>()) {
+      return _buildDefaultRoleIndicator();
+    }
+
     return Obx(() {
-      final user = controller.currentUser.value;
+      final authController = Get.find<AuthController>();
+      final user = authController.currentUser.value;
+
       return Column(
         children: [
           Container(
@@ -233,9 +225,76 @@ class AdminHomeViewDesktop extends GetView<AuthController> {
     });
   }
 
-  Widget _buildQuickActions() {
+  Widget _buildCompactRoleIndicator() {
+    if (!Get.isRegistered<AuthController>()) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.loginButton.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Text(
+          'Role: Administrator',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: AppColors.loginButton,
+          ),
+        ),
+      );
+    }
+
     return Obx(() {
-      final user = controller.currentUser.value;
+      final authController = Get.find<AuthController>();
+      final user = authController.currentUser.value;
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.loginButton.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          'Role: ${user?.primaryRole ?? 'Administrator'}',
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: AppColors.loginButton,
+          ),
+        ),
+      );
+    });
+  }
+
+  Widget _buildDefaultRoleIndicator() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.loginButton.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(
+          color: AppColors.loginButton.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: const Text(
+        'Role: Platform Administrator',
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w500,
+          color: AppColors.loginButton,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickActions() {
+    if (!Get.isRegistered<AuthController>()) {
+      return _buildDefaultQuickActions();
+    }
+
+    return Obx(() {
+      final authController = Get.find<AuthController>();
+      final user = authController.currentUser.value;
       final roles = user?.roleNames ?? [];
 
       return Wrap(
@@ -294,9 +353,42 @@ class AdminHomeViewDesktop extends GetView<AuthController> {
     });
   }
 
+  Widget _buildDefaultQuickActions() {
+    return Wrap(
+      spacing: 24,
+      runSpacing: 24,
+      alignment: WrapAlignment.center,
+      children: [
+        _buildQuickActionCard(
+          icon: Icons.business,
+          title: 'Tenants',
+          subtitle: 'Manage Schools',
+          color: AppColors.info,
+        ),
+        _buildQuickActionCard(
+          icon: Icons.people,
+          title: 'Users',
+          subtitle: 'System Users',
+          color: AppColors.success,
+        ),
+        _buildQuickActionCard(
+          icon: Icons.settings,
+          title: 'Settings',
+          subtitle: 'Platform Config',
+          color: AppColors.warning,
+        ),
+      ],
+    );
+  }
+
   Widget _buildCompactQuickActions() {
+    if (!Get.isRegistered<AuthController>()) {
+      return _buildDefaultCompactQuickActions();
+    }
+
     return Obx(() {
-      final user = controller.currentUser.value;
+      final authController = Get.find<AuthController>();
+      final user = authController.currentUser.value;
 
       return GridView.count(
         shrinkWrap: true,
@@ -318,6 +410,23 @@ class AdminHomeViewDesktop extends GetView<AuthController> {
         ],
       );
     });
+  }
+
+  Widget _buildDefaultCompactQuickActions() {
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 2,
+      crossAxisSpacing: 12,
+      mainAxisSpacing: 12,
+      childAspectRatio: 1.3,
+      children: [
+        _buildCompactActionCard(Icons.business, 'Tenants', AppColors.info),
+        _buildCompactActionCard(Icons.people, 'Users', AppColors.success),
+        _buildCompactActionCard(Icons.settings, 'Settings', AppColors.warning),
+        _buildCompactActionCard(Icons.analytics, 'Reports', AppColors.loginButton),
+      ],
+    );
   }
 
   Widget _buildQuickActionCard({

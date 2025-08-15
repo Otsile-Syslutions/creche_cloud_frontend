@@ -2,9 +2,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import '../../../utils/app_logger.dart';
 
 class AppSidebarController extends GetxController with GetSingleTickerProviderStateMixin {
-  // Observable states
+  // Observable states - Initialize with default values
   final RxBool isExpanded = true.obs;
   final RxInt selectedIndex = 0.obs;
   final RxDouble sidebarWidth = 250.0.obs;
@@ -27,77 +28,108 @@ class AppSidebarController extends GetxController with GetSingleTickerProviderSt
   static const double minHeightForScroll = 676.0;
   static const double maxItemsBeforeScroll = 8;
 
+  // Add a flag to track if controller is initialized
+  bool _isInitialized = false;
+  bool get isInitialized => _isInitialized;
+
   @override
   void onInit() {
     super.onInit();
 
-    // Initialize animation controller
-    animationController = AnimationController(
-      duration: const Duration(milliseconds: 250),
-      vsync: this,
-    );
+    try {
+      // Initialize animation controller
+      animationController = AnimationController(
+        duration: const Duration(milliseconds: 250),
+        vsync: this,
+      );
 
-    // Setup animations
-    widthAnimation = Tween<double>(
-      begin: collapsedWidth.value,
-      end: sidebarWidth.value,
-    ).animate(CurvedAnimation(
-      parent: animationController,
-      curve: Curves.easeInOut,
-    ));
+      // Setup animations
+      widthAnimation = Tween<double>(
+        begin: collapsedWidth.value,
+        end: sidebarWidth.value,
+      ).animate(CurvedAnimation(
+        parent: animationController,
+        curve: Curves.easeInOut,
+      ));
 
-    fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: animationController,
-      curve: const Interval(0.3, 1.0, curve: Curves.easeIn),
-    ));
+      fadeAnimation = Tween<double>(
+        begin: 0.0,
+        end: 1.0,
+      ).animate(CurvedAnimation(
+        parent: animationController,
+        curve: const Interval(0.3, 1.0, curve: Curves.easeIn),
+      ));
 
-    rotationAnimation = Tween<double>(
-      begin: 0.0,
-      end: 0.5,
-    ).animate(CurvedAnimation(
-      parent: animationController,
-      curve: Curves.easeInOut,
-    ));
+      rotationAnimation = Tween<double>(
+        begin: 0.0,
+        end: 0.5,
+      ).animate(CurvedAnimation(
+        parent: animationController,
+        curve: Curves.easeInOut,
+      ));
 
-    // Initialize with expanded state
-    if (isExpanded.value) {
-      animationController.value = 1.0;
-    }
-
-    // Initialize focus node for toggle button
-    toggleButtonFocusNode = FocusNode();
-
-    // Listen to expansion changes
-    ever(isExpanded, (_) {
+      // Initialize with expanded state
       if (isExpanded.value) {
-        animationController.forward();
-      } else {
-        animationController.reverse();
+        animationController.value = 1.0;
       }
-    });
+
+      // Initialize focus node for toggle button
+      toggleButtonFocusNode = FocusNode();
+
+      // Listen to expansion changes
+      ever(isExpanded, (_) {
+        if (animationController.isAnimating) return;
+        if (isExpanded.value) {
+          animationController.forward();
+        } else {
+          animationController.reverse();
+        }
+      });
+
+      _isInitialized = true;
+    } catch (e) {
+      AppLogger.e('Error initializing AppSidebarController', e);
+      _isInitialized = false;
+    }
+  }
+
+  @override
+  void onReady() {
+    super.onReady();
+    // Additional initialization if needed after the widget tree is built
   }
 
   @override
   void onClose() {
-    animationController.dispose();
-    menuScrollController.dispose();
-    toggleButtonFocusNode?.dispose();
-    for (var node in menuItemFocusNodes) {
-      node.dispose();
+    try {
+      animationController.dispose();
+      menuScrollController.dispose();
+      toggleButtonFocusNode?.dispose();
+      for (var node in menuItemFocusNodes) {
+        node.dispose();
+      }
+    } catch (e) {
+      AppLogger.e('Error disposing AppSidebarController', e);
     }
     super.onClose();
   }
 
   // Toggle sidebar expansion
   void toggleSidebar() {
+    if (!_isInitialized) return;
     isExpanded.value = !isExpanded.value;
   }
 
   // Set selected menu item
   void selectMenuItem(int index) {
+    if (!_isInitialized) return;
+
+    // Validate index
+    if (index < 0 || index >= menuItemFocusNodes.length) {
+      selectedIndex.value = 0;
+      return;
+    }
+
     selectedIndex.value = index;
 
     // Ensure selected item is visible in scroll view
@@ -135,6 +167,8 @@ class AppSidebarController extends GetxController with GetSingleTickerProviderSt
 
   // Handle keyboard navigation
   void handleKeyboardNavigation(LogicalKeyboardKey key) {
+    if (!_isInitialized) return;
+
     if (key == LogicalKeyboardKey.arrowUp) {
       navigateToPreviousItem();
     } else if (key == LogicalKeyboardKey.arrowDown) {
@@ -146,16 +180,24 @@ class AppSidebarController extends GetxController with GetSingleTickerProviderSt
   }
 
   void navigateToPreviousItem() {
+    if (!_isInitialized) return;
+
     if (selectedIndex.value > 0) {
       selectMenuItem(selectedIndex.value - 1);
-      menuItemFocusNodes[selectedIndex.value].requestFocus();
+      if (selectedIndex.value < menuItemFocusNodes.length) {
+        menuItemFocusNodes[selectedIndex.value].requestFocus();
+      }
     }
   }
 
   void navigateToNextItem() {
+    if (!_isInitialized) return;
+
     if (selectedIndex.value < menuItemFocusNodes.length - 1) {
       selectMenuItem(selectedIndex.value + 1);
-      menuItemFocusNodes[selectedIndex.value].requestFocus();
+      if (selectedIndex.value < menuItemFocusNodes.length) {
+        menuItemFocusNodes[selectedIndex.value].requestFocus();
+      }
     }
   }
 
@@ -180,6 +222,8 @@ class AppSidebarController extends GetxController with GetSingleTickerProviderSt
 
   // Update responsive width based on screen size
   void updateResponsiveWidth(double screenWidth) {
+    if (!_isInitialized) return;
+
     if (screenWidth < 1200) {
       sidebarWidth.value = 220.0;
       collapsedWidth.value = 60.0;
