@@ -266,8 +266,6 @@ class AuthController extends GetxController {
 
       Get.offAllNamed(homeRoute);
 
-      _showSuccessSnackbar('Welcome Back', 'Hello ${user.firstName}!');
-
       // Log the successful login with enhanced data
       _logAuthEvent('login_success', {
         'user_id': user.id,

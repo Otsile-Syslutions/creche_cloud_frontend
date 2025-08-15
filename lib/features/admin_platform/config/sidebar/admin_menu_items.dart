@@ -14,18 +14,6 @@ class AdminMenuItems {
     AppLogger.d('Received roles: $userRoles');
     AppLogger.d('Roles count: ${userRoles.length}');
 
-    // Also check AuthController directly for debugging
-    try {
-      final authController = Get.find<AuthController>();
-      final currentUser = authController.currentUser.value;
-      AppLogger.d('Current user from controller: ${currentUser?.fullName}');
-      AppLogger.d('User roles from controller: ${currentUser?.roleNames}');
-      AppLogger.d('Is platform admin from controller: ${currentUser?.isPlatformAdmin}');
-      AppLogger.d('Platform type from controller: ${currentUser?.platformType}');
-    } catch (e) {
-      AppLogger.w('Could not access AuthController in getMenuItems: $e');
-    }
-
     final items = <SidebarXItem>[
       // Dashboard - Available to all admin roles
       SidebarXItem(
@@ -151,20 +139,6 @@ class AdminMenuItems {
   static bool _isPlatformAdmin(List<String> userRoles) {
     if (userRoles.isEmpty) {
       AppLogger.w('No user roles provided to _isPlatformAdmin');
-
-      // Fallback: Try to get from AuthController directly
-      try {
-        final authController = Get.find<AuthController>();
-        final user = authController.currentUser.value;
-        if (user != null) {
-          AppLogger.d('Using fallback from AuthController');
-          AppLogger.d('User isPlatformAdmin: ${user.isPlatformAdmin}');
-          return user.isPlatformAdmin;
-        }
-      } catch (e) {
-        AppLogger.w('Fallback failed: $e');
-      }
-
       return false;
     }
 
@@ -208,19 +182,6 @@ class AdminMenuItems {
   static bool _hasReportsAccess(List<String> userRoles) {
     if (userRoles.isEmpty) {
       AppLogger.w('No user roles provided to _hasReportsAccess');
-
-      // Fallback: Try to get from AuthController directly
-      try {
-        final authController = Get.find<AuthController>();
-        final user = authController.currentUser.value;
-        if (user != null && (user.isPlatformAdmin || user.hasRole('platform_support'))) {
-          AppLogger.d('Using fallback from AuthController for reports access');
-          return true;
-        }
-      } catch (e) {
-        AppLogger.w('Fallback failed: $e');
-      }
-
       return false;
     }
 
@@ -266,48 +227,51 @@ class AdminMenuItems {
   }
 
   static Widget buildFooter() {
-    return Obx(() {
-      final authController = Get.find<AuthController>();
-      final user = authController.currentUser.value;
+    // Use GetBuilder instead of Obx to avoid the controller not found issue
+    return GetBuilder<AuthController>(
+      init: Get.isRegistered<AuthController>() ? null : AuthController(),
+      builder: (authController) {
+        final user = authController.currentUser.value;
 
-      // Enhanced debugging
-      AppLogger.d('=== ADMIN FOOTER BUILD ===');
-      AppLogger.d('User exists: ${user != null}');
-      AppLogger.d('User name: ${user?.fullName}');
-      AppLogger.d('User roles: ${user?.roleNames}');
-      AppLogger.d('Is platform admin: ${user?.isPlatformAdmin}');
+        // Enhanced debugging
+        AppLogger.d('=== ADMIN FOOTER BUILD ===');
+        AppLogger.d('User exists: ${user != null}');
+        AppLogger.d('User name: ${user?.fullName}');
+        AppLogger.d('User roles: ${user?.roleNames}');
+        AppLogger.d('Is platform admin: ${user?.isPlatformAdmin}');
 
-      final userRoles = user?.roleNames ?? [];
+        final userRoles = user?.roleNames ?? [];
 
-      // Show different status based on role
-      String statusText = 'Platform Online';
-      bool isActive = true;
-      IconData statusIcon = Icons.check_circle;
+        // Show different status based on role
+        String statusText = 'Platform Online';
+        bool isActive = true;
+        IconData statusIcon = Icons.check_circle;
 
-      // Use both roleNames and isPlatformAdmin flag for determination
-      if (user?.isPlatformAdmin == true || _isPlatformAdmin(userRoles)) {
-        statusText = 'Full Access';
-        statusIcon = Icons.admin_panel_settings;
-        AppLogger.d('✅ Footer: Full Access');
-      } else if (_hasReportsAccess(userRoles)) {
-        statusText = 'Support Access';
-        statusIcon = Icons.support_agent;
-        AppLogger.d('✅ Footer: Support Access');
-      } else {
-        statusText = 'Limited Access';
-        statusIcon = Icons.info;
-        isActive = false;
-        AppLogger.d('✅ Footer: Limited Access');
-      }
+        // Use both roleNames and isPlatformAdmin flag for determination
+        if (user?.isPlatformAdmin == true || _isPlatformAdmin(userRoles)) {
+          statusText = 'Full Access';
+          statusIcon = Icons.admin_panel_settings;
+          AppLogger.d('✅ Footer: Full Access');
+        } else if (_hasReportsAccess(userRoles)) {
+          statusText = 'Support Access';
+          statusIcon = Icons.support_agent;
+          AppLogger.d('✅ Footer: Support Access');
+        } else {
+          statusText = 'Limited Access';
+          statusIcon = Icons.info;
+          isActive = false;
+          AppLogger.d('✅ Footer: Limited Access');
+        }
 
-      AppLogger.d('Admin footer status: $statusText');
-      AppLogger.d('=========================');
+        AppLogger.d('Admin footer status: $statusText');
+        AppLogger.d('=========================');
 
-      return AppSidebarFooter(
-        statusText: statusText,
-        isActive: isActive,
-        statusIcon: statusIcon,
-      );
-    });
+        return AppSidebarFooter(
+          statusText: statusText,
+          isActive: isActive,
+          statusIcon: statusIcon,
+        );
+      },
+    );
   }
 }

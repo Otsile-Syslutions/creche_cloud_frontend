@@ -1,93 +1,139 @@
 // lib/shared/components/sidebar/app_sidebar.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:get/get.dart';
 import 'package:sidebarx/sidebarx.dart';
-import 'package:hugeicons/hugeicons.dart';
 import '../../../constants/app_colors.dart';
 import '../../../constants/app_assets.dart';
+import 'app_sidebar_controller.dart';
+import 'collapsed_sidebar.dart';
+import 'expanded_sidebar.dart';
+import 'sidebar_toggle_button.dart';
 
-class AppSidebar extends StatelessWidget {
-  final SidebarXController controller;
+class AppSidebar extends StatefulWidget {
   final List<SidebarXItem> items;
   final Widget? header;
   final Widget? footer;
-  final double width;
+  final double expandedWidth;
   final double collapsedWidth;
+  final int? selectedIndex;
+  final bool startExpanded;
+  final bool showToggleButton;
 
   const AppSidebar({
     super.key,
-    required this.controller,
     required this.items,
     this.header,
     this.footer,
-    this.width = 250,
+    this.expandedWidth = 250,
     this.collapsedWidth = 70,
+    this.selectedIndex,
+    this.startExpanded = true,
+    this.showToggleButton = true,
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        // Main Sidebar
-        SidebarX(
-          controller: controller,
-          theme: _buildTheme(),
-          extendedTheme: _buildExtendedTheme(),
-          headerBuilder: header != null ? (context, extended) => header! : null,
-          footerBuilder: footer != null ? (context, extended) => footer! : null,
-          items: items,
-          showToggleButton: false, // Disable default toggle
-        ),
+  State<AppSidebar> createState() => _AppSidebarState();
+}
 
-        // Custom Toggle Button - Positioned at top-left
-        Positioned(
-          top: 12,
-          left: 12,
-          child: _buildToggleButton(),
-        ),
-      ],
+class _AppSidebarState extends State<AppSidebar> {
+  late AppSidebarController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Initialize controller
+    _controller = Get.put(
+      AppSidebarController(),
+      tag: 'sidebar_${DateTime.now().millisecondsSinceEpoch}',
     );
+
+    // Set initial values
+    _controller.isExpanded.value = widget.startExpanded;
+    _controller.selectedIndex.value = widget.selectedIndex ?? 0;
+    _controller.sidebarWidth.value = widget.expandedWidth;
+    _controller.collapsedWidth.value = widget.collapsedWidth;
+
+    // Initialize focus nodes for keyboard navigation
+    _controller.initializeFocusNodes(widget.items.length);
   }
 
-  Widget _buildToggleButton() {
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, child) {
-        return Material(
-          color: Colors.transparent,
-          elevation: 2,
-          borderRadius: BorderRadius.circular(8),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(8),
-            onTap: () {
-              controller.setExtended(!controller.extended);
+  @override
+  void dispose() {
+    // Clean up controller
+    Get.delete<AppSidebarController>(
+      tag: 'sidebar_${_controller.hashCode}',
+    );
+    super.dispose();
+  }
+
+  List<SidebarMenuItem> _convertItems(List<SidebarXItem> items) {
+    return items.map((item) {
+      return SidebarMenuItem(
+        label: item.label ?? '',
+        icon: item.icon,
+        iconBuilder: item.iconBuilder,
+        onTap: item.onTap,
+      );
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Update responsive width based on screen size
+        _controller.updateResponsiveWidth(constraints.maxWidth);
+
+        return CallbackShortcuts(
+          bindings: {
+            const SingleActivator(LogicalKeyboardKey.arrowUp): () {
+              _controller.handleKeyboardNavigation(LogicalKeyboardKey.arrowUp);
             },
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: const Color(0xFFE0E0E0),
-                  width: 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Center(
-                child: HugeIcon(
-                  icon: controller.extended
-                      ? HugeIcons.strokeRoundedMenu01
-                      : HugeIcons.strokeRoundedMenu03,
-                  size: 22,
-                  color: AppColors.textSecondary,
-                ),
-              ),
+            const SingleActivator(LogicalKeyboardKey.arrowDown): () {
+              _controller.handleKeyboardNavigation(LogicalKeyboardKey.arrowDown);
+            },
+            const SingleActivator(LogicalKeyboardKey.enter): () {
+              _controller.handleKeyboardNavigation(LogicalKeyboardKey.enter);
+            },
+          },
+          child: Focus(
+            autofocus: false,
+            child: Stack(
+              children: [
+                // Main Sidebar with animation
+                Obx(() {
+                  final isExpanded = _controller.isExpanded.value;
+                  final menuItems = _convertItems(widget.items);
+
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    width: isExpanded
+                        ? _controller.sidebarWidth.value
+                        : _controller.collapsedWidth.value,
+                    child: isExpanded
+                        ? ExpandedSidebar(
+                      controller: _controller,
+                      items: menuItems,
+                      header: _buildHeader(isExpanded),
+                      footer: _buildFooter(isExpanded),
+                      width: _controller.sidebarWidth.value,
+                    )
+                        : CollapsedSidebar(
+                      controller: _controller,
+                      items: menuItems,
+                      header: _buildHeader(isExpanded),
+                      footer: _buildFooter(isExpanded),
+                      width: _controller.collapsedWidth.value,
+                    ),
+                  );
+                }),
+
+                // Toggle Button
+                if (widget.showToggleButton)
+                  SidebarToggleButton(controller: _controller),
+              ],
             ),
           ),
         );
@@ -95,102 +141,63 @@ class AppSidebar extends StatelessWidget {
     );
   }
 
-  SidebarXTheme _buildTheme() {
-    return SidebarXTheme(
-      width: collapsedWidth,
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        border: Border(
-          right: BorderSide(
-            color: Color(0xFFE0E0E0),
-            width: 1,
-          ),
-        ),
+  Widget? _buildHeader(bool isExpanded) {
+    if (widget.header == null) return null;
+
+    // If header is already a custom widget, use it directly
+    if (widget.header is! AppSidebarHeader) {
+      return widget.header;
+    }
+
+    // Handle AppSidebarHeader conversion
+    final appHeader = widget.header as AppSidebarHeader;
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 200),
+      child: isExpanded
+          ? ExpandedSidebarHeader(
+        key: const ValueKey('expanded_header'),
+        customLogo: appHeader.customLogo,
+      )
+          : CollapsedSidebarHeader(
+        key: const ValueKey('collapsed_header'),
+        customLogo: appHeader.customLogo,
       ),
-      textStyle: const TextStyle(
-        color: AppColors.textSecondary,
-        fontSize: 14,
-        fontFamily: 'Roboto',
-        fontWeight: FontWeight.w600,
-      ),
-      selectedTextStyle: const TextStyle(
-        color: Colors.white,
-        fontSize: 14,
-        fontFamily: 'Roboto',
-        fontWeight: FontWeight.w600,
-      ),
-      hoverTextStyle: const TextStyle(
-        color: AppColors.textSecondary,
-        fontSize: 15,
-        fontFamily: 'Roboto',
-        fontWeight: FontWeight.w600,
-      ),
-      itemTextPadding: const EdgeInsets.only(left: 10),
-      selectedItemTextPadding: const EdgeInsets.only(left: 10),
-      itemDecoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        color: Colors.transparent,
-      ),
-      selectedItemDecoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        color: const Color(0xFF875DEC),
-      ),
-      hoverColor: AppColors.loginButton.withOpacity(0.05),
-      iconTheme: const IconThemeData(
-        color: AppColors.textSecondary,
-        size: 22,
-      ),
-      selectedIconTheme: const IconThemeData(
-        color: Colors.white,
-        size: 22,
-      ),
-      itemPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      selectedItemPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      itemMargin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-      selectedItemMargin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
     );
   }
 
-  SidebarXTheme _buildExtendedTheme() {
-    return SidebarXTheme(
-      width: width,
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        border: Border(
-          right: BorderSide(
-            color: Color(0xFFE0E0E0),
-            width: 1,
-          ),
-        ),
+  Widget? _buildFooter(bool isExpanded) {
+    if (widget.footer == null) return null;
+
+    // If footer is already a custom widget, use it directly
+    if (widget.footer is! AppSidebarFooter) {
+      return widget.footer;
+    }
+
+    // Handle AppSidebarFooter conversion
+    final appFooter = widget.footer as AppSidebarFooter;
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 200),
+      child: isExpanded
+          ? ExpandedSidebarFooter(
+        key: const ValueKey('expanded_footer'),
+        statusText: appFooter.statusText,
+        isActive: appFooter.isActive,
+        statusIcon: appFooter.statusIcon,
+        onTap: appFooter.onTap,
+      )
+          : CollapsedSidebarFooter(
+        key: const ValueKey('collapsed_footer'),
+        isActive: appFooter.isActive,
+        statusIcon: appFooter.statusIcon,
+        onTap: appFooter.onTap,
       ),
-      itemTextPadding: const EdgeInsets.only(left: 10),
-      selectedItemTextPadding: const EdgeInsets.only(left: 10),
-      textStyle: const TextStyle(
-        color: AppColors.textSecondary,
-        fontSize: 14,
-        fontFamily: 'Roboto',
-        fontWeight: FontWeight.w600,
-      ),
-      selectedTextStyle: const TextStyle(
-        color: Colors.white,
-        fontSize: 14,
-        fontFamily: 'Roboto',
-        fontWeight: FontWeight.w600,
-      ),
-      hoverTextStyle: const TextStyle(
-        color: AppColors.textSecondary,
-        fontSize: 15,
-        fontFamily: 'Roboto',
-        fontWeight: FontWeight.w600,
-      ),
-      itemPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      selectedItemPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      itemMargin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-      selectedItemMargin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
     );
   }
 }
 
+// Keep the original AppSidebarHeader for backward compatibility
 class AppSidebarHeader extends StatelessWidget {
   final Widget? customLogo;
   final SidebarXController? controller;
@@ -203,59 +210,45 @@ class AppSidebarHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (controller == null) {
-      return _buildHeaderContent(true);
-    }
-
-    return AnimatedBuilder(
-      animation: controller!,
-      builder: (context, child) {
-        final isExtended = controller!.extended;
-        return _buildHeaderContent(isExtended);
-      },
-    );
-  }
-
-  Widget _buildHeaderContent(bool isExtended) {
+    // Default build for backward compatibility
     return Container(
-      padding: EdgeInsets.only(
-        left: isExtended ? 12 : 10,
-        right: isExtended ? 12 : 10,
-        top: 20, // Reduced top padding - logo starts higher
-        bottom: 16, // Reduced bottom padding
+      padding: const EdgeInsets.only(
+        left: 12,
+        right: 12,
+        top: 20,
+        bottom: 16,
       ),
       color: AppColors.surface,
-      child: customLogo ?? SizedBox(
-        width: double.infinity,
-        height: 150, // Fixed 150px height for logo
-        child: Image.asset(
-          isExtended
-              ? AppAssets.ccLogoFullColour
-              : AppAssets.ccLogoFullColourCollapsed,
-          fit: BoxFit.contain,
-          errorBuilder: (context, error, stackTrace) {
-            // Fallback to colored container if image fails
-            return Container(
-              height: 150,
-              decoration: BoxDecoration(
-                color: AppColors.loginButton,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Center(
-                child: Icon(
-                  Icons.cloud,
-                  size: isExtended ? 60 : 30,
-                  color: Colors.white,
-                ),
-              ),
-            );
-          },
-        ),
-      ),
+      child: customLogo ??
+          SizedBox(
+            width: double.infinity,
+            height: 150,
+            child: Image.asset(
+              AppAssets.ccLogoFullColour,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  height: 150,
+                  decoration: BoxDecoration(
+                    color: AppColors.loginButton,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.cloud,
+                      size: 60,
+                      color: Colors.white,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
     );
   }
 }
 
+// Keep the original AppSidebarFooter for backward compatibility
 class AppSidebarFooter extends StatelessWidget {
   final String statusText;
   final bool isActive;
@@ -324,6 +317,44 @@ class AppSidebarFooter extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// Responsive sidebar wrapper for automatic collapsing on small screens
+class ResponsiveAppSidebar extends StatelessWidget {
+  final List<SidebarXItem> items;
+  final Widget? header;
+  final Widget? footer;
+  final double breakpoint;
+  final int? selectedIndex;
+
+  const ResponsiveAppSidebar({
+    super.key,
+    required this.items,
+    this.header,
+    this.footer,
+    this.breakpoint = 1200,
+    this.selectedIndex,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final screenWidth = constraints.maxWidth;
+        final shouldCollapse = screenWidth < breakpoint;
+
+        return AppSidebar(
+          items: items,
+          header: header,
+          footer: footer,
+          selectedIndex: selectedIndex,
+          startExpanded: !shouldCollapse,
+          expandedWidth: screenWidth < 1400 ? 220 : 250,
+          collapsedWidth: screenWidth < 1200 ? 60 : 70,
+        );
+      },
     );
   }
 }
