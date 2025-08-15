@@ -45,7 +45,7 @@ class AdminMenuItems {
             color: selected ? Colors.white : const Color(0xFF6B7280),
             size: 22,
           ),
-          label: 'Tenants',
+          label: 'Schools',
           onTap: () {
             AppLogger.d('Tenants menu tapped');
             // Navigate to tenants management
