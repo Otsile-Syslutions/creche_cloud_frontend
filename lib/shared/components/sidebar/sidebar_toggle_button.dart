@@ -1,7 +1,6 @@
 // lib/shared/components/sidebar/sidebar_toggle_button.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:hugeicons/hugeicons.dart';
 import '../../../constants/app_colors.dart';
 import 'app_sidebar_controller.dart';
 
@@ -83,6 +82,8 @@ class _SidebarToggleButtonState extends State<SidebarToggleButton>
                   borderRadius: BorderRadius.circular(8),
                   onTap: widget.controller.toggleSidebar,
                   child: Obx(() {
+                    final isExpanded = widget.controller.isExpanded.value;
+
                     return AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       width: 40,
@@ -107,14 +108,26 @@ class _SidebarToggleButtonState extends State<SidebarToggleButton>
                         ],
                       ),
                       child: Center(
-                        child: AnimatedRotation(
-                          turns: widget.controller.isExpanded.value ? 0 : 0.5,
+                        child: AnimatedSwitcher(
                           duration: const Duration(milliseconds: 200),
-                          child: HugeIcon(
-                            icon: widget.controller.isExpanded.value
-                                ? HugeIcons.strokeRoundedMenu01
-                                : HugeIcons.strokeRoundedMenu03,
-                            size: 22,
+                          transitionBuilder: (Widget child, Animation<double> animation) {
+                            return RotationTransition(
+                              turns: Tween<double>(
+                                begin: 0.5,
+                                end: 0.0,
+                              ).animate(animation),
+                              child: FadeTransition(
+                                opacity: animation,
+                                child: child,
+                              ),
+                            );
+                          },
+                          child: Icon(
+                            isExpanded
+                                ? Icons.chevron_left_rounded
+                                : Icons.chevron_right_rounded,
+                            key: ValueKey(isExpanded),
+                            size: 24,
                             color: _isHovering
                                 ? AppColors.loginButton
                                 : AppColors.textSecondary,
@@ -267,6 +280,99 @@ class _SidebarToggleButtonHamburgerState
       decoration: BoxDecoration(
         color: AppColors.textSecondary,
         borderRadius: BorderRadius.circular(1),
+      ),
+    );
+  }
+}
+
+// Double chevron style toggle button
+class SidebarToggleButtonDoubleChevron extends StatefulWidget {
+  final AppSidebarController controller;
+
+  const SidebarToggleButtonDoubleChevron({
+    super.key,
+    required this.controller,
+  });
+
+  @override
+  State<SidebarToggleButtonDoubleChevron> createState() =>
+      _SidebarToggleButtonDoubleChevronState();
+}
+
+class _SidebarToggleButtonDoubleChevronState
+    extends State<SidebarToggleButtonDoubleChevron>
+    with SingleTickerProviderStateMixin {
+  bool _isHovering = false;
+  late AnimationController _animationController;
+  late Animation<double> _slideAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+    _slideAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovering = true),
+      onExit: (_) => setState(() => _isHovering = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.controller.toggleSidebar,
+        child: Obx(() {
+          final isExpanded = widget.controller.isExpanded.value;
+
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: _isHovering
+                  ? AppColors.loginButton.withOpacity(0.1)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: _isHovering
+                    ? AppColors.loginButton.withOpacity(0.3)
+                    : Colors.transparent,
+                width: 1,
+              ),
+            ),
+            child: Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isExpanded
+                        ? Icons.keyboard_double_arrow_left_rounded
+                        : Icons.keyboard_double_arrow_right_rounded,
+                    size: 20,
+                    color: _isHovering
+                        ? AppColors.loginButton
+                        : AppColors.textSecondary,
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
       ),
     );
   }

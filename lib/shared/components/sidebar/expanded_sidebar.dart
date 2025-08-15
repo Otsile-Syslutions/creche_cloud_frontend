@@ -43,6 +43,9 @@ class ExpandedSidebar extends StatelessWidget {
           ),
           child: Column(
             children: [
+              // Add 60px spacing from top (below toggle button) - same as collapsed
+              const SizedBox(height: 60),
+
               // Header - Fixed at top
               if (header != null) header!,
 
@@ -119,38 +122,41 @@ class ExpandedSidebar extends StatelessWidget {
                     ? const Color(0xFF875DEC)
                     : Colors.transparent,
               ),
-              child: Row(
-                children: [
-                  // Icon
-                  item.iconBuilder?.call(isSelected, false) ??
-                      Icon(
-                        item.icon ?? Icons.dashboard,
-                        color: isSelected ? Colors.white : AppColors.textSecondary,
-                        size: 22,
-                      ),
-                  const SizedBox(width: 10),
-                  // Label with fade animation
-                  Expanded(
-                    child: AnimatedBuilder(
-                      animation: controller.fadeAnimation,
-                      builder: (context, child) {
-                        return Opacity(
-                          opacity: controller.fadeAnimation.value,
-                          child: Text(
-                            item.label,
-                            style: TextStyle(
-                              color: isSelected ? Colors.white : AppColors.textSecondary,
-                              fontSize: 14,
-                              fontFamily: 'Roboto',
-                              fontWeight: FontWeight.w600,
+              child: ClipRect(
+                child: Row(
+                  children: [
+                    // Icon
+                    item.iconBuilder?.call(isSelected, false) ??
+                        Icon(
+                          item.icon ?? Icons.dashboard,
+                          color: isSelected ? Colors.white : AppColors.textSecondary,
+                          size: 22,
+                        ),
+                    const SizedBox(width: 10),
+                    // Label with fade animation - wrapped in Flexible to prevent overflow
+                    Flexible(
+                      child: AnimatedBuilder(
+                        animation: controller.fadeAnimation,
+                        builder: (context, child) {
+                          return Opacity(
+                            opacity: controller.fadeAnimation.value,
+                            child: Text(
+                              item.label,
+                              style: TextStyle(
+                                color: isSelected ? Colors.white : AppColors.textSecondary,
+                                fontSize: 14,
+                                fontFamily: 'Roboto',
+                                fontWeight: FontWeight.w600,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
                             ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -175,7 +181,7 @@ class ExpandedSidebarHeader extends StatelessWidget {
       padding: const EdgeInsets.only(
         left: 12,
         right: 12,
-        top: 20,
+        top: 0,  // Reduced from 20 to 0 since we have 60px space above
         bottom: 16,
       ),
       color: AppColors.surface,

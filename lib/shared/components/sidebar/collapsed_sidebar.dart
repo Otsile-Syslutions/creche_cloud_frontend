@@ -42,6 +42,9 @@ class CollapsedSidebar extends StatelessWidget {
           ),
           child: Column(
             children: [
+              // Add 60px spacing from top (below toggle button)
+              const SizedBox(height: 60),
+
               // Header - Fixed at top
               if (header != null) header!,
 
@@ -152,20 +155,20 @@ class CollapsedSidebarHeader extends StatelessWidget {
       padding: const EdgeInsets.only(
         left: 10,
         right: 10,
-        top: 20,
+        top: 0,  // Reduced from 20 to 0 since we have 60px space above
         bottom: 16,
       ),
       color: AppColors.surface,
       child: customLogo ??
           SizedBox(
             width: double.infinity,
-            height: 150,
+            height: 50,  // Reduced from 150 to 50
             child: Image.asset(
               AppAssets.ccLogoFullColourCollapsed,
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) {
                 return Container(
-                  height: 150,
+                  height: 50,  // Reduced from 150 to 50
                   decoration: BoxDecoration(
                     color: AppColors.loginButton,
                     borderRadius: BorderRadius.circular(8),
