@@ -6,6 +6,75 @@ import '../../../constants/app_assets.dart';
 import 'app_sidebar_controller.dart';
 import 'collapsed_sidebar.dart'; // For SidebarMenuItem
 
+// Hover wrapper widget for menu items
+class _MenuItemHoverWrapper extends StatefulWidget {
+  final Widget child;
+  final bool isSelected;
+
+  const _MenuItemHoverWrapper({
+    required this.child,
+    required this.isSelected,
+  });
+
+  @override
+  State<_MenuItemHoverWrapper> createState() => _MenuItemHoverWrapperState();
+}
+
+class _MenuItemHoverWrapperState extends State<_MenuItemHoverWrapper>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  bool _isHovering = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 150),
+      vsync: this,
+    );
+    _scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.08,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) {
+        if (!widget.isSelected) {
+          setState(() => _isHovering = true);
+          _controller.forward();
+        }
+      },
+      onExit: (_) {
+        setState(() => _isHovering = false);
+        _controller.reverse();
+      },
+      child: AnimatedBuilder(
+        animation: _scaleAnimation,
+        builder: (context, child) {
+          return Transform.scale(
+            scale: widget.isSelected ? 1.0 : _scaleAnimation.value,
+            alignment: Alignment.centerLeft,
+            child: widget.child,
+          );
+        },
+      ),
+    );
+  }
+}
+
 class ExpandedSidebar extends StatelessWidget {
   final AppSidebarController controller;
   final List<SidebarMenuItem> items;
@@ -43,8 +112,7 @@ class ExpandedSidebar extends StatelessWidget {
           ),
           child: Column(
             children: [
-              // Add 60px spacing from top (below toggle button) - same as collapsed
-              const SizedBox(height: 60),
+              const SizedBox(height: 20),
 
               // Header - Fixed at top
               if (header != null) header!,
@@ -103,59 +171,62 @@ class ExpandedSidebar extends StatelessWidget {
 
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () {
-              controller.selectMenuItem(index);
-              item.onTap?.call();
-            },
-            borderRadius: BorderRadius.circular(8),
-            hoverColor: AppColors.loginButton.withOpacity(0.05),
-            focusColor: AppColors.loginButton.withOpacity(0.1),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                color: isSelected
-                    ? const Color(0xFF875DEC)
-                    : Colors.transparent,
-              ),
-              child: ClipRect(
-                child: Row(
-                  children: [
-                    // Icon
-                    item.iconBuilder?.call(isSelected, false) ??
-                        Icon(
-                          item.icon ?? Icons.dashboard,
-                          color: isSelected ? Colors.white : AppColors.textSecondary,
-                          size: 22,
-                        ),
-                    const SizedBox(width: 10),
-                    // Label with fade animation - wrapped in Flexible to prevent overflow
-                    Flexible(
-                      child: AnimatedBuilder(
-                        animation: controller.fadeAnimation,
-                        builder: (context, child) {
-                          return Opacity(
-                            opacity: controller.fadeAnimation.value,
-                            child: Text(
-                              item.label,
-                              style: TextStyle(
-                                color: isSelected ? Colors.white : AppColors.textSecondary,
-                                fontSize: 14,
-                                fontFamily: 'Roboto',
-                                fontWeight: FontWeight.w600,
+        child: _MenuItemHoverWrapper(
+          isSelected: isSelected,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                controller.selectMenuItem(index);
+                item.onTap?.call();
+              },
+              borderRadius: BorderRadius.circular(8),
+              hoverColor: AppColors.loginButton.withOpacity(0.05),
+              focusColor: AppColors.loginButton.withOpacity(0.1),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: isSelected
+                      ? const Color(0xFF875DEC)
+                      : Colors.transparent,
+                ),
+                child: ClipRect(
+                  child: Row(
+                    children: [
+                      // Icon
+                      item.iconBuilder?.call(isSelected, false) ??
+                          Icon(
+                            item.icon ?? Icons.dashboard,
+                            color: isSelected ? Colors.white : AppColors.textSecondary,
+                            size: 22,
+                          ),
+                      const SizedBox(width: 10),
+                      // Label with fade animation - wrapped in Flexible to prevent overflow
+                      Flexible(
+                        child: AnimatedBuilder(
+                          animation: controller.fadeAnimation,
+                          builder: (context, child) {
+                            return Opacity(
+                              opacity: controller.fadeAnimation.value,
+                              child: Text(
+                                item.label,
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : AppColors.textSecondary,
+                                  fontSize: 14,
+                                  fontFamily: 'Roboto',
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
                               ),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
