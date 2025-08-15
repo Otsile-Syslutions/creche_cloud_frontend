@@ -5,74 +5,6 @@ import '../../../constants/app_colors.dart';
 import '../../../constants/app_assets.dart';
 import 'app_sidebar_controller.dart';
 
-// Hover wrapper widget for menu items
-class _MenuItemHoverWrapper extends StatefulWidget {
-  final Widget child;
-  final bool isSelected;
-
-  const _MenuItemHoverWrapper({
-    required this.child,
-    required this.isSelected,
-  });
-
-  @override
-  State<_MenuItemHoverWrapper> createState() => _MenuItemHoverWrapperState();
-}
-
-class _MenuItemHoverWrapperState extends State<_MenuItemHoverWrapper>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
-  bool _isHovering = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 150),
-      vsync: this,
-    );
-    _scaleAnimation = Tween<double>(
-      begin: 1.0,
-      end: 1.1,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOutCubic,
-    ));
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) {
-        if (!widget.isSelected) {
-          setState(() => _isHovering = true);
-          _controller.forward();
-        }
-      },
-      onExit: (_) {
-        setState(() => _isHovering = false);
-        _controller.reverse();
-      },
-      child: AnimatedBuilder(
-        animation: _scaleAnimation,
-        builder: (context, child) {
-          return Transform.scale(
-            scale: widget.isSelected ? 1.0 : _scaleAnimation.value,
-            child: widget.child,
-          );
-        },
-      ),
-    );
-  }
-}
-
 class CollapsedSidebar extends StatelessWidget {
   final AppSidebarController controller;
   final List<SidebarMenuItem> items;
@@ -110,8 +42,8 @@ class CollapsedSidebar extends StatelessWidget {
           ),
           child: Column(
             children: [
-              // Add 70px spacing from top (below toggle button)
-              const SizedBox(height: 70),
+              // Add spacing from top
+              const SizedBox(height: 20),
 
               // Header - Fixed at top
               if (header != null) header!,
@@ -133,9 +65,12 @@ class CollapsedSidebar extends StatelessWidget {
   }
 
   Widget _buildScrollableMenu() {
-    return Scrollbar(
+    return RawScrollbar(
       controller: controller.menuScrollController,
       thumbVisibility: true,
+      thickness: 6,
+      radius: const Radius.circular(3),
+      thumbColor: AppColors.textHint.withOpacity(0.3),
       child: ListView.builder(
         controller: controller.menuScrollController,
         padding: const EdgeInsets.symmetric(vertical: 8),
@@ -165,49 +100,176 @@ class CollapsedSidebar extends StatelessWidget {
     return Obx(() {
       final isSelected = controller.selectedIndex.value == index;
 
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-        child: Tooltip(
-          message: item.label,
-          preferBelow: false,
-          verticalOffset: 0,
-          waitDuration: const Duration(milliseconds: 500),
-          child: _MenuItemHoverWrapper(
-            isSelected: isSelected,
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () {
-                  controller.selectMenuItem(index);
-                  item.onTap?.call();
-                },
-                borderRadius: BorderRadius.circular(8),
-                hoverColor: AppColors.loginButton.withOpacity(0.05),
-                focusColor: AppColors.loginButton.withOpacity(0.1),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    color: isSelected
-                        ? const Color(0xFF875DEC)
-                        : Colors.transparent,
-                  ),
-                  child: Center(
-                    child: item.iconBuilder?.call(isSelected, false) ??
-                        Icon(
-                          item.icon ?? Icons.dashboard,
-                          color: isSelected ? Colors.white : AppColors.textSecondary,
-                          size: 22,
-                        ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
+      return _CollapsedMenuItem(
+        item: item,
+        isSelected: isSelected,
+        onTap: () {
+          controller.selectMenuItem(index);
+          item.onTap?.call();
+        },
       );
     });
+  }
+}
+
+// Individual collapsed menu item with Orqestra-style tooltip
+class _CollapsedMenuItem extends StatefulWidget {
+  final SidebarMenuItem item;
+  final bool isSelected;
+  final VoidCallback? onTap;
+
+  const _CollapsedMenuItem({
+    required this.item,
+    required this.isSelected,
+    this.onTap,
+  });
+
+  @override
+  State<_CollapsedMenuItem> createState() => _CollapsedMenuItemState();
+}
+
+class _CollapsedMenuItemState extends State<_CollapsedMenuItem>
+    with SingleTickerProviderStateMixin {
+  bool _isHovered = false;
+  late AnimationController _animationController;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 150),
+      vsync: this,
+    );
+    _scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.08,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOutCubic,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      child: MouseRegion(
+        onEnter: (_) {
+          setState(() => _isHovered = true);
+          if (!widget.isSelected) {
+            _animationController.forward();
+          }
+        },
+        onExit: (_) {
+          setState(() => _isHovered = false);
+          _animationController.reverse();
+        },
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: widget.onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // Extended hover background - shows for both selected and non-selected items
+              if (_isHovered)
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 200, // Extended width for label
+                    height: 46,
+                    decoration: BoxDecoration(
+                      // Match expanded sidebar hover colors exactly
+                      color: widget.isSelected
+                          ? const Color(0xFF875DEC) // Purple for selected
+                          : Colors.white, // Solid white background for better visibility
+                      borderRadius: BorderRadius.circular(8),
+                      border: widget.isSelected
+                          ? null
+                          : Border.all(
+                        color: const Color(0xFFE0E0E0),
+                        width: 1,
+                      ),
+                      // No shadow to match expanded sidebar which has no shadow on hover
+                    ),
+                    child: Row(
+                      children: [
+                        // Space for icon
+                        const SizedBox(width: 46),
+
+                        // Label text
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 10.0, right: 12.0),
+                            child: Text(
+                              widget.item.label,
+                              style: TextStyle(
+                                // Match expanded sidebar text colors exactly
+                                color: widget.isSelected
+                                    ? Colors.white
+                                    : AppColors.textSecondary, // Same as expanded sidebar
+                                fontSize: 14,
+                                fontFamily: 'Roboto',
+                                fontWeight: FontWeight.w600,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+              // Base state background (when not hovering)
+              if (!_isHovered && widget.isSelected)
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    color: const Color(0xFF875DEC), // Purple for selected
+                  ),
+                ),
+
+              // Icon container - no extra elevation or shadow
+              AnimatedBuilder(
+                animation: _scaleAnimation,
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: widget.isSelected ? 1.0 : _scaleAnimation.value,
+                    child: Container(
+                      width: 46,
+                      height: 46,
+                      padding: const EdgeInsets.all(12),
+                      child: Center(
+                        child: widget.item.iconBuilder?.call(widget.isSelected, _isHovered) ??
+                            Icon(
+                              widget.item.icon ?? Icons.dashboard,
+                              color: (widget.isSelected || (_isHovered && widget.isSelected))
+                                  ? Colors.white
+                                  : AppColors.textSecondary,
+                              size: 22,
+                            ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -226,20 +288,20 @@ class CollapsedSidebarHeader extends StatelessWidget {
       padding: const EdgeInsets.only(
         left: 10,
         right: 10,
-        top: 0,  // Reduced from 20 to 0 since we have 60px space above
+        top: 0,
         bottom: 16,
       ),
       color: AppColors.surface,
       child: customLogo ??
           SizedBox(
             width: double.infinity,
-            height: 50,  // Reduced from 150 to 50
+            height: 50,
             child: Image.asset(
               AppAssets.ccLogoFullColourCollapsed,
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) {
                 return Container(
-                  height: 50,  // Reduced from 150 to 50
+                  height: 50,
                   decoration: BoxDecoration(
                     color: AppColors.loginButton,
                     borderRadius: BorderRadius.circular(8),

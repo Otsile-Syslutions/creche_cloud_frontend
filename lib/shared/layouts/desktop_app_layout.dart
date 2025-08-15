@@ -6,7 +6,6 @@ import '../../../constants/app_colors.dart';
 import '../components/sidebar/app_sidebar.dart';
 import '../components/topbar/app_topbar.dart';
 
-
 class DesktopAppLayout extends StatefulWidget {
   final Widget body;
   final List<SidebarXItem> sidebarItems;
@@ -53,11 +52,19 @@ class DesktopAppLayout extends StatefulWidget {
 
 class _DesktopAppLayoutState extends State<DesktopAppLayout> {
   late bool _isSidebarExpanded;
+  late double _currentSidebarWidth;
 
   @override
   void initState() {
     super.initState();
     _isSidebarExpanded = widget.startSidebarExpanded;
+  }
+
+  void _handleSidebarToggle() {
+    setState(() {
+      _isSidebarExpanded = !_isSidebarExpanded;
+    });
+    widget.onSidebarToggle?.call();
   }
 
   @override
@@ -67,36 +74,29 @@ class _DesktopAppLayoutState extends State<DesktopAppLayout> {
         final screenWidth = constraints.maxWidth;
         final screenHeight = constraints.maxHeight;
 
+        // Determine responsive widths
+        final expandedWidth = widget.sidebarExpandedWidth ?? (screenWidth < 1400 ? 220 : 250);
+        final collapsedWidth = widget.sidebarCollapsedWidth ?? (screenWidth < 1200 ? 60 : 70);
+
         // Determine if we need responsive adjustments
-        final needsCompactMode = screenHeight < 676 || screenWidth < 1200;
         final shouldAutoCollapseSidebar = widget.enableResponsiveSidebar && screenWidth < 1200;
+
+        // Calculate current sidebar width
+        _currentSidebarWidth = (_isSidebarExpanded && !shouldAutoCollapseSidebar)
+            ? expandedWidth
+            : collapsedWidth;
 
         return Scaffold(
           backgroundColor: widget.backgroundColor ?? AppColors.background,
-          body: Row(
+          body: Stack(
+            clipBehavior: Clip.none, // Critical for allowing tooltip overflow
             children: [
-              // Sidebar
-              if (widget.showSidebar)
-                widget.enableResponsiveSidebar
-                    ? ResponsiveAppSidebar(
-                  items: widget.sidebarItems,
-                  header: widget.sidebarHeader,
-                  footer: widget.sidebarFooter,
-                  selectedIndex: widget.selectedSidebarIndex,
-                  breakpoint: 1200,
-                )
-                    : AppSidebar(
-                  items: widget.sidebarItems,
-                  header: widget.sidebarHeader,
-                  footer: widget.sidebarFooter,
-                  selectedIndex: widget.selectedSidebarIndex,
-                  startExpanded: !shouldAutoCollapseSidebar && widget.startSidebarExpanded,
-                  expandedWidth: widget.sidebarExpandedWidth ?? (screenWidth < 1400 ? 220 : 250),
-                  collapsedWidth: widget.sidebarCollapsedWidth ?? (screenWidth < 1200 ? 60 : 70),
-                ),
-
-              // Main Content Area
-              Expanded(
+              // Main content area - positioned to account for sidebar width
+              Positioned(
+                left: widget.showSidebar ? _currentSidebarWidth : 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
                 child: Scaffold(
                   backgroundColor: widget.backgroundColor ?? AppColors.background,
                   appBar: widget.showTopbar
@@ -110,6 +110,39 @@ class _DesktopAppLayoutState extends State<DesktopAppLayout> {
                   body: widget.body,
                 ),
               ),
+
+              // Sidebar - positioned absolutely to allow overflow
+              if (widget.showSidebar)
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: Stack(
+                    clipBehavior: Clip.none, // Allow sidebar content to overflow
+                    children: [
+                      widget.enableResponsiveSidebar
+                          ? ResponsiveAppSidebar(
+                        items: widget.sidebarItems,
+                        header: widget.sidebarHeader,
+                        footer: widget.sidebarFooter,
+                        selectedIndex: widget.selectedSidebarIndex,
+                        breakpoint: 1200,
+                        isExpanded: _isSidebarExpanded && !shouldAutoCollapseSidebar,
+                        onToggle: _handleSidebarToggle,
+                      )
+                          : AppSidebar(
+                        items: widget.sidebarItems,
+                        header: widget.sidebarHeader,
+                        footer: widget.sidebarFooter,
+                        selectedIndex: widget.selectedSidebarIndex,
+                        startExpanded: _isSidebarExpanded && !shouldAutoCollapseSidebar,
+                        expandedWidth: expandedWidth,
+                        collapsedWidth: collapsedWidth,
+                        onToggle: _handleSidebarToggle,
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
         );

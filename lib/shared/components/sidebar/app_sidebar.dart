@@ -20,6 +20,7 @@ class AppSidebar extends StatefulWidget {
   final int? selectedIndex;
   final bool startExpanded;
   final bool showToggleButton;
+  final VoidCallback? onToggle;
 
   const AppSidebar({
     super.key,
@@ -31,22 +32,48 @@ class AppSidebar extends StatefulWidget {
     this.selectedIndex,
     this.startExpanded = true,
     this.showToggleButton = true,
+    this.onToggle,
   });
 
   @override
   State<AppSidebar> createState() => _AppSidebarState();
 }
 
-class _AppSidebarState extends State<AppSidebar> {
+class _AppSidebarState extends State<AppSidebar> with SingleTickerProviderStateMixin {
   late AppSidebarController _controller;
   late String _controllerTag;
+  late bool _isExpanded;
+  late AnimationController _animationController;
+  late Animation<double> _widthAnimation;
 
   @override
   void initState() {
     super.initState();
 
+    // Local state for expansion
+    _isExpanded = widget.startExpanded;
+
     // Create a unique tag for this controller instance
     _controllerTag = 'sidebar_${UniqueKey().toString()}';
+
+    // Initialize animation controller
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 250),
+      vsync: this,
+    );
+
+    _widthAnimation = Tween<double>(
+      begin: widget.collapsedWidth,
+      end: widget.expandedWidth,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
+
+    // Set initial animation state
+    if (_isExpanded) {
+      _animationController.value = 1.0;
+    }
 
     // Initialize controller with try-catch for safety
     try {
@@ -56,13 +83,27 @@ class _AppSidebarState extends State<AppSidebar> {
       );
 
       // Set initial values
-      _controller.isExpanded.value = widget.startExpanded;
+      _controller.isExpanded.value = _isExpanded;
       _controller.selectedIndex.value = widget.selectedIndex ?? 0;
       _controller.sidebarWidth.value = widget.expandedWidth;
       _controller.collapsedWidth.value = widget.collapsedWidth;
 
       // Initialize focus nodes for keyboard navigation
       _controller.initializeFocusNodes(widget.items.length);
+
+      // Listen to controller changes
+      _controller.isExpanded.listen((value) {
+        if (mounted && value != _isExpanded) {
+          setState(() {
+            _isExpanded = value;
+          });
+          if (_isExpanded) {
+            _animationController.forward();
+          } else {
+            _animationController.reverse();
+          }
+        }
+      });
     } catch (e) {
       AppLogger.e('Error initializing AppSidebar controller', e);
       // Initialize with a fallback controller if needed
@@ -71,7 +112,40 @@ class _AppSidebarState extends State<AppSidebar> {
   }
 
   @override
+  void didUpdateWidget(AppSidebar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // Update expansion state if it changed from parent
+    if (oldWidget.startExpanded != widget.startExpanded) {
+      setState(() {
+        _isExpanded = widget.startExpanded;
+      });
+      _controller.isExpanded.value = widget.startExpanded;
+      if (_isExpanded) {
+        _animationController.forward();
+      } else {
+        _animationController.reverse();
+      }
+    }
+
+    // Update widths if they changed
+    if (oldWidget.expandedWidth != widget.expandedWidth ||
+        oldWidget.collapsedWidth != widget.collapsedWidth) {
+      _controller.sidebarWidth.value = widget.expandedWidth;
+      _controller.collapsedWidth.value = widget.collapsedWidth;
+      _widthAnimation = Tween<double>(
+        begin: widget.collapsedWidth,
+        end: widget.expandedWidth,
+      ).animate(CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeInOut,
+      ));
+    }
+  }
+
+  @override
   void dispose() {
+    _animationController.dispose();
     // Clean up controller safely
     try {
       if (Get.isRegistered<AppSidebarController>(tag: _controllerTag)) {
@@ -97,12 +171,29 @@ class _AppSidebarState extends State<AppSidebar> {
     }).toList();
   }
 
+  void _handleToggle() {
+    setState(() {
+      _isExpanded = !_isExpanded;
+    });
+    _controller.isExpanded.value = _isExpanded;
+
+    if (_isExpanded) {
+      _animationController.forward();
+    } else {
+      _animationController.reverse();
+    }
+
+    widget.onToggle?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         // Update responsive width based on screen size
         _controller.updateResponsiveWidth(constraints.maxWidth);
+
+        final menuItems = _convertItems(widget.items);
 
         return CallbackShortcuts(
           bindings: {
@@ -119,38 +210,82 @@ class _AppSidebarState extends State<AppSidebar> {
           child: Focus(
             autofocus: false,
             child: Stack(
+              clipBehavior: Clip.none, // CRITICAL: Allow overflow for tooltips
               children: [
                 // Main Sidebar with animation
-                Obx(() {
-                  final isExpanded = _controller.isExpanded.value;
-                  final menuItems = _convertItems(widget.items);
+                AnimatedBuilder(
+                  animation: _widthAnimation,
+                  builder: (context, child) {
+                    return Container(
+                      width: _widthAnimation.value,
+                      child: Stack(
+                        clipBehavior: Clip.none, // Allow internal overflow
+                        children: [
+                          // Sidebar content
+                          _isExpanded
+                              ? ExpandedSidebar(
+                            controller: _controller,
+                            items: menuItems,
+                            header: _buildHeader(_isExpanded),
+                            footer: _buildFooter(_isExpanded),
+                            width: widget.expandedWidth,
+                          )
+                              : CollapsedSidebar(
+                            controller: _controller,
+                            items: menuItems,
+                            header: _buildHeader(_isExpanded),
+                            footer: _buildFooter(_isExpanded),
+                            width: widget.collapsedWidth,
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
 
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    width: isExpanded
-                        ? _controller.sidebarWidth.value
-                        : _controller.collapsedWidth.value,
-                    child: isExpanded
-                        ? ExpandedSidebar(
-                      controller: _controller,
-                      items: menuItems,
-                      header: _buildHeader(isExpanded),
-                      footer: _buildFooter(isExpanded),
-                      width: _controller.sidebarWidth.value,
-                    )
-                        : CollapsedSidebar(
-                      controller: _controller,
-                      items: menuItems,
-                      header: _buildHeader(isExpanded),
-                      footer: _buildFooter(isExpanded),
-                      width: _controller.collapsedWidth.value,
-                    ),
-                  );
-                }),
-
-                // Toggle Button
+                // Toggle Button - positioned to be visible
                 if (widget.showToggleButton)
-                  SidebarToggleButton(controller: _controller),
+                  Positioned(
+                    top: _isExpanded ? 12 : 8, // Adjust top position for collapsed state
+                    right: _isExpanded ? 12 : (widget.collapsedWidth - 28), // Adjust position based on state
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        onTap: _handleToggle,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.95),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: const Color(0xFFE0E0E0),
+                              width: 1,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: AnimatedRotation(
+                              duration: const Duration(milliseconds: 250),
+                              turns: _isExpanded ? 0.0 : 0.5,
+                              child: Icon(
+                                Icons.chevron_left_rounded,
+                                size: 24,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -340,12 +475,14 @@ class AppSidebarFooter extends StatelessWidget {
 }
 
 // Responsive sidebar wrapper for automatic collapsing on small screens
-class ResponsiveAppSidebar extends StatelessWidget {
+class ResponsiveAppSidebar extends StatefulWidget {
   final List<SidebarXItem> items;
   final Widget? header;
   final Widget? footer;
   final double breakpoint;
   final int? selectedIndex;
+  final VoidCallback? onToggle;
+  final bool isExpanded;
 
   const ResponsiveAppSidebar({
     super.key,
@@ -354,23 +491,31 @@ class ResponsiveAppSidebar extends StatelessWidget {
     this.footer,
     this.breakpoint = 1200,
     this.selectedIndex,
+    this.onToggle,
+    this.isExpanded = true,
   });
 
+  @override
+  State<ResponsiveAppSidebar> createState() => _ResponsiveAppSidebarState();
+}
+
+class _ResponsiveAppSidebarState extends State<ResponsiveAppSidebar> {
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final screenWidth = constraints.maxWidth;
-        final shouldCollapse = screenWidth < breakpoint;
+        final shouldCollapse = screenWidth < widget.breakpoint;
 
         return AppSidebar(
-          items: items,
-          header: header,
-          footer: footer,
-          selectedIndex: selectedIndex,
-          startExpanded: !shouldCollapse,
+          items: widget.items,
+          header: widget.header,
+          footer: widget.footer,
+          selectedIndex: widget.selectedIndex,
+          startExpanded: widget.isExpanded && !shouldCollapse,
           expandedWidth: screenWidth < 1400 ? 220 : 250,
           collapsedWidth: screenWidth < 1200 ? 60 : 70,
+          onToggle: widget.onToggle,
         );
       },
     );

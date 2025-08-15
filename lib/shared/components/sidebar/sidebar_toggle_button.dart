@@ -10,6 +10,7 @@ class SidebarToggleButton extends StatefulWidget {
   final double? right;
   final double? left;
   final double? bottom;
+  final VoidCallback? onToggle;
 
   const SidebarToggleButton({
     super.key,
@@ -18,6 +19,7 @@ class SidebarToggleButton extends StatefulWidget {
     this.right,
     this.left,
     this.bottom,
+    this.onToggle,
   });
 
   @override
@@ -52,6 +54,11 @@ class _SidebarToggleButtonState extends State<SidebarToggleButton>
     super.dispose();
   }
 
+  void _handleToggle() {
+    widget.controller.toggleSidebar();
+    widget.onToggle?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Positioned(
@@ -80,7 +87,7 @@ class _SidebarToggleButtonState extends State<SidebarToggleButton>
                 borderRadius: BorderRadius.circular(8),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(8),
-                  onTap: widget.controller.toggleSidebar,
+                  onTap: _handleToggle,
                   child: Obx(() {
                     final isExpanded = widget.controller.isExpanded.value;
 
@@ -149,17 +156,22 @@ class _SidebarToggleButtonState extends State<SidebarToggleButton>
 // Alternative toggle button styles
 class SidebarToggleButtonMinimal extends StatelessWidget {
   final AppSidebarController controller;
+  final VoidCallback? onToggle;
 
   const SidebarToggleButtonMinimal({
     super.key,
     required this.controller,
+    this.onToggle,
   });
 
   @override
   Widget build(BuildContext context) {
     return Obx(() {
       return IconButton(
-        onPressed: controller.toggleSidebar,
+        onPressed: () {
+          controller.toggleSidebar();
+          onToggle?.call();
+        },
         icon: AnimatedSwitcher(
           duration: const Duration(milliseconds: 200),
           transitionBuilder: (Widget child, Animation<double> animation) {
@@ -185,10 +197,12 @@ class SidebarToggleButtonMinimal extends StatelessWidget {
 // Hamburger style toggle button
 class SidebarToggleButtonHamburger extends StatefulWidget {
   final AppSidebarController controller;
+  final VoidCallback? onToggle;
 
   const SidebarToggleButtonHamburger({
     super.key,
     required this.controller,
+    this.onToggle,
   });
 
   @override
@@ -238,12 +252,17 @@ class _SidebarToggleButtonHamburgerState
     super.dispose();
   }
 
+  void _handleToggle() {
+    widget.controller.toggleSidebar();
+    widget.onToggle?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: widget.controller.toggleSidebar,
+        onTap: _handleToggle,
         borderRadius: BorderRadius.circular(8),
         child: Container(
           width: 40,
@@ -288,10 +307,12 @@ class _SidebarToggleButtonHamburgerState
 // Double chevron style toggle button
 class SidebarToggleButtonDoubleChevron extends StatefulWidget {
   final AppSidebarController controller;
+  final VoidCallback? onToggle;
 
   const SidebarToggleButtonDoubleChevron({
     super.key,
     required this.controller,
+    this.onToggle,
   });
 
   @override
@@ -328,6 +349,11 @@ class _SidebarToggleButtonDoubleChevronState
     super.dispose();
   }
 
+  void _handleToggle() {
+    widget.controller.toggleSidebar();
+    widget.onToggle?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
@@ -335,7 +361,7 @@ class _SidebarToggleButtonDoubleChevronState
       onExit: (_) => setState(() => _isHovering = false),
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
-        onTap: widget.controller.toggleSidebar,
+        onTap: _handleToggle,
         child: Obx(() {
           final isExpanded = widget.controller.isExpanded.value;
 
