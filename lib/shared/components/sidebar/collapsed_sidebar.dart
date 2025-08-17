@@ -60,7 +60,6 @@ class CollapsedSidebar extends StatelessWidget {
 
               // Footer - Always show Profile Footer
               ProfileSidebarFooter(
-                key: const ValueKey('profile_footer_collapsed'),
                 isExpanded: false,
                 expandedWidth: 250,
                 collapsedWidth: width,

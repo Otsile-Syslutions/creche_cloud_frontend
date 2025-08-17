@@ -173,7 +173,6 @@ class ExpandedSidebar extends StatelessWidget {
 
               // Footer - Always show Profile Footer
               ProfileSidebarFooter(
-                key: const ValueKey('profile_footer_expanded'),
                 isExpanded: true,
                 expandedWidth: width,
                 collapsedWidth: 70,

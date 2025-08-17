@@ -114,7 +114,12 @@ class _ProfileSidebarFooterState extends State<ProfileSidebarFooter>
     _overlayEntry = null;
   }
 
-  Widget _buildDefaultFooter() {
+  Widget _buildFooterContent({
+    required String userName,
+    required String userRole,
+    required String userInitials,
+    String? userPhotoUrl,
+  }) {
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
@@ -128,20 +133,20 @@ class _ProfileSidebarFooterState extends State<ProfileSidebarFooter>
       ),
       child: widget.isExpanded
           ? ExpandedProfileFooter(
-        userName: 'Guest User',
-        userRole: 'Not logged in',
-        userInitials: 'G',
-        userPhotoUrl: null,
+        userName: userName,
+        userRole: userRole,
+        userInitials: userInitials,
+        userPhotoUrl: userPhotoUrl,
         isMenuOpen: _isMenuOpen,
         rotationAnimation: _rotationAnimation,
         onToggleMenu: toggleMenu,
         onCloseMenu: closeMenu,
       )
           : CollapsedProfileFooter(
-        userName: 'Guest User',
-        userRole: 'Not logged in',
-        userInitials: 'G',
-        userPhotoUrl: null,
+        userName: userName,
+        userRole: userRole,
+        userInitials: userInitials,
+        userPhotoUrl: userPhotoUrl,
         isMenuOpen: _isMenuOpen,
         onToggleMenu: toggleMenu,
         onCloseMenu: closeMenu,
@@ -149,60 +154,12 @@ class _ProfileSidebarFooterState extends State<ProfileSidebarFooter>
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // Check if AuthController is registered
-    if (!GetInstance().isRegistered<AuthController>()) {
-      return _buildDefaultFooter();
-    }
-
-    return GetBuilder<AuthController>(
-      builder: (controller) {
-        final UserModel? user = controller.currentUser.value;
-        final TenantModel? tenant = controller.currentTenant.value;
-
-        if (user == null) {
-          return _buildDefaultFooter();
-        }
-
-        // Get user name and initials safely
-        final userName = user.fullName.trim().isNotEmpty ? user.fullName : 'User';
-        final userRole = _getUserRoleDisplay(user, tenant);
-        final userInitials = _getUserInitials(user);
-
-        return Container(
-          width: double.infinity,
-          decoration: const BoxDecoration(
-            color: AppColors.surface,
-            border: Border(
-              top: BorderSide(
-                color: Color(0xFFE0E0E0),
-                width: 1,
-              ),
-            ),
-          ),
-          child: widget.isExpanded
-              ? ExpandedProfileFooter(
-            userName: userName,
-            userRole: userRole,
-            userInitials: userInitials,
-            userPhotoUrl: user.profileImage,
-            isMenuOpen: _isMenuOpen,
-            rotationAnimation: _rotationAnimation,
-            onToggleMenu: toggleMenu,
-            onCloseMenu: closeMenu,
-          )
-              : CollapsedProfileFooter(
-            userName: userName,
-            userRole: userRole,
-            userInitials: userInitials,
-            userPhotoUrl: user.profileImage,
-            isMenuOpen: _isMenuOpen,
-            onToggleMenu: toggleMenu,
-            onCloseMenu: closeMenu,
-          ),
-        );
-      },
+  Widget _buildDefaultFooter() {
+    return _buildFooterContent(
+      userName: 'Guest User',
+      userRole: 'Not logged in',
+      userInitials: 'G',
+      userPhotoUrl: null,
     );
   }
 
@@ -237,5 +194,42 @@ class _ProfileSidebarFooterState extends State<ProfileSidebarFooter>
 
     // Use the primaryRole getter from the model
     return user.primaryRole;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // FIXED: Don't cache the controller, get it fresh each time
+    // This ensures we always have the current auth state
+    return GetBuilder<AuthController>(
+      init: Get.isRegistered<AuthController>() ? null : AuthController(),
+      builder: (authController) {
+        // Use Obx for reactive updates
+        return Obx(() {
+          // Check if controller is properly initialized and has user data
+          if (!authController.isInitialized.value) {
+            return _buildDefaultFooter();
+          }
+
+          final UserModel? user = authController.currentUser.value;
+          final TenantModel? tenant = authController.currentTenant.value;
+
+          if (user == null) {
+            return _buildDefaultFooter();
+          }
+
+          // Get user name and initials safely
+          final userName = user.fullName.trim().isNotEmpty ? user.fullName : 'User';
+          final userRole = _getUserRoleDisplay(user, tenant);
+          final userInitials = _getUserInitials(user);
+
+          return _buildFooterContent(
+            userName: userName,
+            userRole: userRole,
+            userInitials: userInitials,
+            userPhotoUrl: user.profileImage,
+          );
+        });
+      },
+    );
   }
 }
