@@ -51,8 +51,9 @@ class CollapsedProfileFooter extends StatelessWidget {
             Container(
               height: 1,
               color: const Color(0xFFE0E0E0),
-              margin: const EdgeInsets.only(bottom: 2), // Minimal margin for better vertical centering
             ),
+
+            const SizedBox(height: 8), // Equal spacing above avatar
 
             // Profile avatar with chevron and tooltip
             _CollapsedProfileAvatar(
@@ -64,7 +65,9 @@ class CollapsedProfileFooter extends StatelessWidget {
               onTap: onToggleMenu,
             ),
 
-            // Menu icons
+            const SizedBox(height: 8), // Equal spacing below avatar
+
+            // Menu icons - with adjusted spacing
             AnimatedSize(
               duration: const Duration(milliseconds: 200),
               curve: Curves.easeInOut,
@@ -88,7 +91,12 @@ class CollapsedProfileFooter extends StatelessWidget {
               )
                   : const SizedBox.shrink(),
             ),
-            const SizedBox(height: 8), // Proper bottom spacing to center the layout
+
+            // Bottom spacing - equal to top spacing when menu is closed
+            if (!isMenuOpen)
+              const SizedBox(height: 8),
+            if (isMenuOpen)
+              const SizedBox(height: 4),
           ],
         ),
       ],
@@ -124,7 +132,7 @@ class _CollapsedProfileAvatarState extends State<_CollapsedProfileAvatar> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6), // Better vertical centering
+      padding: const EdgeInsets.symmetric(horizontal: 7), // Removed vertical padding - handled by parent
       child: MouseRegion(
         onEnter: (_) => setState(() => _isHovered = true),
         onExit: (_) => setState(() => _isHovered = false),
@@ -143,7 +151,7 @@ class _CollapsedProfileAvatarState extends State<_CollapsedProfileAvatar> {
                   bottom: 0,
                   child: Container(
                     width: 200,
-                    height: 44, // Reduced to match container height
+                    height: 46, // Increased for larger avatar
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(8),
@@ -171,16 +179,16 @@ class _CollapsedProfileAvatarState extends State<_CollapsedProfileAvatar> {
                                 initials: widget.userInitials,
                                 backgroundColor: AppColors.loginButton,
                                 photoUrl: widget.userPhotoUrl,
-                                radius: 13,
+                                radius: 16, // Increased from 13
                               ),
-                              const SizedBox(width: 2),
+                              const SizedBox(width: 3),
                               AnimatedRotation(
                                 duration: const Duration(milliseconds: 200),
-                                turns: widget.isMenuOpen ? 0.5 : 0,
+                                turns: widget.isMenuOpen ? -0.5 : 0, // Changed: negative for up arrow when open
                                 child: Icon(
                                   Icons.keyboard_arrow_down_rounded,
                                   color: AppColors.textSecondary,
-                                  size: 12,
+                                  size: 18, // Increased from 12
                                 ),
                               ),
                             ],
@@ -227,33 +235,36 @@ class _CollapsedProfileAvatarState extends State<_CollapsedProfileAvatar> {
                 ),
 
               // Avatar with chevron container - always visible
-              Container(
-                width: 71, // Adjusted to fit within padded container (85 - 14 padding)
-                height: 44, // Slightly reduced height
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  color: _isHovered ? Colors.transparent : Colors.transparent,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    UserAvatar(
-                      initials: widget.userInitials,
-                      backgroundColor: AppColors.loginButton,
-                      photoUrl: widget.userPhotoUrl,
-                      radius: 13, // Reduced slightly more
-                    ),
-                    const SizedBox(width: 2),
-                    AnimatedRotation(
-                      duration: const Duration(milliseconds: 200),
-                      turns: widget.isMenuOpen ? 0.5 : 0, // Rotate when menu opens
-                      child: Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        color: AppColors.textSecondary,
-                        size: 12, // Smaller icon
+              Opacity(
+                opacity: _isHovered ? 0.0 : 1.0, // Hide when hovering to avoid duplication
+                child: Container(
+                  width: 71, // Adjusted to fit within padded container
+                  height: 46, // Increased for larger avatar
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.transparent,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      UserAvatar(
+                        initials: widget.userInitials,
+                        backgroundColor: AppColors.loginButton,
+                        photoUrl: widget.userPhotoUrl,
+                        radius: 16, // Increased from 13
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 3),
+                      AnimatedRotation(
+                        duration: const Duration(milliseconds: 200),
+                        turns: widget.isMenuOpen ? -0.5 : 0, // Changed: negative for up arrow when open
+                        child: Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          color: AppColors.textSecondary,
+                          size: 18, // Increased from 12
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -291,7 +302,7 @@ class _CollapsedFooterItemState extends State<CollapsedFooterItem> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2), // Consistent padding
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1), // Reduced vertical padding
       child: MouseRegion(
         onEnter: (_) => setState(() => _isHovered = true),
         onExit: (_) => setState(() => _isHovered = false),
@@ -302,28 +313,31 @@ class _CollapsedFooterItemState extends State<CollapsedFooterItem> {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              // Icon container - always visible as base state
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  color: _isHovered ? Colors.transparent : Colors.transparent,
-                ),
-                padding: const EdgeInsets.all(11),
-                child: Center(
-                  child: widget.customWidget ??
-                      Icon(
-                        widget.icon,
-                        color: widget.isError
-                            ? AppColors.error
-                            : AppColors.textSecondary,
-                        size: 22,
-                      ),
+              // Icon container - always visible with opacity control
+              Opacity(
+                opacity: _isHovered ? 0.0 : 1.0, // Hide when hovering to avoid duplication
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.transparent,
+                  ),
+                  padding: const EdgeInsets.all(11),
+                  child: Center(
+                    child: widget.customWidget ??
+                        Icon(
+                          widget.icon,
+                          color: widget.isError
+                              ? AppColors.error
+                              : AppColors.textSecondary,
+                          size: 22,
+                        ),
+                  ),
                 ),
               ),
 
-              // Extended hover background - shows label to the right (higher z-index)
+              // Extended hover background - shows label to the right
               if (_isHovered)
                 Positioned(
                   left: 0,
@@ -331,7 +345,7 @@ class _CollapsedFooterItemState extends State<CollapsedFooterItem> {
                   bottom: 0,
                   child: Container(
                     width: 220, // Extended width for better visibility
-                    height: 44, // Reduced to match
+                    height: 44,
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(8),
