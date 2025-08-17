@@ -7,7 +7,6 @@ import 'app_sidebar_controller.dart';
 import 'collapsed_sidebar.dart';
 import 'footer/profile_sidebar_footer_controller.dart';
 
-
 // Hover wrapper widget for menu items
 class _MenuItemHoverWrapper extends StatefulWidget {
   final Widget child;
@@ -148,7 +147,7 @@ class ExpandedSidebar extends StatelessWidget {
         return Container(
           width: width,
           height: double.infinity,
-          clipBehavior: Clip.hardEdge, // ADD THIS LINE - Clips all child content including hover effects
+          // REMOVED clipBehavior to allow footer expansion
           decoration: const BoxDecoration(
             color: AppColors.surface,
             border: Border(
@@ -158,26 +157,40 @@ class ExpandedSidebar extends StatelessWidget {
               ),
             ),
           ),
-          child: Column(
+          child: Stack(
+            clipBehavior: Clip.none, // Allow overflow for expanded footer
             children: [
-              const SizedBox(height: 20),
+              // Main content
+              Column(
+                children: [
+                  const SizedBox(height: 20),
 
-              // Header - Fixed at top
-              if (header != null) header!,
+                  // Header - Fixed at top
+                  if (header != null) header!,
 
-              // Menu Items - Scrollable if needed
-              Expanded(
-                child: shouldScroll
-                    ? _buildScrollableMenu()
-                    : _buildStaticMenu(),
+                  // Menu Items - Scrollable if needed with proper bottom padding
+                  Expanded(
+                    child: shouldScroll
+                        ? _buildScrollableMenu()
+                        : _buildStaticMenu(),
+                  ),
+
+                  // Reserve space for footer (collapsed height)
+                  const SizedBox(height: 80),
+                ],
               ),
 
-              // Footer - Pass the controller tag if available
-              ProfileSidebarFooter(
-                isExpanded: true,
-                expandedWidth: width,
-                collapsedWidth: 70,
-                controllerTag: controller.controllerTag,
+              // Footer positioned at bottom with overflow allowed
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: ProfileSidebarFooter(
+                  isExpanded: true,
+                  expandedWidth: width,
+                  collapsedWidth: 70,
+                  controllerTag: controller.controllerTag,
+                ),
               ),
             ],
           ),
@@ -195,7 +208,10 @@ class ExpandedSidebar extends StatelessWidget {
       thumbColor: AppColors.textHint.withOpacity(0.3),
       child: ListView.builder(
         controller: controller.menuScrollController,
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.only(
+          top: 8,
+          bottom: 16, // Extra padding to ensure menu items don't go under footer
+        ),
         itemCount: items.length,
         itemBuilder: (context, index) {
           return _buildMenuItem(index);
@@ -205,8 +221,11 @@ class ExpandedSidebar extends StatelessWidget {
   }
 
   Widget _buildStaticMenu() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.only(
+        top: 8,
+        bottom: 16, // Extra padding to ensure menu items don't go under footer
+      ),
       child: Column(
         children: List.generate(
           items.length,
@@ -291,7 +310,7 @@ class ExpandedSidebarHeader extends StatelessWidget {
       padding: const EdgeInsets.only(
         left: 12,
         right: 12,
-        top: 0,  // Reduced from 20 to 0 since we have 60px space above
+        top: 0, // Reduced from 20 to 0 since we have 60px space above
         bottom: 16,
       ),
       color: AppColors.surface,

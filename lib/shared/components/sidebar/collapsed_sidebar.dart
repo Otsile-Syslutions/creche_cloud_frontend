@@ -6,8 +6,6 @@ import '../../../constants/app_assets.dart';
 import 'app_sidebar_controller.dart';
 import 'footer/profile_sidebar_footer_controller.dart';
 
-
-
 class CollapsedSidebar extends StatelessWidget {
   final AppSidebarController controller;
   final List<SidebarMenuItem> items;
@@ -19,7 +17,7 @@ class CollapsedSidebar extends StatelessWidget {
     required this.controller,
     required this.items,
     this.header,
-    this.width = 70,
+    this.width = 85,  // Increased from 70 to accommodate chevron
   });
 
   @override
@@ -32,6 +30,8 @@ class CollapsedSidebar extends StatelessWidget {
         return Container(
           width: width,
           height: double.infinity,
+          // Allow overflow for footer expansion
+          clipBehavior: Clip.none,
           decoration: const BoxDecoration(
             color: AppColors.surface,
             border: Border(
@@ -41,30 +41,44 @@ class CollapsedSidebar extends StatelessWidget {
               ),
             ),
           ),
-          child: Column(
+          child: Stack(
+            clipBehavior: Clip.none, // Allow footer to expand outside bounds
             children: [
-              // Add spacing from top
-              const SizedBox(height: 60),
+              // Main content column
+              Column(
+                children: [
+                  // Add spacing from top
+                  const SizedBox(height: 60),
 
-              // Header - Fixed at top (collapsed logo)
-              if (header != null)
-                header!
-              else
-                const CollapsedSidebarHeader(),
+                  // Header - Fixed at top (collapsed logo)
+                  if (header != null)
+                    header!
+                  else
+                    const CollapsedSidebarHeader(),
 
-              // Menu Items - Scrollable if needed
-              Expanded(
-                child: shouldScroll
-                    ? _buildScrollableMenu()
-                    : _buildStaticMenu(),
+                  // Menu Items - Scrollable if needed
+                  Expanded(
+                    child: shouldScroll
+                        ? _buildScrollableMenu()
+                        : _buildStaticMenu(),
+                  ),
+
+                  // Reserve space for footer (collapsed height)
+                  const SizedBox(height: 80), // Space for footer (matches new footer height)
+                ],
               ),
 
-              // Footer - Pass the controller tag if available
-              ProfileSidebarFooter(
-                isExpanded: false,
-                expandedWidth: 250,
-                collapsedWidth: width,
-                controllerTag: controller.controllerTag,
+              // Footer positioned at bottom with overflow allowed
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: ProfileSidebarFooter(
+                  isExpanded: false,
+                  expandedWidth: 250,
+                  collapsedWidth: width,  // Use the width property
+                  controllerTag: controller.controllerTag,
+                ),
               ),
             ],
           ),
@@ -82,7 +96,10 @@ class CollapsedSidebar extends StatelessWidget {
       thumbColor: AppColors.textHint.withOpacity(0.3),
       child: ListView.builder(
         controller: controller.menuScrollController,
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.only(
+          top: 8,
+          bottom: 16, // Extra padding to ensure menu items don't go under footer
+        ),
         itemCount: items.length,
         itemBuilder: (context, index) {
           return _buildMenuItem(index);
@@ -92,8 +109,11 @@ class CollapsedSidebar extends StatelessWidget {
   }
 
   Widget _buildStaticMenu() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.only(
+        top: 8,
+        bottom: 16, // Extra padding to ensure menu items don't go under footer
+      ),
       child: Column(
         children: List.generate(
           items.length,
@@ -295,8 +315,8 @@ class CollapsedSidebarHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.only(
-        left: 10,
-        right: 10,
+        left: 12,  // Adjusted for wider sidebar
+        right: 12,  // Adjusted for wider sidebar
         top: 0,
         bottom: 16,
       ),

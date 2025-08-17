@@ -1,4 +1,4 @@
-// lib/shared/components/sidebar/collapsed_profile_footer.dart
+// lib/shared/components/sidebar/footer/collapsed_profile_footer.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../constants/app_colors.dart';
@@ -26,71 +26,214 @@ class CollapsedProfileFooter extends StatelessWidget {
   });
 
   void _handleProfile() {
+    print('Profile button clicked!'); // Debug
     onCloseMenu();
     // Navigate to profile page
     // Get.toNamed('/profile');
   }
 
   void _handleLogout() {
+    print('Logout button clicked!'); // Debug
     onCloseMenu();
     Get.offAll(() => const LogoutSplashScreen());
   }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Profile avatar with tooltip
-        CollapsedFooterItem(
-          customWidget: UserAvatar(
-            initials: userInitials,
-            backgroundColor: AppColors.loginButton,
-            photoUrl: userPhotoUrl,
-            radius: 18,
+    // Wrap in ClipRect to prevent overflow
+    return ClipRect(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Divider line above user info
+          Container(
+            height: 1,
+            color: const Color(0xFFE0E0E0),
+            margin: const EdgeInsets.only(bottom: 2), // Minimal margin for better vertical centering
           ),
-          label: '$userName\n$userRole',
-          onTap: onToggleMenu,
-          isAvatar: true,
-        ),
 
-        // Menu icons
-        AnimatedSize(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeInOut,
-          child: isMenuOpen
-              ? Column(
-            children: [
-              CollapsedFooterItem(
-                icon: Icons.person_outline,
-                label: 'Profile',
-                onTap: _handleProfile,
-                isError: false,
-              ),
-              CollapsedFooterItem(
-                icon: Icons.logout,
-                label: 'Logout',
-                onTap: _handleLogout,
-                isError: true,
-              ),
-            ],
-          )
-              : const SizedBox.shrink(),
-        ),
-        const SizedBox(height: 8),
-      ],
+          // Profile avatar with chevron and tooltip
+          _CollapsedProfileAvatar(
+            userName: userName,
+            userRole: userRole,
+            userInitials: userInitials,
+            userPhotoUrl: userPhotoUrl,
+            isMenuOpen: isMenuOpen,
+            onTap: onToggleMenu,
+          ),
+
+          // Menu icons
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            child: isMenuOpen
+                ? Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CollapsedFooterItem(
+                  icon: Icons.person_outline,
+                  label: 'Profile',
+                  onTap: _handleProfile,
+                  isError: false,
+                ),
+                CollapsedFooterItem(
+                  icon: Icons.logout,
+                  label: 'Logout',
+                  onTap: _handleLogout,
+                  isError: true,
+                ),
+              ],
+            )
+                : const SizedBox.shrink(),
+          ),
+          const SizedBox(height: 8), // Proper bottom spacing to center the layout
+        ],
+      ),
     );
   }
 }
 
-// Collapsed footer item with tooltip (same style as menu items)
+// Special widget for the profile avatar with chevron
+class _CollapsedProfileAvatar extends StatefulWidget {
+  final String userName;
+  final String userRole;
+  final String userInitials;
+  final String? userPhotoUrl;
+  final bool isMenuOpen;
+  final VoidCallback onTap;
+
+  const _CollapsedProfileAvatar({
+    required this.userName,
+    required this.userRole,
+    required this.userInitials,
+    this.userPhotoUrl,
+    required this.isMenuOpen,
+    required this.onTap,
+  });
+
+  @override
+  State<_CollapsedProfileAvatar> createState() => _CollapsedProfileAvatarState();
+}
+
+class _CollapsedProfileAvatarState extends State<_CollapsedProfileAvatar> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6), // Better vertical centering
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: widget.onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // Extended hover background - shows user info to the right
+              if (_isHovered)
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 200,
+                    height: 44, // Reduced to match container height
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: const Color(0xFFE0E0E0),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const SizedBox(width: 71), // Space for avatar and chevron (matches container)
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 10.0, right: 12.0),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  widget.userName,
+                                  style: const TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 13,
+                                    fontFamily: 'Roboto',
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  widget.userRole,
+                                  style: const TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 11,
+                                    fontFamily: 'Roboto',
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+              // Avatar with chevron container - using Flexible widgets
+              SizedBox(
+                width: 71, // Adjusted to fit within padded container (85 - 14 padding)
+                height: 44, // Slightly reduced height
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: UserAvatar(
+                        initials: widget.userInitials,
+                        backgroundColor: AppColors.loginButton,
+                        photoUrl: widget.userPhotoUrl,
+                        radius: 13, // Reduced slightly more
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    AnimatedRotation(
+                      duration: const Duration(milliseconds: 200),
+                      turns: widget.isMenuOpen ? 0.5 : 0, // Rotate when menu opens
+                      child: Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: AppColors.textSecondary,
+                        size: 12, // Smaller icon
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Collapsed footer item with tooltip (for Profile and Logout buttons)
 class CollapsedFooterItem extends StatefulWidget {
   final IconData? icon;
   final Widget? customWidget;
   final String label;
   final VoidCallback? onTap;
   final bool isError;
-  final bool isAvatar;
 
   const CollapsedFooterItem({
     super.key,
@@ -99,7 +242,6 @@ class CollapsedFooterItem extends StatefulWidget {
     required this.label,
     this.onTap,
     this.isError = false,
-    this.isAvatar = false,
   });
 
   @override
@@ -112,7 +254,7 @@ class _CollapsedFooterItemState extends State<CollapsedFooterItem> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2), // Consistent padding
       child: MouseRegion(
         onEnter: (_) => setState(() => _isHovered = true),
         onExit: (_) => setState(() => _isHovered = false),
@@ -123,54 +265,11 @@ class _CollapsedFooterItemState extends State<CollapsedFooterItem> {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              // Extended hover background - shows label to the right
-              if (_isHovered)
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  bottom: 0,
-                  child: Container(
-                    width: 200,
-                    height: 46,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: const Color(0xFFE0E0E0),
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        const SizedBox(width: 46),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(left: 10.0, right: 12.0),
-                            child: Text(
-                              widget.label,
-                              style: TextStyle(
-                                color: widget.isError
-                                    ? AppColors.error
-                                    : AppColors.textSecondary,
-                                fontSize: widget.isAvatar ? 12 : 14,
-                                fontFamily: 'Roboto',
-                                fontWeight: FontWeight.w600,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: widget.isAvatar ? 2 : 1,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-              // Icon/Avatar container
+              // Icon container - base layer
               Container(
-                width: 46,
-                height: 46,
-                padding: EdgeInsets.all(widget.isAvatar ? 4 : 12),
+                width: 44, // Reduced to match height
+                height: 44,
+                padding: const EdgeInsets.all(11), // Adjusted padding
                 child: Center(
                   child: widget.customWidget ??
                       Icon(
@@ -182,6 +281,56 @@ class _CollapsedFooterItemState extends State<CollapsedFooterItem> {
                       ),
                 ),
               ),
+
+              // Extended hover background - shows label to the right (higher z-index)
+              if (_isHovered)
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 220, // Extended width for better visibility
+                    height: 44, // Reduced to match
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: const Color(0xFFE0E0E0),
+                        width: 1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 8,
+                          offset: const Offset(2, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        const SizedBox(width: 44), // Space for icon (adjusted)
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 10.0, right: 12.0),
+                            child: Text(
+                              widget.label,
+                              style: TextStyle(
+                                color: widget.isError
+                                    ? AppColors.error
+                                    : AppColors.textSecondary,
+                                fontSize: 14,
+                                fontFamily: 'Roboto',
+                                fontWeight: FontWeight.w600,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
