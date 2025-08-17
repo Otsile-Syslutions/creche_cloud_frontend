@@ -1,4 +1,6 @@
-// lib/shared/components/sidebar/expanded_profile_footer.dart
+// lib/shared/components/sidebar/expanded_profile_footer_simple.dart
+
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../constants/app_colors.dart';
@@ -28,12 +30,14 @@ class ExpandedProfileFooter extends StatelessWidget {
   });
 
   void _handleProfile() {
+    print('Profile button clicked!'); // Debug
     onCloseMenu();
     // Navigate to profile page
     // Get.toNamed('/profile');
   }
 
   void _handleLogout() {
+    print('Logout button clicked!'); // Debug
     onCloseMenu();
     Get.offAll(() => const LogoutSplashScreen());
   }
@@ -46,29 +50,86 @@ class ExpandedProfileFooter extends StatelessWidget {
         // Profile section with user info
         _buildProfileSection(),
 
-        // Menu items with proper hover effect
-        AnimatedSize(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeInOut,
-          child: isMenuOpen
-              ? Column(
-            children: [
-              _buildMenuItem(
-                icon: Icons.person_outline,
-                label: 'Profile',
+        // Menu items
+        if (isMenuOpen) ...[
+          const SizedBox(height: 4),
+
+          // Profile button
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              child: InkWell(
                 onTap: _handleProfile,
-                isError: false,
+                borderRadius: BorderRadius.circular(8),
+                hoverColor: AppColors.loginButton.withOpacity(0.05),
+                splashColor: AppColors.loginButton.withOpacity(0.1),
+                highlightColor: AppColors.loginButton.withOpacity(0.08),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.person_outline,
+                        color: AppColors.textSecondary,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'Profile',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 14,
+                          fontFamily: 'Roboto',
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              _buildMenuItem(
-                icon: Icons.logout,
-                label: 'Logout',
+            ),
+          ),
+
+          // Logout button
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              child: InkWell(
                 onTap: _handleLogout,
-                isError: true,
+                borderRadius: BorderRadius.circular(8),
+                hoverColor: Colors.red.withOpacity(0.05),
+                splashColor: Colors.red.withOpacity(0.1),
+                highlightColor: Colors.red.withOpacity(0.08),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.logout,
+                        color: AppColors.error,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Logout',
+                        style: TextStyle(
+                          color: AppColors.error,
+                          fontSize: 14,
+                          fontFamily: 'Roboto',
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ],
-          )
-              : const SizedBox.shrink(),
-        ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -77,7 +138,10 @@ class ExpandedProfileFooter extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onToggleMenu,
+        onTap: () {
+          print('Profile section clicked - Menu is ${isMenuOpen ? 'open' : 'closed'}'); // Debug
+          onToggleMenu();
+        },
         hoverColor: Colors.grey.withOpacity(0.05),
         highlightColor: Colors.grey.withOpacity(0.1),
         child: Container(
@@ -122,65 +186,15 @@ class ExpandedProfileFooter extends StatelessWidget {
                   ],
                 ),
               ),
-              // Animated chevron
-              AnimatedBuilder(
-                animation: rotationAnimation,
-                builder: (context, child) {
-                  return Transform.rotate(
-                    angle: rotationAnimation.value * 3.14159,
-                    child: const Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      color: AppColors.textSecondary,
-                      size: 20,
-                    ),
-                  );
-                },
+              // Simple chevron rotation
+              Icon(
+                isMenuOpen
+                    ? Icons.keyboard_arrow_down_rounded  // Points DOWN when open
+                    : Icons.keyboard_arrow_up_rounded,   // Points UP when closed
+                color: AppColors.textSecondary,
+                size: 20,
               ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMenuItem({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-    required bool isError,
-  }) {
-    return HoverScaleWrapper(
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
-          hoverColor: AppColors.loginButton.withOpacity(0.05),
-          focusColor: AppColors.loginButton.withOpacity(0.1),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  icon,
-                  size: 22,
-                  color: isError ? AppColors.error : AppColors.textSecondary,
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: isError ? AppColors.error : AppColors.textSecondary,
-                    fontSize: 14,
-                    fontFamily: 'Roboto',
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
           ),
         ),
       ),

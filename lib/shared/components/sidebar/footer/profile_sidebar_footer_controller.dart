@@ -2,9 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../constants/app_colors.dart';
-import '../../../../features/auth/controllers/auth_controller.dart';
-import '../../../../features/auth/models/tenant_model.dart';
-import '../../../../features/auth/models/user_model.dart';
+import '../../../../utils/app_logger.dart';
+import '../app_sidebar_controller.dart';
 import 'expanded_profile_footer.dart';
 import 'collapsed_profile_footer.dart';
 
@@ -13,12 +12,14 @@ class ProfileSidebarFooter extends StatefulWidget {
   final bool isExpanded;
   final double expandedWidth;
   final double collapsedWidth;
+  final String? controllerTag;  // Optional tag to find specific controller
 
   const ProfileSidebarFooter({
     super.key,
     this.isExpanded = true,
     this.expandedWidth = 250,
     this.collapsedWidth = 70,
+    this.controllerTag,
   });
 
   @override
@@ -32,6 +33,7 @@ class _ProfileSidebarFooterState extends State<ProfileSidebarFooter>
   late Animation<double> _expandAnimation;
   late Animation<double> _rotationAnimation;
   OverlayEntry? _overlayEntry;
+  AppSidebarController? _sidebarController;
 
   @override
   void initState() {
@@ -54,6 +56,33 @@ class _ProfileSidebarFooterState extends State<ProfileSidebarFooter>
     // Start with menu collapsed (default state)
     _isMenuOpen = false;
     _animationController.value = 0.0;
+
+    // Find the AppSidebarController
+    _findSidebarController();
+  }
+
+  void _findSidebarController() {
+    try {
+      // Try to find controller with tag if provided
+      if (widget.controllerTag != null) {
+        if (Get.isRegistered<AppSidebarController>(tag: widget.controllerTag)) {
+          _sidebarController = Get.find<AppSidebarController>(tag: widget.controllerTag);
+          AppLogger.d('Found AppSidebarController with tag: ${widget.controllerTag}');
+        }
+      }
+
+      // Fallback to finding controller without tag
+      if (_sidebarController == null && Get.isRegistered<AppSidebarController>()) {
+        _sidebarController = Get.find<AppSidebarController>();
+        AppLogger.d('Found AppSidebarController without tag');
+      }
+
+      if (_sidebarController == null) {
+        AppLogger.w('AppSidebarController not found, ProfileSidebarFooter will show default data');
+      }
+    } catch (e) {
+      AppLogger.e('Error finding AppSidebarController', e);
+    }
   }
 
   @override
@@ -163,73 +192,39 @@ class _ProfileSidebarFooterState extends State<ProfileSidebarFooter>
     );
   }
 
-  String _getUserInitials(UserModel user) {
-    // Safely get initials, handling empty names
-    try {
-      if (user.firstName.isNotEmpty && user.lastName.isNotEmpty) {
-        return user.initials; // Use the model's computed property
-      } else if (user.firstName.isNotEmpty) {
-        return user.firstName[0].toUpperCase();
-      } else if (user.lastName.isNotEmpty) {
-        return user.lastName[0].toUpperCase();
-      } else if (user.email.isNotEmpty) {
-        return user.email[0].toUpperCase();
-      }
-    } catch (e) {
-      // Fallback if any error occurs
-    }
-    return 'U';
-  }
-
-  String _getUserRoleDisplay(UserModel user, TenantModel? tenant) {
-    // Use the model's computed properties
-    if (user.isPlatformAdmin) {
-      return 'Platform Admin';
-    }
-
-    // Check tenant name for tenant users
-    if (user.platformType == 'tenant' && tenant != null) {
-      return tenant.displayName;
-    }
-
-    // Use the primaryRole getter from the model
-    return user.primaryRole;
-  }
-
   @override
   Widget build(BuildContext context) {
-    // FIXED: Don't cache the controller, get it fresh each time
-    // This ensures we always have the current auth state
-    return GetBuilder<AuthController>(
-      init: Get.isRegistered<AuthController>() ? null : AuthController(),
-      builder: (authController) {
-        // Use Obx for reactive updates
-        return Obx(() {
-          // Check if controller is properly initialized and has user data
-          if (!authController.isInitialized.value) {
-            return _buildDefaultFooter();
-          }
+    // If no controller found, show default footer
+    if (_sidebarController == null) {
+      // Try to find controller one more time in case it was registered after initState
+      _findSidebarController();
 
-          final UserModel? user = authController.currentUser.value;
-          final TenantModel? tenant = authController.currentTenant.value;
+      if (_sidebarController == null) {
+        return _buildDefaultFooter();
+      }
+    }
 
-          if (user == null) {
-            return _buildDefaultFooter();
-          }
+    // Use Obx to observe changes from the sidebar controller
+    return Obx(() {
+      // Check if controller has user data loaded
+      if (!_sidebarController!.isUserDataLoaded.value) {
+        return _buildDefaultFooter();
+      }
 
-          // Get user name and initials safely
-          final userName = user.fullName.trim().isNotEmpty ? user.fullName : 'User';
-          final userRole = _getUserRoleDisplay(user, tenant);
-          final userInitials = _getUserInitials(user);
+      // Get user data from sidebar controller
+      final userName = _sidebarController!.userName.value;
+      final userRole = _sidebarController!.userRole.value;
+      final userInitials = _sidebarController!.userInitials.value;
+      final userPhotoUrl = _sidebarController!.userPhotoUrl.value.isNotEmpty
+          ? _sidebarController!.userPhotoUrl.value
+          : null;
 
-          return _buildFooterContent(
-            userName: userName,
-            userRole: userRole,
-            userInitials: userInitials,
-            userPhotoUrl: user.profileImage,
-          );
-        });
-      },
-    );
+      return _buildFooterContent(
+        userName: userName,
+        userRole: userRole,
+        userInitials: userInitials,
+        userPhotoUrl: userPhotoUrl,
+      );
+    });
   }
 }

@@ -7,6 +7,7 @@ import 'app_sidebar_controller.dart';
 import 'footer/profile_sidebar_footer_controller.dart';
 
 
+
 class CollapsedSidebar extends StatelessWidget {
   final AppSidebarController controller;
   final List<SidebarMenuItem> items;
@@ -58,11 +59,12 @@ class CollapsedSidebar extends StatelessWidget {
                     : _buildStaticMenu(),
               ),
 
-              // Footer - Always show Profile Footer
+              // Footer - Pass the controller tag if available
               ProfileSidebarFooter(
                 isExpanded: false,
                 expandedWidth: 250,
                 collapsedWidth: width,
+                controllerTag: controller.controllerTag,
               ),
             ],
           ),

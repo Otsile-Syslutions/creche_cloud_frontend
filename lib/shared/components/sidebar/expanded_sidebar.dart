@@ -7,6 +7,7 @@ import 'app_sidebar_controller.dart';
 import 'collapsed_sidebar.dart';
 import 'footer/profile_sidebar_footer_controller.dart';
 
+
 // Hover wrapper widget for menu items
 class _MenuItemHoverWrapper extends StatefulWidget {
   final Widget child;
@@ -171,11 +172,12 @@ class ExpandedSidebar extends StatelessWidget {
                     : _buildStaticMenu(),
               ),
 
-              // Footer - Always show Profile Footer
+              // Footer - Pass the controller tag if available
               ProfileSidebarFooter(
                 isExpanded: true,
                 expandedWidth: width,
                 collapsedWidth: 70,
+                controllerTag: controller.controllerTag,
               ),
             ],
           ),

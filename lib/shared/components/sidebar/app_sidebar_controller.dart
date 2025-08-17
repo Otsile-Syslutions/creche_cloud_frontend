@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../../utils/app_logger.dart';
+import '../../../features/auth/controllers/auth_controller.dart';
+import '../../../features/auth/models/tenant_model.dart';
+import '../../../features/auth/models/user_model.dart';
 
 class AppSidebarController extends GetxController with GetSingleTickerProviderStateMixin {
   // Observable states - Initialize with default values
@@ -10,6 +13,15 @@ class AppSidebarController extends GetxController with GetSingleTickerProviderSt
   final RxInt selectedIndex = 0.obs;
   final RxDouble sidebarWidth = 250.0.obs;
   final RxDouble collapsedWidth = 70.0.obs;
+
+  // User information observables
+  final Rx<UserModel?> currentUser = Rx<UserModel?>(null);
+  final Rx<TenantModel?> currentTenant = Rx<TenantModel?>(null);
+  final RxString userName = 'Guest User'.obs;
+  final RxString userRole = 'Not logged in'.obs;
+  final RxString userInitials = 'G'.obs;
+  final RxString userPhotoUrl = ''.obs;
+  final RxBool isUserDataLoaded = false.obs;
 
   // Animation controller
   late AnimationController animationController;
@@ -31,6 +43,12 @@ class AppSidebarController extends GetxController with GetSingleTickerProviderSt
   // Add a flag to track if controller is initialized
   bool _isInitialized = false;
   bool get isInitialized => _isInitialized;
+
+  // Controller tag for identification
+  String? controllerTag;
+
+  // Auth controller reference
+  AuthController? _authController;
 
   @override
   void onInit() {
@@ -86,6 +104,9 @@ class AppSidebarController extends GetxController with GetSingleTickerProviderSt
         }
       });
 
+      // Initialize user data
+      _initializeUserData();
+
       _isInitialized = true;
     } catch (e) {
       AppLogger.e('Error initializing AppSidebarController', e);
@@ -93,10 +114,125 @@ class AppSidebarController extends GetxController with GetSingleTickerProviderSt
     }
   }
 
+  void _initializeUserData() {
+    try {
+      // Get or initialize auth controller
+      if (Get.isRegistered<AuthController>()) {
+        _authController = Get.find<AuthController>();
+      } else {
+        _authController = Get.put(AuthController());
+      }
+
+      // Initial load of user data
+      _updateUserData();
+
+      // Listen to auth controller changes
+      if (_authController != null) {
+        // Listen to user changes
+        ever(_authController!.currentUser, (_) {
+          _updateUserData();
+        });
+
+        // Listen to tenant changes
+        ever(_authController!.currentTenant, (_) {
+          _updateUserData();
+        });
+
+        // Listen to initialization status
+        ever(_authController!.isInitialized, (initialized) {
+          if (initialized) {
+            _updateUserData();
+          }
+        });
+      }
+    } catch (e) {
+      AppLogger.e('Error initializing user data in AppSidebarController', e);
+      _setDefaultUserData();
+    }
+  }
+
+  void _updateUserData() {
+    try {
+      if (_authController == null || !_authController!.isInitialized.value) {
+        _setDefaultUserData();
+        return;
+      }
+
+      final user = _authController!.currentUser.value;
+      final tenant = _authController!.currentTenant.value;
+
+      if (user == null) {
+        _setDefaultUserData();
+        return;
+      }
+
+      // Update user observables
+      currentUser.value = user;
+      currentTenant.value = tenant;
+
+      // Update display values
+      userName.value = user.fullName.trim().isNotEmpty ? user.fullName : 'User';
+      userRole.value = _getUserRoleDisplay(user, tenant);
+      userInitials.value = _getUserInitials(user);
+      userPhotoUrl.value = user.profileImage ?? '';
+      isUserDataLoaded.value = true;
+
+      AppLogger.d('User data updated in AppSidebarController: ${userName.value}');
+    } catch (e) {
+      AppLogger.e('Error updating user data in AppSidebarController', e);
+      _setDefaultUserData();
+    }
+  }
+
+  void _setDefaultUserData() {
+    currentUser.value = null;
+    currentTenant.value = null;
+    userName.value = 'Guest User';
+    userRole.value = 'Not logged in';
+    userInitials.value = 'G';
+    userPhotoUrl.value = '';
+    isUserDataLoaded.value = false;
+  }
+
+  String _getUserInitials(UserModel user) {
+    try {
+      if (user.firstName.isNotEmpty && user.lastName.isNotEmpty) {
+        return user.initials;
+      } else if (user.firstName.isNotEmpty) {
+        return user.firstName[0].toUpperCase();
+      } else if (user.lastName.isNotEmpty) {
+        return user.lastName[0].toUpperCase();
+      } else if (user.email.isNotEmpty) {
+        return user.email[0].toUpperCase();
+      }
+    } catch (e) {
+      // Fallback if any error occurs
+    }
+    return 'U';
+  }
+
+  String _getUserRoleDisplay(UserModel user, TenantModel? tenant) {
+    if (user.isPlatformAdmin) {
+      return 'Platform Admin';
+    }
+
+    if (user.platformType == 'tenant' && tenant != null) {
+      return tenant.displayName;
+    }
+
+    return user.primaryRole;
+  }
+
+  // Method to manually refresh user data
+  void refreshUserData() {
+    _updateUserData();
+  }
+
   @override
   void onReady() {
     super.onReady();
-    // Additional initialization if needed after the widget tree is built
+    // Refresh user data when controller is ready
+    _updateUserData();
   }
 
   @override

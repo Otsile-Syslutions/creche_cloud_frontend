@@ -82,6 +82,9 @@ class _AppSidebarState extends State<AppSidebar> with SingleTickerProviderStateM
         tag: _controllerTag,
       );
 
+      // Store the controller tag in the controller itself
+      _controller.controllerTag = _controllerTag;
+
       // Set initial values
       _controller.isExpanded.value = _isExpanded;
       _controller.selectedIndex.value = widget.selectedIndex ?? 0;
@@ -108,6 +111,7 @@ class _AppSidebarState extends State<AppSidebar> with SingleTickerProviderStateM
       AppLogger.e('Error initializing AppSidebar controller', e);
       // Initialize with a fallback controller if needed
       _controller = AppSidebarController();
+      _controller.controllerTag = _controllerTag;
     }
   }
 
