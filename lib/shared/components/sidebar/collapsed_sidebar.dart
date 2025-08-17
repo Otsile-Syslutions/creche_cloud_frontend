@@ -27,25 +27,23 @@ class CollapsedSidebar extends StatelessWidget {
         final availableHeight = constraints.maxHeight;
         final shouldScroll = controller.shouldEnableScroll(availableHeight, items.length);
 
-        return Container(
-          width: width,
-          height: double.infinity,
-          // Allow overflow for footer expansion
-          clipBehavior: Clip.none,
-          decoration: const BoxDecoration(
-            color: AppColors.surface,
-            border: Border(
-              right: BorderSide(
-                color: Color(0xFFE0E0E0),
-                width: 1,
+        return Stack(
+          clipBehavior: Clip.none, // Allow overflow for tooltips and footer expansion
+          children: [
+            // Main sidebar container
+            Container(
+              width: width,
+              height: double.infinity,
+              decoration: const BoxDecoration(
+                color: AppColors.surface,
+                border: Border(
+                  right: BorderSide(
+                    color: Color(0xFFE0E0E0),
+                    width: 1,
+                  ),
+                ),
               ),
-            ),
-          ),
-          child: Stack(
-            clipBehavior: Clip.none, // Allow footer to expand outside bounds
-            children: [
-              // Main content column
-              Column(
+              child: Column(
                 children: [
                   // Add spacing from top
                   const SizedBox(height: 60),
@@ -67,21 +65,21 @@ class CollapsedSidebar extends StatelessWidget {
                   const SizedBox(height: 80), // Space for footer (matches new footer height)
                 ],
               ),
+            ),
 
-              // Footer positioned at bottom with overflow allowed
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: ProfileSidebarFooter(
-                  isExpanded: false,
-                  expandedWidth: 250,
-                  collapsedWidth: width,  // Use the width property
-                  controllerTag: controller.controllerTag,
-                ),
+            // Footer positioned at bottom with overflow allowed
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: ProfileSidebarFooter(
+                isExpanded: false,
+                expandedWidth: 250,
+                collapsedWidth: width,  // Use the width property
+                controllerTag: controller.controllerTag,
               ),
-            ],
-          ),
+            ),
+          ],
         );
       },
     );
@@ -228,12 +226,34 @@ class _CollapsedMenuItemState extends State<_CollapsedMenuItem>
                         color: const Color(0xFFE0E0E0),
                         width: 1,
                       ),
-                      // No shadow to match expanded sidebar which has no shadow on hover
+                      boxShadow: widget.isSelected
+                          ? null
+                          : [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 4,
+                          offset: const Offset(2, 2),
+                        ),
+                      ],
                     ),
                     child: Row(
                       children: [
-                        // Space for icon
-                        const SizedBox(width: 46),
+                        // Icon in the tooltip
+                        Container(
+                          width: 46,
+                          height: 46,
+                          padding: const EdgeInsets.all(12),
+                          child: Center(
+                            child: widget.item.iconBuilder?.call(widget.isSelected, _isHovered) ??
+                                Icon(
+                                  widget.item.icon ?? Icons.dashboard,
+                                  color: widget.isSelected
+                                      ? Colors.white
+                                      : AppColors.textSecondary,
+                                  size: 22,
+                                ),
+                          ),
+                        ),
 
                         // Label text
                         Expanded(

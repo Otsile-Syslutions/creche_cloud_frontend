@@ -28,7 +28,7 @@ class AppSidebar extends StatefulWidget {
     this.header,
     this.footer,
     this.expandedWidth = 250,
-    this.collapsedWidth = 70,
+    this.collapsedWidth = 85,  // Updated from 70 to match new collapsed sidebar width
     this.selectedIndex,
     this.startExpanded = true,
     this.showToggleButton = true,
@@ -121,9 +121,7 @@ class _AppSidebarState extends State<AppSidebar> with SingleTickerProviderStateM
 
     // Update expansion state if it changed from parent
     if (oldWidget.startExpanded != widget.startExpanded) {
-      setState(() {
-        _isExpanded = widget.startExpanded;
-      });
+      _isExpanded = widget.startExpanded;
       _controller.isExpanded.value = widget.startExpanded;
       if (_isExpanded) {
         _animationController.forward();
@@ -245,42 +243,41 @@ class _AppSidebarState extends State<AppSidebar> with SingleTickerProviderStateM
                   },
                 ),
 
-                // Toggle Button - positioned to be visible
+                // Toggle Button - positioned to be visible and above content
                 if (widget.showToggleButton)
                   Positioned(
-                    top: _isExpanded ? 12 : 12, // Keep same top position for both states
-                    right: _isExpanded ? 12 : ((widget.collapsedWidth - 40) / 2), // Center in collapsed state
+                    top: 12,
+                    right: _isExpanded ? 12 : null,
+                    left: _isExpanded ? null : ((widget.collapsedWidth - 40) / 2), // Center horizontally when collapsed
                     child: MouseRegion(
                       cursor: SystemMouseCursors.click,
-                      child: GestureDetector(
-                        onTap: _handleToggle,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 250),
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.95),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: const Color(0xFFE0E0E0),
-                              width: 1,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
+                      child: Material(
+                        color: Colors.transparent,
+                        elevation: 2, // Ensure button is above other content
+                        borderRadius: BorderRadius.circular(8),
+                        child: InkWell(
+                          onTap: _handleToggle,
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.95),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: const Color(0xFFE0E0E0),
+                                width: 1,
                               ),
-                            ],
-                          ),
-                          child: Center(
-                            child: AnimatedRotation(
-                              duration: const Duration(milliseconds: 250),
-                              turns: _isExpanded ? 0.0 : 0.5,
-                              child: Icon(
-                                Icons.chevron_left_rounded,
-                                size: 24,
-                                color: AppColors.textSecondary,
+                            ),
+                            child: Center(
+                              child: AnimatedRotation(
+                                duration: const Duration(milliseconds: 250),
+                                turns: _isExpanded ? 0.0 : 0.5,
+                                child: Icon(
+                                  Icons.chevron_left_rounded,
+                                  size: 24,
+                                  color: AppColors.textSecondary,
+                                ),
                               ),
                             ),
                           ),
@@ -479,14 +476,17 @@ class _ResponsiveAppSidebarState extends State<ResponsiveAppSidebar> {
         final screenWidth = constraints.maxWidth;
         final shouldCollapse = screenWidth < widget.breakpoint;
 
+        // Use widget.isExpanded directly unless forced to collapse by screen size
+        final effectiveExpanded = widget.isExpanded && !shouldCollapse;
+
         return AppSidebar(
           items: widget.items,
           header: widget.header,
           footer: widget.footer,
           selectedIndex: widget.selectedIndex,
-          startExpanded: widget.isExpanded && !shouldCollapse,
+          startExpanded: effectiveExpanded,
           expandedWidth: screenWidth < 1400 ? 220 : 250,
-          collapsedWidth: screenWidth < 1200 ? 60 : 70,
+          collapsedWidth: 85,  // Updated to match the new collapsed width
           onToggle: widget.onToggle,
         );
       },

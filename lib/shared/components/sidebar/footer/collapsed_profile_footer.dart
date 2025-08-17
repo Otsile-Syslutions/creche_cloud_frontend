@@ -40,55 +40,58 @@ class CollapsedProfileFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Wrap in ClipRect to prevent overflow
-    return ClipRect(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Divider line above user info
-          Container(
-            height: 1,
-            color: const Color(0xFFE0E0E0),
-            margin: const EdgeInsets.only(bottom: 2), // Minimal margin for better vertical centering
-          ),
+    // Remove ClipRect to allow overflow for tooltips
+    return Stack(
+      clipBehavior: Clip.none, // Allow tooltips to overflow
+      children: [
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Divider line above user info
+            Container(
+              height: 1,
+              color: const Color(0xFFE0E0E0),
+              margin: const EdgeInsets.only(bottom: 2), // Minimal margin for better vertical centering
+            ),
 
-          // Profile avatar with chevron and tooltip
-          _CollapsedProfileAvatar(
-            userName: userName,
-            userRole: userRole,
-            userInitials: userInitials,
-            userPhotoUrl: userPhotoUrl,
-            isMenuOpen: isMenuOpen,
-            onTap: onToggleMenu,
-          ),
+            // Profile avatar with chevron and tooltip
+            _CollapsedProfileAvatar(
+              userName: userName,
+              userRole: userRole,
+              userInitials: userInitials,
+              userPhotoUrl: userPhotoUrl,
+              isMenuOpen: isMenuOpen,
+              onTap: onToggleMenu,
+            ),
 
-          // Menu icons
-          AnimatedSize(
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeInOut,
-            child: isMenuOpen
-                ? Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CollapsedFooterItem(
-                  icon: Icons.person_outline,
-                  label: 'Profile',
-                  onTap: _handleProfile,
-                  isError: false,
-                ),
-                CollapsedFooterItem(
-                  icon: Icons.logout,
-                  label: 'Logout',
-                  onTap: _handleLogout,
-                  isError: true,
-                ),
-              ],
-            )
-                : const SizedBox.shrink(),
-          ),
-          const SizedBox(height: 8), // Proper bottom spacing to center the layout
-        ],
-      ),
+            // Menu icons
+            AnimatedSize(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
+              child: isMenuOpen
+                  ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CollapsedFooterItem(
+                    icon: Icons.person_outline,
+                    label: 'Profile',
+                    onTap: _handleProfile,
+                    isError: false,
+                  ),
+                  CollapsedFooterItem(
+                    icon: Icons.logout,
+                    label: 'Logout',
+                    onTap: _handleLogout,
+                    isError: true,
+                  ),
+                ],
+              )
+                  : const SizedBox.shrink(),
+            ),
+            const SizedBox(height: 8), // Proper bottom spacing to center the layout
+          ],
+        ),
+      ],
     );
   }
 }
@@ -148,10 +151,42 @@ class _CollapsedProfileAvatarState extends State<_CollapsedProfileAvatar> {
                         color: const Color(0xFFE0E0E0),
                         width: 1,
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 4,
+                          offset: const Offset(2, 2),
+                        ),
+                      ],
                     ),
                     child: Row(
                       children: [
-                        const SizedBox(width: 71), // Space for avatar and chevron (matches container)
+                        // Avatar and chevron in tooltip
+                        SizedBox(
+                          width: 71,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              UserAvatar(
+                                initials: widget.userInitials,
+                                backgroundColor: AppColors.loginButton,
+                                photoUrl: widget.userPhotoUrl,
+                                radius: 13,
+                              ),
+                              const SizedBox(width: 2),
+                              AnimatedRotation(
+                                duration: const Duration(milliseconds: 200),
+                                turns: widget.isMenuOpen ? 0.5 : 0,
+                                child: Icon(
+                                  Icons.keyboard_arrow_down_rounded,
+                                  color: AppColors.textSecondary,
+                                  size: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // User info text
                         Expanded(
                           child: Padding(
                             padding: const EdgeInsets.only(left: 10.0, right: 12.0),
@@ -191,20 +226,22 @@ class _CollapsedProfileAvatarState extends State<_CollapsedProfileAvatar> {
                   ),
                 ),
 
-              // Avatar with chevron container - using Flexible widgets
-              SizedBox(
+              // Avatar with chevron container - always visible
+              Container(
                 width: 71, // Adjusted to fit within padded container (85 - 14 padding)
                 height: 44, // Slightly reduced height
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: _isHovered ? Colors.transparent : Colors.transparent,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Flexible(
-                      child: UserAvatar(
-                        initials: widget.userInitials,
-                        backgroundColor: AppColors.loginButton,
-                        photoUrl: widget.userPhotoUrl,
-                        radius: 13, // Reduced slightly more
-                      ),
+                    UserAvatar(
+                      initials: widget.userInitials,
+                      backgroundColor: AppColors.loginButton,
+                      photoUrl: widget.userPhotoUrl,
+                      radius: 13, // Reduced slightly more
                     ),
                     const SizedBox(width: 2),
                     AnimatedRotation(
@@ -265,11 +302,15 @@ class _CollapsedFooterItemState extends State<CollapsedFooterItem> {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              // Icon container - base layer
+              // Icon container - always visible as base state
               Container(
-                width: 44, // Reduced to match height
+                width: 44,
                 height: 44,
-                padding: const EdgeInsets.all(11), // Adjusted padding
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: _isHovered ? Colors.transparent : Colors.transparent,
+                ),
+                padding: const EdgeInsets.all(11),
                 child: Center(
                   child: widget.customWidget ??
                       Icon(
@@ -308,7 +349,23 @@ class _CollapsedFooterItemState extends State<CollapsedFooterItem> {
                     ),
                     child: Row(
                       children: [
-                        const SizedBox(width: 44), // Space for icon (adjusted)
+                        // Icon in the tooltip
+                        Container(
+                          width: 44,
+                          height: 44,
+                          padding: const EdgeInsets.all(11),
+                          child: Center(
+                            child: widget.customWidget ??
+                                Icon(
+                                  widget.icon,
+                                  color: widget.isError
+                                      ? AppColors.error
+                                      : AppColors.textSecondary,
+                                  size: 22,
+                                ),
+                          ),
+                        ),
+                        // Label text
                         Expanded(
                           child: Padding(
                             padding: const EdgeInsets.only(left: 10.0, right: 12.0),
