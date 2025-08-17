@@ -290,25 +290,28 @@ class _CollapsedMenuItemState extends State<_CollapsedMenuItem>
                   ),
                 ),
 
-              // Icon container - no extra elevation or shadow
+              // Icon container - hide visually when hovering but keep in widget tree
               AnimatedBuilder(
                 animation: _scaleAnimation,
                 builder: (context, child) {
                   return Transform.scale(
                     scale: widget.isSelected ? 1.0 : _scaleAnimation.value,
-                    child: Container(
-                      width: 46,
-                      height: 46,
-                      padding: const EdgeInsets.all(12),
-                      child: Center(
-                        child: widget.item.iconBuilder?.call(widget.isSelected, _isHovered) ??
-                            Icon(
-                              widget.item.icon ?? Icons.dashboard,
-                              color: (widget.isSelected || (_isHovered && widget.isSelected))
-                                  ? Colors.white
-                                  : AppColors.textSecondary,
-                              size: 22,
-                            ),
+                    child: Opacity(
+                      opacity: _isHovered ? 0.0 : 1.0,  // Hide when hovering
+                      child: Container(
+                        width: 46,
+                        height: 46,
+                        padding: const EdgeInsets.all(12),
+                        child: Center(
+                          child: widget.item.iconBuilder?.call(widget.isSelected, _isHovered) ??
+                              Icon(
+                                widget.item.icon ?? Icons.dashboard,
+                                color: widget.isSelected
+                                    ? Colors.white
+                                    : AppColors.textSecondary,
+                                size: 22,
+                              ),
+                        ),
                       ),
                     ),
                   );
