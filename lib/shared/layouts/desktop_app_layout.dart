@@ -1,27 +1,19 @@
 // lib/shared/responsive/layouts/desktop_app_layout.dart
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 import 'package:sidebarx/sidebarx.dart';
 import '../../../constants/app_colors.dart';
 import '../components/sidebar/app_sidebar.dart';
-import '../components/topbar/app_topbar.dart';
 
 class DesktopAppLayout extends StatefulWidget {
   final Widget body;
   final List<SidebarXItem> sidebarItems;
   final Widget? sidebarHeader;
   final Widget? sidebarFooter;
-  final String appBarTitle;
-  final List<Widget>? appBarActions;
   final int? selectedSidebarIndex;
-  final bool showSidebar;
-  final bool showTopbar;
   final Color? backgroundColor;
   final double? sidebarExpandedWidth;
   final double? sidebarCollapsedWidth;
   final bool startSidebarExpanded;
-  final PreferredSizeWidget? customTopbar;
-  final String? appBarSubtitle;
   final VoidCallback? onSidebarToggle;
   final bool enableResponsiveSidebar;
 
@@ -31,17 +23,11 @@ class DesktopAppLayout extends StatefulWidget {
     required this.sidebarItems,
     this.sidebarHeader,
     this.sidebarFooter,
-    this.appBarTitle = 'Dashboard',
-    this.appBarActions,
     this.selectedSidebarIndex,
-    this.showSidebar = true,
-    this.showTopbar = true,
     this.backgroundColor,
     this.sidebarExpandedWidth,
     this.sidebarCollapsedWidth,
     this.startSidebarExpanded = true,
-    this.customTopbar,
-    this.appBarSubtitle,
     this.onSidebarToggle,
     this.enableResponsiveSidebar = true,
   });
@@ -72,7 +58,6 @@ class _DesktopAppLayoutState extends State<DesktopAppLayout> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final screenWidth = constraints.maxWidth;
-        final screenHeight = constraints.maxHeight;
 
         // Determine responsive widths
         final expandedWidth = widget.sidebarExpandedWidth ?? (screenWidth < 1400 ? 220 : 250);
@@ -93,56 +78,44 @@ class _DesktopAppLayoutState extends State<DesktopAppLayout> {
             children: [
               // Main content area - positioned to account for sidebar width
               Positioned(
-                left: widget.showSidebar ? _currentSidebarWidth : 0,
+                left: _currentSidebarWidth,
                 top: 0,
                 right: 0,
                 bottom: 0,
-                child: Scaffold(
-                  backgroundColor: widget.backgroundColor ?? AppColors.background,
-                  appBar: widget.showTopbar
-                      ? (widget.customTopbar ??
-                      AppTopbar(
-                        title: widget.appBarTitle,
-                        subtitle: widget.appBarSubtitle,
-                        additionalActions: widget.appBarActions,
-                      ))
-                      : null,
-                  body: widget.body,
-                ),
+                child: widget.body,
               ),
 
               // Sidebar - positioned absolutely to allow overflow
-              if (widget.showSidebar)
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  bottom: 0,
-                  child: Stack(
-                    clipBehavior: Clip.none, // Allow sidebar content to overflow
-                    children: [
-                      widget.enableResponsiveSidebar
-                          ? ResponsiveAppSidebar(
-                        items: widget.sidebarItems,
-                        header: widget.sidebarHeader,
-                        footer: widget.sidebarFooter,
-                        selectedIndex: widget.selectedSidebarIndex,
-                        breakpoint: 1200,
-                        isExpanded: _isSidebarExpanded && !shouldAutoCollapseSidebar,
-                        onToggle: _handleSidebarToggle,
-                      )
-                          : AppSidebar(
-                        items: widget.sidebarItems,
-                        header: widget.sidebarHeader,
-                        footer: widget.sidebarFooter,
-                        selectedIndex: widget.selectedSidebarIndex,
-                        startExpanded: _isSidebarExpanded && !shouldAutoCollapseSidebar,
-                        expandedWidth: expandedWidth,
-                        collapsedWidth: collapsedWidth,
-                        onToggle: _handleSidebarToggle,
-                      ),
-                    ],
-                  ),
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                child: Stack(
+                  clipBehavior: Clip.none, // Allow sidebar content to overflow
+                  children: [
+                    widget.enableResponsiveSidebar
+                        ? ResponsiveAppSidebar(
+                      items: widget.sidebarItems,
+                      header: widget.sidebarHeader,
+                      footer: widget.sidebarFooter,
+                      selectedIndex: widget.selectedSidebarIndex,
+                      breakpoint: 1200,
+                      isExpanded: _isSidebarExpanded && !shouldAutoCollapseSidebar,
+                      onToggle: _handleSidebarToggle,
+                    )
+                        : AppSidebar(
+                      items: widget.sidebarItems,
+                      header: widget.sidebarHeader,
+                      footer: widget.sidebarFooter,
+                      selectedIndex: widget.selectedSidebarIndex,
+                      startExpanded: _isSidebarExpanded && !shouldAutoCollapseSidebar,
+                      expandedWidth: expandedWidth,
+                      collapsedWidth: collapsedWidth,
+                      onToggle: _handleSidebarToggle,
+                    ),
+                  ],
                 ),
+              ),
             ],
           ),
         );
@@ -157,7 +130,6 @@ class PlatformDesktopLayout extends StatelessWidget {
   final List<SidebarXItem> Function() getSidebarItems;
   final Widget Function()? buildSidebarHeader;
   final Widget Function()? buildSidebarFooter;
-  final PreferredSizeWidget? topbar;
   final String platformType;
   final int? selectedIndex;
 
@@ -167,7 +139,6 @@ class PlatformDesktopLayout extends StatelessWidget {
     required this.getSidebarItems,
     this.buildSidebarHeader,
     this.buildSidebarFooter,
-    this.topbar,
     required this.platformType,
     this.selectedIndex,
   });
@@ -179,24 +150,9 @@ class PlatformDesktopLayout extends StatelessWidget {
       sidebarItems: getSidebarItems(),
       sidebarHeader: buildSidebarHeader?.call(),
       sidebarFooter: buildSidebarFooter?.call(),
-      appBarTitle: _getDefaultTitle(),
-      customTopbar: topbar,
       selectedSidebarIndex: selectedIndex ?? 0,
       enableResponsiveSidebar: true,
     );
-  }
-
-  String _getDefaultTitle() {
-    switch (platformType) {
-      case 'admin':
-        return 'Platform Administration';
-      case 'tenant':
-        return 'School Management';
-      case 'parent':
-        return 'Parent Portal';
-      default:
-        return 'Dashboard';
-    }
   }
 }
 
@@ -206,8 +162,6 @@ class AdminDesktopLayout extends StatelessWidget {
   final List<SidebarXItem> sidebarItems;
   final Widget? sidebarHeader;
   final Widget? sidebarFooter;
-  final String? appBarTitle;
-  final List<Widget>? appBarActions;
   final int? selectedIndex;
 
   const AdminDesktopLayout({
@@ -216,8 +170,6 @@ class AdminDesktopLayout extends StatelessWidget {
     required this.sidebarItems,
     this.sidebarHeader,
     this.sidebarFooter,
-    this.appBarTitle,
-    this.appBarActions,
     this.selectedIndex,
   });
 
@@ -228,10 +180,6 @@ class AdminDesktopLayout extends StatelessWidget {
       sidebarItems: sidebarItems,
       sidebarHeader: sidebarHeader,
       sidebarFooter: sidebarFooter,
-      customTopbar: AdminTopbar(
-        customTitle: appBarTitle,
-        additionalActions: appBarActions,
-      ),
       selectedSidebarIndex: selectedIndex ?? 0,
       enableResponsiveSidebar: true,
     );
@@ -244,8 +192,6 @@ class TenantDesktopLayout extends StatelessWidget {
   final List<SidebarXItem> sidebarItems;
   final Widget? sidebarHeader;
   final Widget? sidebarFooter;
-  final String? appBarTitle;
-  final List<Widget>? appBarActions;
   final int? selectedIndex;
 
   const TenantDesktopLayout({
@@ -254,8 +200,6 @@ class TenantDesktopLayout extends StatelessWidget {
     required this.sidebarItems,
     this.sidebarHeader,
     this.sidebarFooter,
-    this.appBarTitle,
-    this.appBarActions,
     this.selectedIndex,
   });
 
@@ -266,10 +210,6 @@ class TenantDesktopLayout extends StatelessWidget {
       sidebarItems: sidebarItems,
       sidebarHeader: sidebarHeader,
       sidebarFooter: sidebarFooter,
-      customTopbar: TenantTopbar(
-        customTitle: appBarTitle,
-        additionalActions: appBarActions,
-      ),
       selectedSidebarIndex: selectedIndex ?? 0,
       enableResponsiveSidebar: true,
     );
@@ -282,8 +222,6 @@ class ParentDesktopLayout extends StatelessWidget {
   final List<SidebarXItem> sidebarItems;
   final Widget? sidebarHeader;
   final Widget? sidebarFooter;
-  final String? appBarTitle;
-  final List<Widget>? appBarActions;
   final int? selectedIndex;
 
   const ParentDesktopLayout({
@@ -292,8 +230,6 @@ class ParentDesktopLayout extends StatelessWidget {
     required this.sidebarItems,
     this.sidebarHeader,
     this.sidebarFooter,
-    this.appBarTitle,
-    this.appBarActions,
     this.selectedIndex,
   });
 
@@ -304,10 +240,6 @@ class ParentDesktopLayout extends StatelessWidget {
       sidebarItems: sidebarItems,
       sidebarHeader: sidebarHeader,
       sidebarFooter: sidebarFooter,
-      customTopbar: ParentTopbar(
-        customTitle: appBarTitle,
-        additionalActions: appBarActions,
-      ),
       selectedSidebarIndex: selectedIndex ?? 0,
       enableResponsiveSidebar: true,
     );

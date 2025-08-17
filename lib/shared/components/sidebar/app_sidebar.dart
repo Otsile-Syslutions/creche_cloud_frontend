@@ -227,14 +227,12 @@ class _AppSidebarState extends State<AppSidebar> with SingleTickerProviderStateM
                             controller: _controller,
                             items: menuItems,
                             header: _buildHeader(_isExpanded),
-                            footer: _buildFooter(_isExpanded),
                             width: widget.expandedWidth,
                           )
                               : CollapsedSidebar(
                             controller: _controller,
                             items: menuItems,
                             header: _buildHeader(_isExpanded),
-                            footer: _buildFooter(_isExpanded),
                             width: widget.collapsedWidth,
                           ),
                         ],
@@ -246,8 +244,8 @@ class _AppSidebarState extends State<AppSidebar> with SingleTickerProviderStateM
                 // Toggle Button - positioned to be visible
                 if (widget.showToggleButton)
                   Positioned(
-                    top: _isExpanded ? 12 : 8, // Adjust top position for collapsed state
-                    right: _isExpanded ? 12 : (widget.collapsedWidth - 28), // Adjust position based on state
+                    top: _isExpanded ? 12 : 12, // Keep same top position for both states
+                    right: _isExpanded ? 12 : ((widget.collapsedWidth - 40) / 2), // Center in collapsed state
                     child: MouseRegion(
                       cursor: SystemMouseCursors.click,
                       child: GestureDetector(
@@ -315,36 +313,6 @@ class _AppSidebarState extends State<AppSidebar> with SingleTickerProviderStateM
           : CollapsedSidebarHeader(
         key: const ValueKey('collapsed_header'),
         customLogo: appHeader.customLogo,
-      ),
-    );
-  }
-
-  Widget? _buildFooter(bool isExpanded) {
-    if (widget.footer == null) return null;
-
-    // If footer is already a custom widget, use it directly
-    if (widget.footer is! AppSidebarFooter) {
-      return widget.footer;
-    }
-
-    // Handle AppSidebarFooter conversion
-    final appFooter = widget.footer as AppSidebarFooter;
-
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 200),
-      child: isExpanded
-          ? ExpandedSidebarFooter(
-        key: const ValueKey('expanded_footer'),
-        statusText: appFooter.statusText,
-        isActive: appFooter.isActive,
-        statusIcon: appFooter.statusIcon,
-        onTap: appFooter.onTap,
-      )
-          : CollapsedSidebarFooter(
-        key: const ValueKey('collapsed_footer'),
-        isActive: appFooter.isActive,
-        statusIcon: appFooter.statusIcon,
-        onTap: appFooter.onTap,
       ),
     );
   }

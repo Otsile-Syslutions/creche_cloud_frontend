@@ -46,17 +46,13 @@ class _SimpleDesktopWrapper extends StatelessWidget {
   }
 }
 
-// Complete responsive layout with sidebar and topbar for main app screens
+// Complete responsive layout with sidebar for main app screens
 class ResponsiveMainLayout extends StatelessWidget {
   final Widget body;
   final List<SidebarXItem> sidebarItems;
   final Widget? sidebarHeader;
   final Widget? sidebarFooter;
-  final String appBarTitle;
-  final List<Widget>? appBarActions;
   final int? selectedSidebarIndex;
-  final PreferredSizeWidget? customTopbar;
-  final String? appBarSubtitle;
 
   const ResponsiveMainLayout({
     super.key,
@@ -64,11 +60,7 @@ class ResponsiveMainLayout extends StatelessWidget {
     required this.sidebarItems,
     this.sidebarHeader,
     this.sidebarFooter,
-    this.appBarTitle = 'Dashboard',
-    this.appBarActions,
     this.selectedSidebarIndex,
-    this.customTopbar,
-    this.appBarSubtitle,
   });
 
   @override
@@ -76,81 +68,70 @@ class ResponsiveMainLayout extends StatelessWidget {
     return ResponsiveLayout(
       mobile: _MobileMainLayout(
         body: body,
-        title: appBarTitle,
-        subtitle: appBarSubtitle,
+        sidebarItems: sidebarItems,
       ),
       tablet: _TabletMainLayout(
         body: body,
         sidebarItems: sidebarItems,
         sidebarHeader: sidebarHeader,
         sidebarFooter: sidebarFooter,
-        title: appBarTitle,
-        subtitle: appBarSubtitle,
       ),
       desktop: DesktopAppLayout(
         body: body,
         sidebarItems: sidebarItems,
         sidebarHeader: sidebarHeader,
         sidebarFooter: sidebarFooter,
-        appBarTitle: appBarTitle,
-        appBarActions: appBarActions,
         selectedSidebarIndex: selectedSidebarIndex,
-        customTopbar: customTopbar,
-        appBarSubtitle: appBarSubtitle,
       ),
     );
   }
 }
 
 // Mobile layout with bottom navigation instead of sidebar
-class _MobileMainLayout extends StatelessWidget {
+class _MobileMainLayout extends StatefulWidget {
   final Widget body;
-  final String title;
-  final String? subtitle;
+  final List<SidebarXItem> sidebarItems;
 
   const _MobileMainLayout({
     required this.body,
-    required this.title,
-    this.subtitle,
+    required this.sidebarItems,
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          title,
-          style: const TextStyle(fontSize: 18),
-        ),
-        centerTitle: true,
-      ),
-      body: body,
-      bottomNavigationBar: _buildBottomNavigation(),
-    );
-  }
+  State<_MobileMainLayout> createState() => _MobileMainLayoutState();
+}
 
-  Widget _buildBottomNavigation() {
-    // This would be connected to navigation logic
-    return BottomNavigationBar(
-      type: BottomNavigationBarType.fixed,
-      items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.home),
-          label: 'Home',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.dashboard),
-          label: 'Dashboard',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.person),
-          label: 'Profile',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.settings),
-          label: 'Settings',
-        ),
-      ],
+class _MobileMainLayoutState extends State<_MobileMainLayout> {
+  int _selectedIndex = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    // Convert sidebar items to bottom nav items (max 5 items)
+    final navItems = widget.sidebarItems.take(5).toList();
+
+    return Scaffold(
+      body: widget.body,
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        type: BottomNavigationBarType.fixed,
+        onTap: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+          // Call the onTap function of the corresponding sidebar item
+          if (index < navItems.length) {
+            navItems[index].onTap?.call();
+          }
+        },
+        items: navItems.map((item) {
+          return BottomNavigationBarItem(
+            icon: item.icon != null
+                ? Icon(item.icon)
+                : item.iconBuilder?.call(false, false) ?? const Icon(Icons.circle),
+            label: item.label ?? '',
+          );
+        }).toList(),
+      ),
     );
   }
 }
@@ -161,26 +142,18 @@ class _TabletMainLayout extends StatelessWidget {
   final List<SidebarXItem> sidebarItems;
   final Widget? sidebarHeader;
   final Widget? sidebarFooter;
-  final String title;
-  final String? subtitle;
 
   const _TabletMainLayout({
     required this.body,
     required this.sidebarItems,
     this.sidebarHeader,
     this.sidebarFooter,
-    required this.title,
-    this.subtitle,
   });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          title,
-          style: const TextStyle(fontSize: 18),
-        ),
         leading: Builder(
           builder: (context) => IconButton(
             icon: const Icon(Icons.menu),
@@ -228,7 +201,6 @@ class AdminResponsiveLayout extends StatelessWidget {
   final List<SidebarXItem> Function() getSidebarItems;
   final Widget Function()? buildSidebarHeader;
   final Widget Function()? buildSidebarFooter;
-  final String? title;
   final int? selectedIndex;
 
   const AdminResponsiveLayout({
@@ -237,7 +209,6 @@ class AdminResponsiveLayout extends StatelessWidget {
     required this.getSidebarItems,
     this.buildSidebarHeader,
     this.buildSidebarFooter,
-    this.title,
     this.selectedIndex,
   });
 
@@ -248,7 +219,6 @@ class AdminResponsiveLayout extends StatelessWidget {
       sidebarItems: getSidebarItems(),
       sidebarHeader: buildSidebarHeader?.call(),
       sidebarFooter: buildSidebarFooter?.call(),
-      appBarTitle: title ?? 'Platform Administration',
       selectedSidebarIndex: selectedIndex ?? 0,
     );
   }
@@ -259,7 +229,6 @@ class TenantResponsiveLayout extends StatelessWidget {
   final List<SidebarXItem> Function() getSidebarItems;
   final Widget Function()? buildSidebarHeader;
   final Widget Function()? buildSidebarFooter;
-  final String? title;
   final int? selectedIndex;
 
   const TenantResponsiveLayout({
@@ -268,7 +237,6 @@ class TenantResponsiveLayout extends StatelessWidget {
     required this.getSidebarItems,
     this.buildSidebarHeader,
     this.buildSidebarFooter,
-    this.title,
     this.selectedIndex,
   });
 
@@ -279,7 +247,6 @@ class TenantResponsiveLayout extends StatelessWidget {
       sidebarItems: getSidebarItems(),
       sidebarHeader: buildSidebarHeader?.call(),
       sidebarFooter: buildSidebarFooter?.call(),
-      appBarTitle: title ?? 'School Management',
       selectedSidebarIndex: selectedIndex ?? 0,
     );
   }
@@ -290,7 +257,6 @@ class ParentResponsiveLayout extends StatelessWidget {
   final List<SidebarXItem> Function() getSidebarItems;
   final Widget Function()? buildSidebarHeader;
   final Widget Function()? buildSidebarFooter;
-  final String? title;
   final int? selectedIndex;
 
   const ParentResponsiveLayout({
@@ -299,7 +265,6 @@ class ParentResponsiveLayout extends StatelessWidget {
     required this.getSidebarItems,
     this.buildSidebarHeader,
     this.buildSidebarFooter,
-    this.title,
     this.selectedIndex,
   });
 
@@ -310,7 +275,6 @@ class ParentResponsiveLayout extends StatelessWidget {
       sidebarItems: getSidebarItems(),
       sidebarHeader: buildSidebarHeader?.call(),
       sidebarFooter: buildSidebarFooter?.call(),
-      appBarTitle: title ?? 'Parent Portal',
       selectedSidebarIndex: selectedIndex ?? 0,
     );
   }

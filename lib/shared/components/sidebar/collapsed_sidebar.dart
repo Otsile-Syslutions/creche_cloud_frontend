@@ -4,12 +4,13 @@ import 'package:get/get.dart';
 import '../../../constants/app_colors.dart';
 import '../../../constants/app_assets.dart';
 import 'app_sidebar_controller.dart';
+import 'footer/profile_sidebar_footer_controller.dart';
+
 
 class CollapsedSidebar extends StatelessWidget {
   final AppSidebarController controller;
   final List<SidebarMenuItem> items;
   final Widget? header;
-  final Widget? footer;
   final double width;
 
   const CollapsedSidebar({
@@ -17,7 +18,6 @@ class CollapsedSidebar extends StatelessWidget {
     required this.controller,
     required this.items,
     this.header,
-    this.footer,
     this.width = 70,
   });
 
@@ -43,10 +43,13 @@ class CollapsedSidebar extends StatelessWidget {
           child: Column(
             children: [
               // Add spacing from top
-              const SizedBox(height: 20),
+              const SizedBox(height: 60),
 
-              // Header - Fixed at top
-              if (header != null) header!,
+              // Header - Fixed at top (collapsed logo)
+              if (header != null)
+                header!
+              else
+                const CollapsedSidebarHeader(),
 
               // Menu Items - Scrollable if needed
               Expanded(
@@ -55,8 +58,13 @@ class CollapsedSidebar extends StatelessWidget {
                     : _buildStaticMenu(),
               ),
 
-              // Footer - Fixed at bottom
-              if (footer != null) footer!,
+              // Footer - Always show Profile Footer
+              ProfileSidebarFooter(
+                key: const ValueKey('profile_footer_collapsed'),
+                isExpanded: false,
+                expandedWidth: 250,
+                collapsedWidth: width,
+              ),
             ],
           ),
         );
@@ -321,7 +329,7 @@ class CollapsedSidebarHeader extends StatelessWidget {
   }
 }
 
-// Collapsed Footer Widget
+// Collapsed Footer Widget (keeping for backward compatibility)
 class CollapsedSidebarFooter extends StatelessWidget {
   final bool isActive;
   final IconData? statusIcon;

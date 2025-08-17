@@ -4,7 +4,8 @@ import 'package:get/get.dart';
 import '../../../constants/app_colors.dart';
 import '../../../constants/app_assets.dart';
 import 'app_sidebar_controller.dart';
-import 'collapsed_sidebar.dart'; // For SidebarMenuItem
+import 'collapsed_sidebar.dart';
+import 'footer/profile_sidebar_footer_controller.dart';
 
 // Hover wrapper widget for menu items
 class _MenuItemHoverWrapper extends StatefulWidget {
@@ -75,11 +76,57 @@ class _MenuItemHoverWrapperState extends State<_MenuItemHoverWrapper>
   }
 }
 
+// New hover effect widget that applies background at the container level
+class _MenuItemHoverEffect extends StatefulWidget {
+  final Widget child;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _MenuItemHoverEffect({
+    required this.child,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  State<_MenuItemHoverEffect> createState() => _MenuItemHoverEffectState();
+}
+
+class _MenuItemHoverEffectState extends State<_MenuItemHoverEffect> {
+  bool _isHovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) {
+        if (!widget.isSelected) {
+          setState(() => _isHovering = true);
+        }
+      },
+      onExit: (_) => setState(() => _isHovering = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            color: widget.isSelected
+                ? const Color(0xFF875DEC)
+                : _isHovering
+                ? AppColors.loginButton.withOpacity(0.05)
+                : Colors.transparent,
+          ),
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}
+
 class ExpandedSidebar extends StatelessWidget {
   final AppSidebarController controller;
   final List<SidebarMenuItem> items;
   final Widget? header;
-  final Widget? footer;
   final double width;
 
   const ExpandedSidebar({
@@ -87,7 +134,6 @@ class ExpandedSidebar extends StatelessWidget {
     required this.controller,
     required this.items,
     this.header,
-    this.footer,
     this.width = 250,
   });
 
@@ -101,6 +147,7 @@ class ExpandedSidebar extends StatelessWidget {
         return Container(
           width: width,
           height: double.infinity,
+          clipBehavior: Clip.hardEdge, // ADD THIS LINE - Clips all child content including hover effects
           decoration: const BoxDecoration(
             color: AppColors.surface,
             border: Border(
@@ -124,8 +171,13 @@ class ExpandedSidebar extends StatelessWidget {
                     : _buildStaticMenu(),
               ),
 
-              // Footer - Fixed at bottom
-              if (footer != null) footer!,
+              // Footer - Always show Profile Footer
+              ProfileSidebarFooter(
+                key: const ValueKey('profile_footer_expanded'),
+                isExpanded: true,
+                expandedWidth: width,
+                collapsedWidth: 70,
+              ),
             ],
           ),
         );
@@ -171,63 +223,49 @@ class ExpandedSidebar extends StatelessWidget {
 
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-        child: _MenuItemHoverWrapper(
+        child: _MenuItemHoverEffect(
           isSelected: isSelected,
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
-                controller.selectMenuItem(index);
-                item.onTap?.call();
-              },
-              borderRadius: BorderRadius.circular(8),
-              hoverColor: AppColors.loginButton.withOpacity(0.05),
-              focusColor: AppColors.loginButton.withOpacity(0.1),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  color: isSelected
-                      ? const Color(0xFF875DEC)
-                      : Colors.transparent,
-                ),
-                child: ClipRect(
-                  child: Row(
-                    children: [
-                      // Icon
-                      item.iconBuilder?.call(isSelected, false) ??
-                          Icon(
-                            item.icon ?? Icons.dashboard,
-                            color: isSelected ? Colors.white : AppColors.textSecondary,
-                            size: 22,
-                          ),
-                      const SizedBox(width: 10),
-                      // Label with fade animation - wrapped in Flexible to prevent overflow
-                      Flexible(
-                        child: AnimatedBuilder(
-                          animation: controller.fadeAnimation,
-                          builder: (context, child) {
-                            return Opacity(
-                              opacity: controller.fadeAnimation.value,
-                              child: Text(
-                                item.label,
-                                style: TextStyle(
-                                  color: isSelected ? Colors.white : AppColors.textSecondary,
-                                  fontSize: 14,
-                                  fontFamily: 'Roboto',
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                              ),
-                            );
-                          },
-                        ),
+          onTap: () {
+            controller.selectMenuItem(index);
+            item.onTap?.call();
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: _MenuItemHoverWrapper(
+              isSelected: isSelected,
+              child: Row(
+                children: [
+                  // Icon
+                  item.iconBuilder?.call(isSelected, false) ??
+                      Icon(
+                        item.icon ?? Icons.dashboard,
+                        color: isSelected ? Colors.white : AppColors.textSecondary,
+                        size: 22,
                       ),
-                    ],
+                  const SizedBox(width: 10),
+                  // Label with fade animation - wrapped in Flexible to prevent overflow
+                  Flexible(
+                    child: AnimatedBuilder(
+                      animation: controller.fadeAnimation,
+                      builder: (context, child) {
+                        return Opacity(
+                          opacity: controller.fadeAnimation.value,
+                          child: Text(
+                            item.label,
+                            style: TextStyle(
+                              color: isSelected ? Colors.white : AppColors.textSecondary,
+                              fontSize: 14,
+                              fontFamily: 'Roboto',
+                              fontWeight: FontWeight.w600,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
           ),
@@ -285,7 +323,7 @@ class ExpandedSidebarHeader extends StatelessWidget {
   }
 }
 
-// Expanded Footer Widget
+// Expanded Footer Widget (keeping for backward compatibility)
 class ExpandedSidebarFooter extends StatelessWidget {
   final String statusText;
   final bool isActive;
