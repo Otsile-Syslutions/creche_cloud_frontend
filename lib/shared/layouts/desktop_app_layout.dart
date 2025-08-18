@@ -1,12 +1,12 @@
 // lib/shared/responsive/layouts/desktop_app_layout.dart
 import 'package:flutter/material.dart';
-import 'package:sidebarx/sidebarx.dart';
 import '../../../constants/app_colors.dart';
 import '../components/sidebar/app_sidebar.dart';
 
+
 class DesktopAppLayout extends StatefulWidget {
   final Widget body;
-  final List<SidebarXItem> sidebarItems;
+  final List<AppSidebarItem> sidebarItems; // Changed from SidebarXItem to AppSidebarItem
   final Widget? sidebarHeader;
   final Widget? sidebarFooter;
   final int? selectedSidebarIndex;
@@ -127,7 +127,7 @@ class _DesktopAppLayoutState extends State<DesktopAppLayout> {
 // Simplified layout for specific platforms
 class PlatformDesktopLayout extends StatelessWidget {
   final Widget body;
-  final List<SidebarXItem> Function() getSidebarItems;
+  final List<AppSidebarItem> Function() getSidebarItems; // Changed return type
   final Widget Function()? buildSidebarHeader;
   final Widget Function()? buildSidebarFooter;
   final String platformType;
@@ -159,7 +159,7 @@ class PlatformDesktopLayout extends StatelessWidget {
 // Admin-specific desktop layout
 class AdminDesktopLayout extends StatelessWidget {
   final Widget body;
-  final List<SidebarXItem> sidebarItems;
+  final List<AppSidebarItem> sidebarItems; // Changed type
   final Widget? sidebarHeader;
   final Widget? sidebarFooter;
   final int? selectedIndex;
@@ -189,7 +189,7 @@ class AdminDesktopLayout extends StatelessWidget {
 // Tenant-specific desktop layout
 class TenantDesktopLayout extends StatelessWidget {
   final Widget body;
-  final List<SidebarXItem> sidebarItems;
+  final List<AppSidebarItem> sidebarItems; // Changed type
   final Widget? sidebarHeader;
   final Widget? sidebarFooter;
   final int? selectedIndex;
@@ -219,7 +219,7 @@ class TenantDesktopLayout extends StatelessWidget {
 // Parent-specific desktop layout
 class ParentDesktopLayout extends StatelessWidget {
   final Widget body;
-  final List<SidebarXItem> sidebarItems;
+  final List<AppSidebarItem> sidebarItems; // Changed type
   final Widget? sidebarHeader;
   final Widget? sidebarFooter;
   final int? selectedIndex;

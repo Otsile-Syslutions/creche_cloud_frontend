@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:sidebarx/sidebarx.dart';
+import 'package:sidebarx/sidebarx.dart' hide SidebarXItem;
 import '../../../constants/app_colors.dart';
 import '../../../constants/app_assets.dart';
 import '../../../utils/app_logger.dart';
@@ -11,8 +11,25 @@ import 'collapsed_sidebar.dart';
 import 'expanded_sidebar.dart';
 import 'sidebar_toggle_button.dart';
 
+// Extended SidebarXItem to support subItems (shared definition)
+class AppSidebarItem {
+  final IconData? icon;
+  final Widget Function(bool selected, bool hovered)? iconBuilder;
+  final String? label;
+  final VoidCallback? onTap;
+  final List<AppSidebarItem>? subItems; // Add support for subitems
+
+  const AppSidebarItem({
+    this.icon,
+    this.iconBuilder,
+    this.label,
+    this.onTap,
+    this.subItems, // New parameter
+  });
+}
+
 class AppSidebar extends StatefulWidget {
-  final List<SidebarXItem> items;
+  final List<AppSidebarItem> items;
   final Widget? header;
   final Widget? footer;
   final double expandedWidth;
@@ -28,7 +45,7 @@ class AppSidebar extends StatefulWidget {
     this.header,
     this.footer,
     this.expandedWidth = 250,
-    this.collapsedWidth = 85,  // Updated from 70 to match new collapsed sidebar width
+    this.collapsedWidth = 85,
     this.selectedIndex,
     this.startExpanded = true,
     this.showToggleButton = true,
@@ -162,13 +179,16 @@ class _AppSidebarState extends State<AppSidebar> with SingleTickerProviderStateM
     super.dispose();
   }
 
-  List<SidebarMenuItem> _convertItems(List<SidebarXItem> items) {
+  List<SidebarMenuItem> _convertItems(List<AppSidebarItem> items) {
     return items.map((item) {
       return SidebarMenuItem(
         label: item.label ?? '',
         icon: item.icon,
         iconBuilder: item.iconBuilder,
         onTap: item.onTap,
+        subItems: item.subItems != null
+            ? _convertItems(item.subItems!)
+            : null, // Recursively convert subitems
       );
     }).toList();
   }
@@ -412,7 +432,7 @@ class AppSidebarFooter extends StatelessWidget {
 
 // Responsive sidebar wrapper for automatic collapsing on small screens
 class ResponsiveAppSidebar extends StatefulWidget {
-  final List<SidebarXItem> items;
+  final List<AppSidebarItem> items;
   final Widget? header;
   final Widget? footer;
   final double breakpoint;
@@ -453,7 +473,7 @@ class _ResponsiveAppSidebarState extends State<ResponsiveAppSidebar> {
           selectedIndex: widget.selectedIndex,
           startExpanded: effectiveExpanded,
           expandedWidth: screenWidth < 1400 ? 220 : 250,
-          collapsedWidth: 85,  // Updated to match the new collapsed width
+          collapsedWidth: 85,
           onToggle: widget.onToggle,
         );
       },

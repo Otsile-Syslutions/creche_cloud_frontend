@@ -1,14 +1,14 @@
 // lib/features/tenant_platform/config/sidebar/tenant_menu_items.dart
 import 'package:flutter/material.dart';
-import 'package:sidebarx/sidebarx.dart';
+import 'package:sidebarx/sidebarx.dart' hide SidebarXItem;
 
 import 'package:hugeicons/hugeicons.dart';
 import '../../../../shared/components/sidebar/app_sidebar.dart';
 
 class TenantMenuItems {
-  static List<SidebarXItem> getMenuItems(List<String> userRoles) {
-    final items = <SidebarXItem>[
-      SidebarXItem(
+  static List<AppSidebarItem> getMenuItems(List<String> userRoles) {
+    final items = <AppSidebarItem>[
+      AppSidebarItem(
         iconBuilder: (selected, hovered) => HugeIcon(
           icon: HugeIcons.strokeRoundedDashboardSquare01,
           color: selected ? Colors.white : const Color(0xFF6B7280),
@@ -30,7 +30,7 @@ class TenantMenuItems {
       'assistant'
     ].contains(role.toLowerCase()))) {
       items.addAll([
-        SidebarXItem(
+        AppSidebarItem(
           iconBuilder: (selected, hovered) => HugeIcon(
             icon: HugeIcons.strokeRoundedBaby01,
             color: selected ? Colors.white : const Color(0xFF6B7280),
@@ -42,7 +42,7 @@ class TenantMenuItems {
             // Get.toNamed(AppRoutes.tenantChildren);
           },
         ),
-        SidebarXItem(
+        AppSidebarItem(
           iconBuilder: (selected, hovered) => HugeIcon(
             icon: HugeIcons.strokeRoundedUserCheck01,
             color: selected ? Colors.white : const Color(0xFF6B7280),
@@ -54,7 +54,7 @@ class TenantMenuItems {
             // Get.toNamed(AppRoutes.tenantAttendance);
           },
         ),
-        SidebarXItem(
+        AppSidebarItem(
           iconBuilder: (selected, hovered) => HugeIcon(
             icon: HugeIcons.strokeRoundedDish01,
             color: selected ? Colors.white : const Color(0xFF6B7280),
@@ -66,7 +66,7 @@ class TenantMenuItems {
             // Get.toNamed(AppRoutes.tenantMeals);
           },
         ),
-        SidebarXItem(
+        AppSidebarItem(
           iconBuilder: (selected, hovered) => HugeIcon(
             icon: HugeIcons.strokeRoundedBasketball01,
             color: selected ? Colors.white : const Color(0xFF6B7280),
@@ -78,7 +78,7 @@ class TenantMenuItems {
             // Get.toNamed(AppRoutes.tenantActivities);
           },
         ),
-        SidebarXItem(
+        AppSidebarItem(
           iconBuilder: (selected, hovered) => HugeIcon(
             icon: HugeIcons.strokeRoundedMessage01,
             color: selected ? Colors.white : const Color(0xFF6B7280),
@@ -99,7 +99,7 @@ class TenantMenuItems {
       'school_manager'
     ].contains(role.toLowerCase()))) {
       items.addAll([
-        SidebarXItem(
+        AppSidebarItem(
           iconBuilder: (selected, hovered) => HugeIcon(
             icon: HugeIcons.strokeRoundedUserMultiple,
             color: selected ? Colors.white : const Color(0xFF6B7280),
@@ -111,7 +111,7 @@ class TenantMenuItems {
             // Get.toNamed(AppRoutes.tenantStaff);
           },
         ),
-        SidebarXItem(
+        AppSidebarItem(
           iconBuilder: (selected, hovered) => HugeIcon(
             icon: HugeIcons.strokeRoundedChartLineData01,
             color: selected ? Colors.white : const Color(0xFF6B7280),
@@ -129,7 +129,7 @@ class TenantMenuItems {
     // Add admin-only items
     if (userRoles.any((role) => role.toLowerCase() == 'school_admin')) {
       items.addAll([
-        SidebarXItem(
+        AppSidebarItem(
           iconBuilder: (selected, hovered) => HugeIcon(
             icon: HugeIcons.strokeRoundedUserSettings01,
             color: selected ? Colors.white : const Color(0xFF6B7280),
@@ -141,7 +141,7 @@ class TenantMenuItems {
             // Get.toNamed(AppRoutes.tenantUsers);
           },
         ),
-        SidebarXItem(
+        AppSidebarItem(
           iconBuilder: (selected, hovered) => HugeIcon(
             icon: HugeIcons.strokeRoundedInvoice,
             color: selected ? Colors.white : const Color(0xFF6B7280),
@@ -153,7 +153,7 @@ class TenantMenuItems {
             // Get.toNamed(AppRoutes.tenantBilling);
           },
         ),
-        SidebarXItem(
+        AppSidebarItem(
           iconBuilder: (selected, hovered) => HugeIcon(
             icon: HugeIcons.strokeRoundedSettings01,
             color: selected ? Colors.white : const Color(0xFF6B7280),

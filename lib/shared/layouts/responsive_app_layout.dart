@@ -1,10 +1,11 @@
 // lib/shared/responsive/layouts/responsive_app_layout.dart
 import 'package:flutter/material.dart';
-import 'package:sidebarx/sidebarx.dart';
+import '../components/sidebar/app_sidebar.dart';
 import '../responsive/responsive_layout.dart';
 import 'mobile_app_layout.dart';
 import 'tablet_app_layout.dart';
 import 'desktop_app_layout.dart';
+
 
 // Simple responsive layout for basic screens without sidebar
 class ResponsiveAppLayout extends StatelessWidget {
@@ -49,7 +50,7 @@ class _SimpleDesktopWrapper extends StatelessWidget {
 // Complete responsive layout with sidebar for main app screens
 class ResponsiveMainLayout extends StatelessWidget {
   final Widget body;
-  final List<SidebarXItem> sidebarItems;
+  final List<AppSidebarItem> sidebarItems; // Changed from SidebarXItem to AppSidebarItem
   final Widget? sidebarHeader;
   final Widget? sidebarFooter;
   final int? selectedSidebarIndex;
@@ -90,7 +91,7 @@ class ResponsiveMainLayout extends StatelessWidget {
 // Mobile layout with bottom navigation instead of sidebar
 class _MobileMainLayout extends StatefulWidget {
   final Widget body;
-  final List<SidebarXItem> sidebarItems;
+  final List<AppSidebarItem> sidebarItems; // Changed from SidebarXItem to AppSidebarItem
 
   const _MobileMainLayout({
     required this.body,
@@ -139,7 +140,7 @@ class _MobileMainLayoutState extends State<_MobileMainLayout> {
 // Tablet layout with collapsible sidebar
 class _TabletMainLayout extends StatelessWidget {
   final Widget body;
-  final List<SidebarXItem> sidebarItems;
+  final List<AppSidebarItem> sidebarItems; // Changed from SidebarXItem to AppSidebarItem
   final Widget? sidebarHeader;
   final Widget? sidebarFooter;
 
@@ -198,7 +199,7 @@ class _TabletMainLayout extends StatelessWidget {
 // Platform-specific responsive layouts
 class AdminResponsiveLayout extends StatelessWidget {
   final Widget body;
-  final List<SidebarXItem> Function() getSidebarItems;
+  final List<AppSidebarItem> Function() getSidebarItems; // Changed return type
   final Widget Function()? buildSidebarHeader;
   final Widget Function()? buildSidebarFooter;
   final int? selectedIndex;
@@ -226,7 +227,7 @@ class AdminResponsiveLayout extends StatelessWidget {
 
 class TenantResponsiveLayout extends StatelessWidget {
   final Widget body;
-  final List<SidebarXItem> Function() getSidebarItems;
+  final List<AppSidebarItem> Function() getSidebarItems; // Changed return type
   final Widget Function()? buildSidebarHeader;
   final Widget Function()? buildSidebarFooter;
   final int? selectedIndex;
@@ -254,7 +255,7 @@ class TenantResponsiveLayout extends StatelessWidget {
 
 class ParentResponsiveLayout extends StatelessWidget {
   final Widget body;
-  final List<SidebarXItem> Function() getSidebarItems;
+  final List<AppSidebarItem> Function() getSidebarItems; // Changed return type
   final Widget Function()? buildSidebarHeader;
   final Widget Function()? buildSidebarFooter;
   final int? selectedIndex;

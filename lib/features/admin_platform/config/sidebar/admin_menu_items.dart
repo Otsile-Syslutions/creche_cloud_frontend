@@ -1,20 +1,13 @@
 // lib/features/admin_platform/config/sidebar/admin_menu_items.dart
 import 'package:flutter/material.dart';
-import 'package:sidebarx/sidebarx.dart';
+import 'package:sidebarx/sidebarx.dart' hide SidebarXItem; // Hide SidebarXItem to avoid conflicts
 import 'package:hugeicons/hugeicons.dart';
 import '../../../../shared/components/sidebar/app_sidebar.dart';
-import '../../../../utils/app_logger.dart';
 
 class AdminMenuItems {
-  static List<SidebarXItem> getMenuItems(List<String> userRoles) {
-    // Enhanced debug logging
-    AppLogger.d('=== ADMIN MENU GENERATION ===');
-    AppLogger.d('Received roles: $userRoles');
-    AppLogger.d('Roles count: ${userRoles.length}');
-
-    final items = <SidebarXItem>[
-      // Dashboard - Available to all admin roles
-      SidebarXItem(
+  static List<AppSidebarItem> getMenuItems(List<String> userRoles) {
+    final items = <AppSidebarItem>[
+      AppSidebarItem(
         iconBuilder: (selected, hovered) => HugeIcon(
           icon: HugeIcons.strokeRoundedDashboardSquare01,
           color: selected ? Colors.white : const Color(0xFF6B7280),
@@ -22,73 +15,74 @@ class AdminMenuItems {
         ),
         label: 'Dashboard',
         onTap: () {
-          AppLogger.d('Admin Dashboard tapped');
-          // Navigate to admin home
-          // Get.toNamed(AppRoutes.adminHome);
+          // Navigate to admin dashboard
+          // Get.toNamed(AppRoutes.adminDashboard);
         },
       ),
     ];
 
-    // More flexible role checking
-    final isPlatformAdmin = _isPlatformAdmin(userRoles);
-    AppLogger.d('Is platform admin result: $isPlatformAdmin');
-
-    // Platform Admin only features
-    if (isPlatformAdmin) {
-      AppLogger.d('✅ Adding platform admin menu items');
+    // Add platform admin items
+    if (userRoles.any((role) =>
+    role.toLowerCase() == 'platform_admin' ||
+        role.toLowerCase() == 'admin')) {
       items.addAll([
-        SidebarXItem(
+        AppSidebarItem(
           iconBuilder: (selected, hovered) => HugeIcon(
             icon: HugeIcons.strokeRoundedBuilding01,
             color: selected ? Colors.white : const Color(0xFF6B7280),
             size: 22,
           ),
-          label: 'Schools',
-          onTap: () {
-            AppLogger.d('Tenants menu tapped');
-            // Navigate to tenants management
-            // Get.toNamed(AppRoutes.adminTenants);
-          },
+          label: 'Tenants',
+          subItems: [
+            AppSidebarItem(
+              label: 'All Tenants',
+              onTap: () {
+                // Get.toNamed(AppRoutes.adminTenants);
+              },
+            ),
+            AppSidebarItem(
+              label: 'Add Tenant',
+              onTap: () {
+                // Get.toNamed(AppRoutes.adminAddTenant);
+              },
+            ),
+            AppSidebarItem(
+              label: 'Inactive Tenants',
+              onTap: () {
+                // Get.toNamed(AppRoutes.adminInactiveTenants);
+              },
+            ),
+          ],
         ),
-        SidebarXItem(
+        AppSidebarItem(
           iconBuilder: (selected, hovered) => HugeIcon(
             icon: HugeIcons.strokeRoundedUserMultiple,
             color: selected ? Colors.white : const Color(0xFF6B7280),
             size: 22,
           ),
           label: 'Users',
-          onTap: () {
-            AppLogger.d('Users menu tapped');
-            // Navigate to user management
-            // Get.toNamed(AppRoutes.adminUsers);
-          },
+          subItems: [
+            AppSidebarItem(
+              label: 'All Users',
+              onTap: () {
+                // Get.toNamed(AppRoutes.adminUsers);
+              },
+            ),
+            AppSidebarItem(
+              label: 'Platform Admins',
+              onTap: () {
+                // Get.toNamed(AppRoutes.adminPlatformAdmins);
+              },
+            ),
+            AppSidebarItem(
+              label: 'User Roles',
+              onTap: () {
+                // Get.toNamed(AppRoutes.adminUserRoles);
+              },
+            ),
+          ],
         ),
-      ]);
-    } else {
-      AppLogger.d('❌ Not adding platform admin items - user is not platform admin');
-    }
-
-    // Reports and Analytics
-    final hasReportsAccess = _hasReportsAccess(userRoles);
-    AppLogger.d('Has reports access result: $hasReportsAccess');
-
-    if (hasReportsAccess) {
-      AppLogger.d('✅ Adding reports and analytics menu items');
-      items.addAll([
-        SidebarXItem(
-          iconBuilder: (selected, hovered) => HugeIcon(
-            icon: HugeIcons.strokeRoundedFile02,
-            color: selected ? Colors.white : const Color(0xFF6B7280),
-            size: 22,
-          ),
-          label: 'Reports',
-          onTap: () {
-            AppLogger.d('Reports menu tapped');
-            // Navigate to reports
-            // Get.toNamed(AppRoutes.adminReports);
-          },
-        ),
-        SidebarXItem(
+        AppSidebarItem(
           iconBuilder: (selected, hovered) => HugeIcon(
             icon: HugeIcons.strokeRoundedChartLineData01,
             color: selected ? Colors.white : const Color(0xFF6B7280),
@@ -96,171 +90,152 @@ class AdminMenuItems {
           ),
           label: 'Analytics',
           onTap: () {
-            AppLogger.d('Analytics menu tapped');
             // Navigate to analytics
             // Get.toNamed(AppRoutes.adminAnalytics);
           },
         ),
-      ]);
-    } else {
-      AppLogger.d('❌ Not adding reports items - user does not have reports access');
-    }
-
-    // Platform Admin only - Settings
-    if (isPlatformAdmin) {
-      AppLogger.d('✅ Adding settings menu item');
-      items.add(
-        SidebarXItem(
+        AppSidebarItem(
           iconBuilder: (selected, hovered) => HugeIcon(
-            icon: HugeIcons.strokeRoundedSettings01,
+            icon: HugeIcons.strokeRoundedCreditCard,
             color: selected ? Colors.white : const Color(0xFF6B7280),
             size: 22,
           ),
-          label: 'Settings',
+          label: 'Billing',
+          subItems: [
+            AppSidebarItem(
+              label: 'Subscriptions',
+              onTap: () {
+                // Get.toNamed(AppRoutes.adminSubscriptions);
+              },
+            ),
+            AppSidebarItem(
+              label: 'Invoices',
+              onTap: () {
+                // Get.toNamed(AppRoutes.adminInvoices);
+              },
+            ),
+            AppSidebarItem(
+              label: 'Payment Methods',
+              onTap: () {
+                // Get.toNamed(AppRoutes.adminPaymentMethods);
+              },
+            ),
+          ],
+        ),
+      ]);
+    }
+
+    // Add support items
+    if (userRoles.any((role) =>
+    role.toLowerCase() == 'platform_support' ||
+        role.toLowerCase() == 'support')) {
+      items.addAll([
+        AppSidebarItem(
+          iconBuilder: (selected, hovered) => HugeIcon(
+            icon: HugeIcons.strokeRoundedCustomerSupport,
+            color: selected ? Colors.white : const Color(0xFF6B7280),
+            size: 22,
+          ),
+          label: 'Support',
+          subItems: [
+            AppSidebarItem(
+              label: 'Open Tickets',
+              onTap: () {
+                // Get.toNamed(AppRoutes.adminOpenTickets);
+              },
+            ),
+            AppSidebarItem(
+              label: 'Resolved Tickets',
+              onTap: () {
+                // Get.toNamed(AppRoutes.adminResolvedTickets);
+              },
+            ),
+            AppSidebarItem(
+              label: 'Knowledge Base',
+              onTap: () {
+                // Get.toNamed(AppRoutes.adminKnowledgeBase);
+              },
+            ),
+          ],
+        ),
+        AppSidebarItem(
+          iconBuilder: (selected, hovered) => HugeIcon(
+            icon: HugeIcons.strokeRoundedNotification02,
+            color: selected ? Colors.white : const Color(0xFF6B7280),
+            size: 22,
+          ),
+          label: 'Announcements',
           onTap: () {
-            AppLogger.d('Settings menu tapped');
-            // Navigate to settings
-            // Get.toNamed(AppRoutes.adminSettings);
+            // Navigate to announcements
+            // Get.toNamed(AppRoutes.adminAnnouncements);
           },
         ),
-      );
+      ]);
     }
 
-    AppLogger.d('Total admin menu items generated: ${items.length}');
-    AppLogger.d('Menu items: ${items.map((e) => e.label).toList()}');
-    AppLogger.d('=============================');
+    // Add settings for all admin users
+    items.add(
+      AppSidebarItem(
+        iconBuilder: (selected, hovered) => HugeIcon(
+          icon: HugeIcons.strokeRoundedSettings01,
+          color: selected ? Colors.white : const Color(0xFF6B7280),
+          size: 22,
+        ),
+        label: 'Settings',
+        subItems: [
+          AppSidebarItem(
+            label: 'Platform Settings',
+            onTap: () {
+              // Get.toNamed(AppRoutes.adminPlatformSettings);
+            },
+          ),
+          AppSidebarItem(
+            label: 'Security',
+            onTap: () {
+              // Get.toNamed(AppRoutes.adminSecurity);
+            },
+          ),
+          AppSidebarItem(
+            label: 'API Configuration',
+            onTap: () {
+              // Get.toNamed(AppRoutes.adminApiConfig);
+            },
+          ),
+          AppSidebarItem(
+            label: 'Logs',
+            onTap: () {
+              // Get.toNamed(AppRoutes.adminLogs);
+            },
+          ),
+        ],
+      ),
+    );
 
     return items;
-  }
-
-  /// Enhanced platform admin checking
-  static bool _isPlatformAdmin(List<String> userRoles) {
-    if (userRoles.isEmpty) {
-      AppLogger.w('No user roles provided to _isPlatformAdmin');
-      return false;
-    }
-
-    // Check for exact matches first
-    const platformAdminRoles = [
-      'platform_admin',
-      'platform_administrator',
-      'super_admin',
-      'superadmin',
-    ];
-
-    for (final role in userRoles) {
-      final normalizedRole = role.toLowerCase().trim();
-
-      // Debug each role check
-      AppLogger.d('Checking role: "$role" (normalized: "$normalizedRole")');
-
-      // Exact match check
-      if (platformAdminRoles.contains(normalizedRole)) {
-        AppLogger.d('✅ Found exact platform admin role: $role');
-        return true;
-      }
-
-      // Partial match check for variations
-      if (normalizedRole.contains('platform') && normalizedRole.contains('admin')) {
-        AppLogger.d('✅ Found platform admin role by pattern: $role');
-        return true;
-      }
-
-      if (normalizedRole.contains('super') && normalizedRole.contains('admin')) {
-        AppLogger.d('✅ Found super admin role by pattern: $role');
-        return true;
-      }
-    }
-
-    AppLogger.d('❌ No platform admin role found in: $userRoles');
-    return false;
-  }
-
-  /// Enhanced reports access checking
-  static bool _hasReportsAccess(List<String> userRoles) {
-    if (userRoles.isEmpty) {
-      AppLogger.w('No user roles provided to _hasReportsAccess');
-      return false;
-    }
-
-    // If user is platform admin, they automatically have reports access
-    if (_isPlatformAdmin(userRoles)) {
-      AppLogger.d('✅ Has reports access via platform admin role');
-      return true;
-    }
-
-    // Check for support roles
-    const supportRoles = [
-      'platform_support',
-      'platform_support_agent',
-      'support',
-      'support_admin',
-    ];
-
-    for (final role in userRoles) {
-      final normalizedRole = role.toLowerCase().trim();
-
-      // Exact match check
-      if (supportRoles.contains(normalizedRole)) {
-        AppLogger.d('✅ Found support role: $role');
-        return true;
-      }
-
-      // Pattern matching for support roles
-      if (normalizedRole.contains('support') &&
-          (normalizedRole.contains('platform') || normalizedRole.contains('admin'))) {
-        AppLogger.d('✅ Found support role by pattern: $role');
-        return true;
-      }
-    }
-
-    AppLogger.d('❌ No reports access role found in: $userRoles');
-    return false;
   }
 
   static Widget buildHeader({SidebarXController? controller}) {
     return AppSidebarHeader(
       controller: controller,
+      // You can add a custom admin logo here
+      // customLogo: Image.asset('assets/images/admin_logo.png'),
     );
   }
 
   static Widget buildFooter() {
-    // Simple static footer without GetBuilder
     return const AppSidebarFooter(
-      statusText: 'Platform Online',
+      statusText: 'Platform Admin',
       isActive: true,
       statusIcon: Icons.admin_panel_settings,
     );
   }
 
-  // New method to build dynamic footer based on roles (to be called from parent widget that has access to AuthController)
-  static Widget buildDynamicFooter(List<String> userRoles, {bool? isPlatformAdminFlag}) {
-    String statusText = 'Platform Online';
-    bool isActive = true;
-    IconData statusIcon = Icons.check_circle;
-
-    // Use both roleNames and isPlatformAdmin flag for determination
-    if (isPlatformAdminFlag == true || _isPlatformAdmin(userRoles)) {
-      statusText = 'Full Access';
-      statusIcon = Icons.admin_panel_settings;
-      AppLogger.d('✅ Footer: Full Access');
-    } else if (_hasReportsAccess(userRoles)) {
-      statusText = 'Support Access';
-      statusIcon = Icons.support_agent;
-      AppLogger.d('✅ Footer: Support Access');
-    } else {
-      statusText = 'Limited Access';
-      statusIcon = Icons.info;
-      isActive = false;
-      AppLogger.d('✅ Footer: Limited Access');
-    }
-
-    AppLogger.d('Admin footer status: $statusText');
-
+  // Dynamic footer with platform status
+  static Widget buildDynamicFooter({required bool isSystemOnline}) {
     return AppSidebarFooter(
-      statusText: statusText,
-      isActive: isActive,
-      statusIcon: statusIcon,
+      statusText: isSystemOnline ? 'System Online' : 'System Maintenance',
+      isActive: isSystemOnline,
+      statusIcon: isSystemOnline ? Icons.check_circle : Icons.warning,
     );
   }
 }

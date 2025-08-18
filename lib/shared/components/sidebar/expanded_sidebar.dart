@@ -81,11 +81,13 @@ class _MenuItemHoverEffect extends StatefulWidget {
   final Widget child;
   final bool isSelected;
   final VoidCallback onTap;
+  final bool isSubmenuItem;
 
   const _MenuItemHoverEffect({
     required this.child,
     required this.isSelected,
     required this.onTap,
+    this.isSubmenuItem = false,
   });
 
   @override
@@ -109,9 +111,11 @@ class _MenuItemHoverEffectState extends State<_MenuItemHoverEffect> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(widget.isSubmenuItem ? 6 : 8),
             color: widget.isSelected
-                ? const Color(0xFF875DEC)
+                ? (widget.isSubmenuItem
+                ? AppColors.loginButton.withOpacity(0.15)
+                : const Color(0xFF875DEC))
                 : _isHovering
                 ? AppColors.loginButton.withOpacity(0.05)
                 : Colors.transparent,
@@ -142,12 +146,13 @@ class ExpandedSidebar extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final availableHeight = constraints.maxHeight;
-        final shouldScroll = controller.shouldEnableScroll(availableHeight, items.length);
+        // Count total items including subitems
+        int totalItemCount = _getTotalItemCount();
+        final shouldScroll = controller.shouldEnableScroll(availableHeight, totalItemCount);
 
         return Container(
           width: width,
           height: double.infinity,
-          // REMOVED clipBehavior to allow footer expansion
           decoration: const BoxDecoration(
             color: AppColors.surface,
             border: Border(
@@ -158,29 +163,20 @@ class ExpandedSidebar extends StatelessWidget {
             ),
           ),
           child: Stack(
-            clipBehavior: Clip.none, // Allow overflow for expanded footer
+            clipBehavior: Clip.none,
             children: [
-              // Main content
               Column(
                 children: [
                   const SizedBox(height: 20),
-
-                  // Header - Fixed at top
                   if (header != null) header!,
-
-                  // Menu Items - Scrollable if needed with proper bottom padding
                   Expanded(
                     child: shouldScroll
                         ? _buildScrollableMenu()
                         : _buildStaticMenu(),
                   ),
-
-                  // Reserve space for footer (collapsed height)
                   const SizedBox(height: 80),
                 ],
               ),
-
-              // Footer positioned at bottom with overflow allowed
               Positioned(
                 left: 0,
                 right: 0,
@@ -188,7 +184,7 @@ class ExpandedSidebar extends StatelessWidget {
                 child: ProfileSidebarFooter(
                   isExpanded: true,
                   expandedWidth: width,
-                  collapsedWidth: 70,
+                  collapsedWidth: 85,
                   controllerTag: controller.controllerTag,
                 ),
               ),
@@ -197,6 +193,16 @@ class ExpandedSidebar extends StatelessWidget {
         );
       },
     );
+  }
+
+  int _getTotalItemCount() {
+    int count = items.length;
+    for (var item in items) {
+      if (item.subItems != null) {
+        count += item.subItems!.length;
+      }
+    }
+    return count;
   }
 
   Widget _buildScrollableMenu() {
@@ -210,11 +216,11 @@ class ExpandedSidebar extends StatelessWidget {
         controller: controller.menuScrollController,
         padding: const EdgeInsets.only(
           top: 8,
-          bottom: 16, // Extra padding to ensure menu items don't go under footer
+          bottom: 16,
         ),
         itemCount: items.length,
         itemBuilder: (context, index) {
-          return _buildMenuItem(index);
+          return _buildMenuItemWithSubitems(index);
         },
       ),
     );
@@ -224,30 +230,65 @@ class ExpandedSidebar extends StatelessWidget {
     return SingleChildScrollView(
       padding: const EdgeInsets.only(
         top: 8,
-        bottom: 16, // Extra padding to ensure menu items don't go under footer
+        bottom: 16,
       ),
       child: Column(
         children: List.generate(
           items.length,
-              (index) => _buildMenuItem(index),
+              (index) => _buildMenuItemWithSubitems(index),
         ),
       ),
     );
   }
 
+  Widget _buildMenuItemWithSubitems(int index) {
+    final item = items[index];
+    final hasSubItems = item.subItems != null && item.subItems!.isNotEmpty;
+
+    return Obx(() {
+      final isExpanded = controller.isMenuItemExpanded(index);
+
+      return Column(
+        children: [
+          _buildMenuItem(index),
+          if (hasSubItems)
+            AnimatedSize(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
+              child: isExpanded
+                  ? Column(
+                children: item.subItems!.asMap().entries.map((entry) {
+                  final subIndex = entry.key;
+                  final subItem = entry.value;
+                  return _buildSubmenuItem(index, subIndex, subItem);
+                }).toList(),
+              )
+                  : const SizedBox.shrink(),
+            ),
+        ],
+      );
+    });
+  }
+
   Widget _buildMenuItem(int index) {
     final item = items[index];
+    final hasSubItems = item.subItems != null && item.subItems!.isNotEmpty;
 
     return Obx(() {
       final isSelected = controller.selectedIndex.value == index;
+      final isExpanded = controller.isMenuItemExpanded(index);
 
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
         child: _MenuItemHoverEffect(
           isSelected: isSelected,
           onTap: () {
-            controller.selectMenuItem(index);
-            item.onTap?.call();
+            if (hasSubItems) {
+              controller.toggleSubmenu(index);
+            } else {
+              controller.selectMenuItem(index);
+              item.onTap?.call();
+            }
           },
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -263,7 +304,7 @@ class ExpandedSidebar extends StatelessWidget {
                         size: 22,
                       ),
                   const SizedBox(width: 10),
-                  // Label with fade animation - wrapped in Flexible to prevent overflow
+                  // Label
                   Flexible(
                     child: AnimatedBuilder(
                       animation: controller.fadeAnimation,
@@ -285,8 +326,75 @@ class ExpandedSidebar extends StatelessWidget {
                       },
                     ),
                   ),
+                  // Chevron for items with subitems
+                  if (hasSubItems) ...[
+                    const SizedBox(width: 8),
+                    AnimatedRotation(
+                      duration: const Duration(milliseconds: 200),
+                      turns: isExpanded ? 0.25 : 0,
+                      child: Icon(
+                        Icons.chevron_right,
+                        size: 18,
+                        color: isSelected
+                            ? Colors.white.withOpacity(0.8)
+                            : AppColors.textSecondary.withOpacity(0.6),
+                      ),
+                    ),
+                  ],
                 ],
               ),
+            ),
+          ),
+        ),
+      );
+    });
+  }
+
+  Widget _buildSubmenuItem(int parentIndex, int subIndex, SidebarMenuItem subItem) {
+    return Obx(() {
+      final combinedIndex = parentIndex * 100 + subIndex;
+      final isSelected = controller.selectedIndex.value == combinedIndex;
+
+      return Padding(
+        padding: const EdgeInsets.only(
+          left: 12,
+          right: 12,
+          top: 2,
+          bottom: 2,
+        ),
+        child: _MenuItemHoverEffect(
+          isSelected: isSelected,
+          isSubmenuItem: true,
+          onTap: () {
+            controller.selectSubmenuItem(parentIndex, subIndex);
+            subItem.onTap?.call();
+          },
+          child: Padding(
+            padding: const EdgeInsets.only(
+              left: 48, // Indent for submenu items
+              right: 16,
+              top: 10,
+              bottom: 10,
+            ),
+            child: Row(
+              children: [
+                // No icon for submenu items as requested
+                Flexible(
+                  child: Text(
+                    subItem.label,
+                    style: TextStyle(
+                      color: isSelected
+                          ? AppColors.loginButton
+                          : AppColors.textSecondary,
+                      fontSize: 13,
+                      fontFamily: 'Roboto',
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -310,7 +418,7 @@ class ExpandedSidebarHeader extends StatelessWidget {
       padding: const EdgeInsets.only(
         left: 12,
         right: 12,
-        top: 0, // Reduced from 20 to 0 since we have 60px space above
+        top: 0,
         bottom: 16,
       ),
       color: AppColors.surface,

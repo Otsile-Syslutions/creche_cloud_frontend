@@ -17,7 +17,7 @@ class CollapsedSidebar extends StatelessWidget {
     required this.controller,
     required this.items,
     this.header,
-    this.width = 85,  // Increased from 70 to accommodate chevron
+    this.width = 85,
   });
 
   @override
@@ -28,9 +28,8 @@ class CollapsedSidebar extends StatelessWidget {
         final shouldScroll = controller.shouldEnableScroll(availableHeight, items.length);
 
         return Stack(
-          clipBehavior: Clip.none, // Allow overflow for tooltips and footer expansion
+          clipBehavior: Clip.none,
           children: [
-            // Main sidebar container
             Container(
               width: width,
               height: double.infinity,
@@ -45,29 +44,20 @@ class CollapsedSidebar extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  // Add spacing from top
                   const SizedBox(height: 60),
-
-                  // Header - Fixed at top (collapsed logo)
                   if (header != null)
                     header!
                   else
                     const CollapsedSidebarHeader(),
-
-                  // Menu Items - Scrollable if needed
                   Expanded(
                     child: shouldScroll
                         ? _buildScrollableMenu()
                         : _buildStaticMenu(),
                   ),
-
-                  // Reserve space for footer (collapsed height)
-                  const SizedBox(height: 80), // Space for footer (matches new footer height)
+                  const SizedBox(height: 80),
                 ],
               ),
             ),
-
-            // Footer positioned at bottom with overflow allowed
             Positioned(
               left: 0,
               right: 0,
@@ -75,7 +65,7 @@ class CollapsedSidebar extends StatelessWidget {
               child: ProfileSidebarFooter(
                 isExpanded: false,
                 expandedWidth: 250,
-                collapsedWidth: width,  // Use the width property
+                collapsedWidth: width,
                 controllerTag: controller.controllerTag,
               ),
             ),
@@ -96,7 +86,7 @@ class CollapsedSidebar extends StatelessWidget {
         controller: controller.menuScrollController,
         padding: const EdgeInsets.only(
           top: 8,
-          bottom: 16, // Extra padding to ensure menu items don't go under footer
+          bottom: 16,
         ),
         itemCount: items.length,
         itemBuilder: (context, index) {
@@ -110,7 +100,7 @@ class CollapsedSidebar extends StatelessWidget {
     return SingleChildScrollView(
       padding: const EdgeInsets.only(
         top: 8,
-        bottom: 16, // Extra padding to ensure menu items don't go under footer
+        bottom: 16,
       ),
       child: Column(
         children: List.generate(
@@ -126,28 +116,40 @@ class CollapsedSidebar extends StatelessWidget {
 
     return Obx(() {
       final isSelected = controller.selectedIndex.value == index;
+      final hasSubItems = item.subItems != null && item.subItems!.isNotEmpty;
 
       return _CollapsedMenuItem(
         item: item,
         isSelected: isSelected,
+        hasSubItems: hasSubItems,
         onTap: () {
-          controller.selectMenuItem(index);
-          item.onTap?.call();
+          if (hasSubItems) {
+            // If item has subitems, expand sidebar and show submenu
+            controller.isExpanded.value = true;
+            Future.delayed(const Duration(milliseconds: 300), () {
+              controller.toggleSubmenu(index);
+            });
+          } else {
+            controller.selectMenuItem(index);
+            item.onTap?.call();
+          }
         },
       );
     });
   }
 }
 
-// Individual collapsed menu item with Orqestra-style tooltip
+// Individual collapsed menu item with tooltip
 class _CollapsedMenuItem extends StatefulWidget {
   final SidebarMenuItem item;
   final bool isSelected;
+  final bool hasSubItems;
   final VoidCallback? onTap;
 
   const _CollapsedMenuItem({
     required this.item,
     required this.isSelected,
+    required this.hasSubItems,
     this.onTap,
   });
 
@@ -205,20 +207,18 @@ class _CollapsedMenuItemState extends State<_CollapsedMenuItem>
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              // Extended hover background - shows for both selected and non-selected items
               if (_isHovered)
                 Positioned(
                   left: 0,
                   top: 0,
                   bottom: 0,
                   child: Container(
-                    width: 200, // Extended width for label
+                    width: 220,
                     height: 46,
                     decoration: BoxDecoration(
-                      // Match expanded sidebar hover colors exactly
                       color: widget.isSelected
-                          ? const Color(0xFF875DEC) // Purple for selected
-                          : Colors.white, // Solid white background for better visibility
+                          ? const Color(0xFF875DEC)
+                          : Colors.white,
                       borderRadius: BorderRadius.circular(8),
                       border: widget.isSelected
                           ? null
@@ -238,7 +238,6 @@ class _CollapsedMenuItemState extends State<_CollapsedMenuItem>
                     ),
                     child: Row(
                       children: [
-                        // Icon in the tooltip
                         Container(
                           width: 46,
                           height: 46,
@@ -254,23 +253,34 @@ class _CollapsedMenuItemState extends State<_CollapsedMenuItem>
                                 ),
                           ),
                         ),
-
-                        // Label text
                         Expanded(
                           child: Padding(
                             padding: const EdgeInsets.only(left: 10.0, right: 12.0),
-                            child: Text(
-                              widget.item.label,
-                              style: TextStyle(
-                                // Match expanded sidebar text colors exactly
-                                color: widget.isSelected
-                                    ? Colors.white
-                                    : AppColors.textSecondary, // Same as expanded sidebar
-                                fontSize: 14,
-                                fontFamily: 'Roboto',
-                                fontWeight: FontWeight.w600,
-                              ),
-                              overflow: TextOverflow.ellipsis,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    widget.item.label,
+                                    style: TextStyle(
+                                      color: widget.isSelected
+                                          ? Colors.white
+                                          : AppColors.textSecondary,
+                                      fontSize: 14,
+                                      fontFamily: 'Roboto',
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (widget.hasSubItems)
+                                  Icon(
+                                    Icons.chevron_right,
+                                    size: 16,
+                                    color: widget.isSelected
+                                        ? Colors.white.withOpacity(0.8)
+                                        : AppColors.textSecondary.withOpacity(0.6),
+                                  ),
+                              ],
                             ),
                           ),
                         ),
@@ -278,26 +288,22 @@ class _CollapsedMenuItemState extends State<_CollapsedMenuItem>
                     ),
                   ),
                 ),
-
-              // Base state background (when not hovering)
               if (!_isHovered && widget.isSelected)
                 Container(
                   width: 46,
                   height: 46,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(8),
-                    color: const Color(0xFF875DEC), // Purple for selected
+                    color: const Color(0xFF875DEC),
                   ),
                 ),
-
-              // Icon container - hide visually when hovering but keep in widget tree
               AnimatedBuilder(
                 animation: _scaleAnimation,
                 builder: (context, child) {
                   return Transform.scale(
                     scale: widget.isSelected ? 1.0 : _scaleAnimation.value,
                     child: Opacity(
-                      opacity: _isHovered ? 0.0 : 1.0,  // Hide when hovering
+                      opacity: _isHovered ? 0.0 : 1.0,
                       child: Container(
                         width: 46,
                         height: 46,
@@ -338,8 +344,8 @@ class CollapsedSidebarHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.only(
-        left: 12,  // Adjusted for wider sidebar
-        right: 12,  // Adjusted for wider sidebar
+        left: 12,
+        right: 12,
         top: 0,
         bottom: 16,
       ),
@@ -426,17 +432,19 @@ class CollapsedSidebarFooter extends StatelessWidget {
   }
 }
 
-// Sidebar Menu Item Model
+// Updated Sidebar Menu Item Model with Submenu Support
 class SidebarMenuItem {
   final String label;
   final IconData? icon;
   final Widget Function(bool selected, bool hovered)? iconBuilder;
   final VoidCallback? onTap;
+  final List<SidebarMenuItem>? subItems; // Add support for subitems
 
   const SidebarMenuItem({
     required this.label,
     this.icon,
     this.iconBuilder,
     this.onTap,
+    this.subItems, // New parameter for subitems
   });
 }

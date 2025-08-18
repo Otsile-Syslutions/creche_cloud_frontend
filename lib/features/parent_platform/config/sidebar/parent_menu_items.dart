@@ -1,13 +1,13 @@
 // lib/features/parent_platform/config/sidebar/parent_menu_items.dart
 import 'package:flutter/material.dart';
-import 'package:sidebarx/sidebarx.dart';
+import 'package:sidebarx/sidebarx.dart' hide SidebarXItem;
 import 'package:hugeicons/hugeicons.dart';
 import '../../../../shared/components/sidebar/app_sidebar.dart';
 
 class ParentMenuItems {
-  static List<SidebarXItem> getMenuItems() {
+  static List<AppSidebarItem> getMenuItems() {
     return [
-      SidebarXItem(
+      AppSidebarItem(
         iconBuilder: (selected, hovered) => HugeIcon(
           icon: HugeIcons.strokeRoundedHome01,
           color: selected ? Colors.white : const Color(0xFF6B7280),
@@ -19,7 +19,7 @@ class ParentMenuItems {
           // Get.toNamed(AppRoutes.parentHome);
         },
       ),
-      SidebarXItem(
+      AppSidebarItem(
         iconBuilder: (selected, hovered) => HugeIcon(
           icon: HugeIcons.strokeRoundedBaby01,
           color: selected ? Colors.white : const Color(0xFF6B7280),
@@ -31,7 +31,7 @@ class ParentMenuItems {
           // Get.toNamed(AppRoutes.parentChildren);
         },
       ),
-      SidebarXItem(
+      AppSidebarItem(
         iconBuilder: (selected, hovered) => HugeIcon(
           icon: HugeIcons.strokeRoundedImage01,
           color: selected ? Colors.white : const Color(0xFF6B7280),
@@ -43,7 +43,7 @@ class ParentMenuItems {
           // Get.toNamed(AppRoutes.parentActivities);
         },
       ),
-      SidebarXItem(
+      AppSidebarItem(
         iconBuilder: (selected, hovered) => HugeIcon(
           icon: HugeIcons.strokeRoundedMessage01,
           color: selected ? Colors.white : const Color(0xFF6B7280),
@@ -55,7 +55,7 @@ class ParentMenuItems {
           // Get.toNamed(AppRoutes.parentMessages);
         },
       ),
-      SidebarXItem(
+      AppSidebarItem(
         iconBuilder: (selected, hovered) => HugeIcon(
           icon: HugeIcons.strokeRoundedFile02,
           color: selected ? Colors.white : const Color(0xFF6B7280),
@@ -67,7 +67,7 @@ class ParentMenuItems {
           // Get.toNamed(AppRoutes.parentReports);
         },
       ),
-      SidebarXItem(
+      AppSidebarItem(
         iconBuilder: (selected, hovered) => HugeIcon(
           icon: HugeIcons.strokeRoundedInvoice,
           color: selected ? Colors.white : const Color(0xFF6B7280),

@@ -12,7 +12,10 @@ class AppSidebarController extends GetxController with GetSingleTickerProviderSt
   final RxBool isExpanded = true.obs;
   final RxInt selectedIndex = 0.obs;
   final RxDouble sidebarWidth = 250.0.obs;
-  final RxDouble collapsedWidth = 70.0.obs;
+  final RxDouble collapsedWidth = 85.0.obs;
+
+  // Submenu expansion states - track which menu items are expanded
+  final RxMap<int, bool> expandedMenuItems = <int, bool>{}.obs;
 
   // User information observables
   final Rx<UserModel?> currentUser = Rx<UserModel?>(null);
@@ -101,6 +104,8 @@ class AppSidebarController extends GetxController with GetSingleTickerProviderSt
           animationController.forward();
         } else {
           animationController.reverse();
+          // Collapse all submenus when sidebar is collapsed
+          expandedMenuItems.clear();
         }
       });
 
@@ -112,6 +117,41 @@ class AppSidebarController extends GetxController with GetSingleTickerProviderSt
       AppLogger.e('Error initializing AppSidebarController', e);
       _isInitialized = false;
     }
+  }
+
+  // Toggle submenu expansion
+  void toggleSubmenu(int index) {
+    if (!_isInitialized) return;
+
+    // Only allow submenu expansion when sidebar is expanded
+    if (!isExpanded.value) {
+      // If sidebar is collapsed, expand it first
+      isExpanded.value = true;
+      // Then expand the submenu after a delay
+      Future.delayed(const Duration(milliseconds: 300), () {
+        expandedMenuItems[index] = !(expandedMenuItems[index] ?? false);
+      });
+    } else {
+      expandedMenuItems[index] = !(expandedMenuItems[index] ?? false);
+    }
+  }
+
+  // Check if a menu item is expanded
+  bool isMenuItemExpanded(int index) {
+    return expandedMenuItems[index] ?? false;
+  }
+
+  // Select a submenu item
+  void selectSubmenuItem(int parentIndex, int subIndex) {
+    if (!_isInitialized) return;
+
+    // Expand parent if not already expanded
+    if (!isMenuItemExpanded(parentIndex)) {
+      expandedMenuItems[parentIndex] = true;
+    }
+
+    // Set selected index using a combined index (e.g., parentIndex * 100 + subIndex)
+    selectedIndex.value = parentIndex * 100 + subIndex;
   }
 
   void _initializeUserData() {
@@ -362,13 +402,13 @@ class AppSidebarController extends GetxController with GetSingleTickerProviderSt
 
     if (screenWidth < 1200) {
       sidebarWidth.value = 220.0;
-      collapsedWidth.value = 60.0;
+      collapsedWidth.value = 85.0;
     } else if (screenWidth < 1600) {
       sidebarWidth.value = 240.0;
-      collapsedWidth.value = 65.0;
+      collapsedWidth.value = 85.0;
     } else {
       sidebarWidth.value = 250.0;
-      collapsedWidth.value = 70.0;
+      collapsedWidth.value = 85.0;
     }
 
     // Update animation if needed
