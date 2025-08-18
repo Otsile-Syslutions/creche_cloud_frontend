@@ -35,7 +35,7 @@ class AdminMenuItems {
           label: 'Schools',
           subItems: [
             AppSidebarItem(
-              label: 'Active Schools',
+              label: 'Active Customers',
               onTap: () {
                 // Get.toNamed(AppRoutes.adminActiveSchools);
               },
