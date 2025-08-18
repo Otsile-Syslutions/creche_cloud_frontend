@@ -1,9 +1,16 @@
 // lib/features/admin_platform/controllers/admin_home_controller.dart
 import 'package:get/get.dart';
 import '../../../../utils/app_logger.dart';
+import '../../../../routes/app_routes.dart';
+import '../../../../core/services/api_service.dart';
+import '../../../../core/services/storage_service.dart';
 import '../../../auth/controllers/auth_controller.dart';
 
 class AdminHomeController extends GetxController {
+  // Services
+  final ApiService _apiService = ApiService.to;
+  final StorageService _storageService = StorageService.to;
+
   // Use lazy getter for safe auth controller access
   AuthController? get _authController =>
       Get.isRegistered<AuthController>() ? Get.find<AuthController>() : null;
@@ -13,6 +20,7 @@ class AdminHomeController extends GetxController {
   final RxBool isUserDataLoaded = false.obs;
   final RxString selectedMenuItem = 'dashboard'.obs;
   final RxString currentView = 'dashboard'.obs;
+  final RxBool isInitialized = false.obs;
 
   // Stats (will be loaded from API in future)
   final RxInt totalTenants = 0.obs;
@@ -47,6 +55,11 @@ class AdminHomeController extends GetxController {
   void onReady() {
     super.onReady();
     AppLogger.d('AdminHomeController ready');
+
+    // Additional initialization after view is ready
+    if (!isInitialized.value) {
+      _ensureAuthenticationAndLoadData();
+    }
   }
 
   @override
@@ -65,6 +78,9 @@ class AdminHomeController extends GetxController {
         return;
       }
 
+      // Ensure authentication is valid
+      await _ensureAuthentication();
+
       // Ensure user data is loaded
       await _ensureUserDataLoaded();
 
@@ -79,6 +95,7 @@ class AdminHomeController extends GetxController {
         await _loadDashboardStats();
 
         isUserDataLoaded.value = true;
+        isInitialized.value = true;
       } else {
         AppLogger.w('No user data available for admin dashboard');
       }
@@ -86,6 +103,128 @@ class AdminHomeController extends GetxController {
       AppLogger.e('Error initializing admin dashboard', e);
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  /// Ensure authentication and load data (called from onReady)
+  Future<void> _ensureAuthenticationAndLoadData() async {
+    try {
+      // Skip if already initialized
+      if (isInitialized.value) return;
+
+      AppLogger.d('Ensuring authentication and loading admin data...');
+
+      // Ensure authentication is valid
+      await _ensureAuthentication();
+
+      // Load dashboard data if not already loaded
+      if (!isUserDataLoaded.value) {
+        await _loadDashboardStats();
+        isUserDataLoaded.value = true;
+      }
+
+      isInitialized.value = true;
+
+    } catch (e) {
+      AppLogger.e('Failed to ensure authentication and load data', e);
+    }
+  }
+
+  /// CRITICAL: Ensure user is authenticated before loading admin content
+  Future<void> _ensureAuthentication() async {
+    try {
+      // Check if user is authenticated
+      if (_authController == null || !_authController!.isAuthenticated.value) {
+        AppLogger.w('User not authenticated in AdminHomeController');
+        Get.offAllNamed(AppRoutes.login);
+        return;
+      }
+
+      // Verify the user has admin privileges
+      final user = currentUser;
+      if (user == null) {
+        AppLogger.w('No user data available');
+        Get.offAllNamed(AppRoutes.login);
+        return;
+      }
+
+      // Check if user is platform admin or has admin roles
+      final isAdmin = isPlatformAdmin || hasSupportRole();
+
+      if (!isAdmin) {
+        AppLogger.w('User does not have admin privileges');
+        // Redirect to appropriate platform based on user role
+        _redirectBasedOnRole();
+        return;
+      }
+
+      // Ensure token is set in API service
+      await _ensureTokenInApiService();
+
+      AppLogger.d('Authentication verified for admin user');
+
+    } catch (e) {
+      AppLogger.e('Authentication check failed', e);
+      await _authController?.clearSession();
+      Get.offAllNamed(AppRoutes.login);
+      throw e;
+    }
+  }
+
+  /// Ensure token is properly set in API service
+  Future<void> _ensureTokenInApiService() async {
+    try {
+      final token = await _storageService.getString('access_token');
+
+      if (token == null || token.isEmpty) {
+        AppLogger.w('No access token found, attempting refresh...');
+
+        // Try to refresh token
+        final refreshToken = await _storageService.getString('refresh_token');
+        if (refreshToken != null && refreshToken.isNotEmpty) {
+          try {
+            await _apiService.refreshTokenRequest();
+            AppLogger.d('Token refreshed successfully');
+          } catch (e) {
+            AppLogger.e('Token refresh failed', e);
+            await _authController?.clearSession();
+            Get.offAllNamed(AppRoutes.login);
+            return;
+          }
+        } else {
+          await _authController?.clearSession();
+          Get.offAllNamed(AppRoutes.login);
+          return;
+        }
+      } else {
+        // Ensure token is set in API service
+        if (_apiService.accessToken != token) {
+          await _apiService.setAccessToken(token);
+          AppLogger.d('Token set in API service');
+        }
+      }
+    } catch (e) {
+      AppLogger.e('Error ensuring token in API service', e);
+      throw e;
+    }
+  }
+
+  /// Redirect user based on their role
+  void _redirectBasedOnRole() {
+    final user = currentUser;
+    if (user == null) {
+      Get.offAllNamed(AppRoutes.login);
+      return;
+    }
+
+    if (user.roleNames.contains('parent')) {
+      Get.offAllNamed(AppRoutes.parentHome);
+    } else if (user.roleNames.contains('school_admin') ||
+        user.roleNames.contains('teacher') ||
+        user.roleNames.contains('assistant')) {
+      Get.offAllNamed(AppRoutes.tenantHome);
+    } else {
+      Get.offAllNamed(AppRoutes.login);
     }
   }
 
@@ -112,6 +251,9 @@ class AdminHomeController extends GetxController {
       final user = currentUser;
       if (user == null) return;
 
+      // Ensure authentication before making API calls
+      await _ensureTokenInApiService();
+
       // TODO: Replace with actual API calls
       if (user.isPlatformAdmin == true || isPlatformAdmin) {
         // Load platform admin stats
@@ -136,10 +278,36 @@ class AdminHomeController extends GetxController {
     AppLogger.d('Admin menu item selected: $item');
   }
 
-  // Navigate to different sections
-  void navigateToSection(String section) {
-    currentView.value = section;
-    AppLogger.d('Navigating to admin section: $section');
+  // Navigate to different sections with authentication check
+  Future<void> navigateToSection(String section) async {
+    try {
+      // Ensure authentication before navigation
+      await _ensureAuthentication();
+
+      currentView.value = section;
+      AppLogger.d('Navigating to admin section: $section');
+
+      // Navigate to the route if it's different from current
+      final routeMap = {
+        'market-explorer': AppRoutes.adminMarketExplorer,
+        'active-schools': AppRoutes.adminActiveSchools,
+        'sales-pipeline': AppRoutes.adminSalesPipeline,
+        'users': AppRoutes.adminUsers,
+        'tenants': AppRoutes.adminTenants,
+        'reports': AppRoutes.adminReports,
+        'settings': AppRoutes.adminSettings,
+        'analytics': AppRoutes.adminAnalytics,
+        'support': AppRoutes.adminSupport,
+      };
+
+      final route = routeMap[section];
+      if (route != null) {
+        Get.toNamed(route);
+      }
+
+    } catch (e) {
+      AppLogger.e('Navigation failed', e);
+    }
   }
 
   Future<void> refreshDashboard() async {
@@ -270,5 +438,14 @@ class AdminHomeController extends GetxController {
   // Check if user can view system health
   bool canViewSystemHealth() {
     return isPlatformAdmin || hasSupportRole();
+  }
+
+  // Logout user
+  Future<void> logout() async {
+    try {
+      await _authController?.logout();
+    } catch (e) {
+      AppLogger.e('Logout failed', e);
+    }
   }
 }

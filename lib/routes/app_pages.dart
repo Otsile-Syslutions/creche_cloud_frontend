@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../features/admin_platform/home/bindings/admin_home_binding.dart';
 import '../features/auth/bindings/auth_binding.dart';
 import '../features/auth/controllers/auth_controller.dart';
+import '../middlewares/auth_middleware.dart';
 import 'app_routes.dart';
 
 // Auth views
@@ -27,7 +28,9 @@ import '../features/admin_platform/schools_management/market_explorer/bindings/m
 
 class AppPages {
   static final List<GetPage> pages = [
-    // Auth routes
+    // =========================================================================
+    // AUTH ROUTES (No middleware needed - public routes)
+    // =========================================================================
     GetPage(
       name: AppRoutes.login,
       page: () => const LoginView(),
@@ -49,102 +52,176 @@ class AppPages {
       binding: AuthBinding(),
     ),
 
-    // Platform home routes
+    // =========================================================================
+    // PLATFORM HOME ROUTES
+    // =========================================================================
+
+    // Admin Platform Home (Platform Admin/Support only)
     GetPage(
       name: AppRoutes.adminHome,
       page: () => const AdminHomeView(),
-      binding: AdminBinding(),
-      middlewares: [
-        AuthMiddleware(priority: 1),
-        RoleMiddleware(
-          requiredRoles: ['platform_admin', 'platform_support'],
-          priority: 2,
-        ),
-      ],
+      binding: AdminHomeBinding(),
+      middlewares: [AuthMiddlewareFactory.admin()],
     ),
+
+    // Parent Platform Home (Parents only)
     GetPage(
       name: AppRoutes.parentHome,
       page: () => const ParentHomeView(),
-      binding: AuthBinding(), // Create ParentBinding later if needed
-      middlewares: [
-        AuthMiddleware(priority: 1),
-        RoleMiddleware(
-          requiredRoles: ['parent'],
-          priority: 2,
-        ),
-      ],
+      binding: AuthBinding(), // TODO: Create ParentBinding when needed
+      middlewares: [AuthMiddlewareFactory.withRoles(['parent'])],
     ),
+
+    // Tenant Platform Home (School Staff)
     GetPage(
       name: AppRoutes.tenantHome,
       page: () => const TenantHomeView(),
-      binding: AuthBinding(), // Create TenantBinding later if needed
+      binding: AuthBinding(), // TODO: Create TenantBinding when needed
       middlewares: [
-        AuthMiddleware(priority: 1),
-        RoleMiddleware(
-          requiredRoles: ['school_admin', 'school_manager', 'teacher', 'assistant', 'viewer'],
-          priority: 2,
-        ),
+        AuthMiddlewareFactory.withRoles([
+          'school_admin',
+          'school_manager',
+          'teacher',
+          'assistant',
+          'viewer'
+        ])
       ],
     ),
 
-    // Schools Management routes (Admin Platform)
+    // =========================================================================
+    // ADMIN PLATFORM - SCHOOLS MANAGEMENT ROUTES
+    // =========================================================================
+
+    // Active Schools (Admin/Support)
     GetPage(
       name: AppRoutes.adminActiveSchools,
-      page: () => const ActiveSchoolsPlaceholderView(), // TODO: Replace with actual view
+      page: () => const ActiveSchoolsPlaceholderView(),
       binding: AuthBinding(), // TODO: Replace with ActiveSchoolsBinding
-      middlewares: [
-        AuthMiddleware(priority: 1),
-        RoleMiddleware(
-          requiredRoles: ['platform_admin', 'platform_support'],
-          priority: 2,
-        ),
-      ],
+      middlewares: [AuthMiddlewareFactory.admin()],
     ),
+
+    // Sales Pipeline (Admin/Support)
     GetPage(
       name: AppRoutes.adminSalesPipeline,
-      page: () => const SalesPipelinePlaceholderView(), // TODO: Replace with actual view
+      page: () => const SalesPipelinePlaceholderView(),
       binding: AuthBinding(), // TODO: Replace with SalesPipelineBinding
-      middlewares: [
-        AuthMiddleware(priority: 1),
-        RoleMiddleware(
-          requiredRoles: ['platform_admin', 'platform_support'],
-          priority: 2,
-        ),
-      ],
+      middlewares: [AuthMiddlewareFactory.admin()],
     ),
+
+    // Market Explorer (Admin/Support)
     GetPage(
       name: AppRoutes.adminMarketExplorer,
       page: () => const MarketExplorerPage(),
       binding: MarketExplorerBinding(),
-      middlewares: [
-        AuthMiddleware(priority: 1),
-        RoleMiddleware(
-          requiredRoles: ['platform_admin', 'platform_support'],
-          priority: 2,
-        ),
-      ],
+      middlewares: [AuthMiddlewareFactory.admin()],
     ),
+
+    // Market Explorer Detail (Admin/Support)
     GetPage(
       name: AppRoutes.adminMarketExplorerDetail,
-      page: () => MarketExplorerDetailPlaceholderView(), // TODO: Create detail view
+      page: () => const MarketExplorerDetailPlaceholderView(),
       binding: MarketExplorerBinding(),
-      middlewares: [
-        AuthMiddleware(priority: 1),
-        RoleMiddleware(
-          requiredRoles: ['platform_admin', 'platform_support'],
-          priority: 2,
-        ),
-      ],
+      middlewares: [AuthMiddlewareFactory.admin()],
     ),
+
+    // =========================================================================
+    // ADMIN PLATFORM - OTHER MANAGEMENT ROUTES
+    // =========================================================================
+
+    // Users Management (Platform Admin only)
+    GetPage(
+      name: AppRoutes.adminUsers,
+      page: () => const AdminPlaceholderView(title: 'Users Management'),
+      binding: AuthBinding(),
+      middlewares: [AuthMiddlewareFactory.withRoles(['platform_admin'])],
+    ),
+
+    // Tenants Management (Platform Admin only)
+    GetPage(
+      name: AppRoutes.adminTenants,
+      page: () => const AdminPlaceholderView(title: 'Tenants Management'),
+      binding: AuthBinding(),
+      middlewares: [AuthMiddlewareFactory.withRoles(['platform_admin'])],
+    ),
+
+    // Reports (Admin/Support)
+    GetPage(
+      name: AppRoutes.adminReports,
+      page: () => const AdminPlaceholderView(title: 'Reports'),
+      binding: AuthBinding(),
+      middlewares: [AuthMiddlewareFactory.support()],
+    ),
+
+    // Settings (Platform Admin only)
+    GetPage(
+      name: AppRoutes.adminSettings,
+      page: () => const AdminPlaceholderView(title: 'Settings'),
+      binding: AuthBinding(),
+      middlewares: [AuthMiddlewareFactory.withRoles(['platform_admin'])],
+    ),
+
+    // Analytics (Admin/Support)
+    GetPage(
+      name: AppRoutes.adminAnalytics,
+      page: () => const AdminPlaceholderView(title: 'Analytics'),
+      binding: AuthBinding(),
+      middlewares: [AuthMiddlewareFactory.support()],
+    ),
+
+    // Billing (Platform Admin only)
+    GetPage(
+      name: AppRoutes.adminBilling,
+      page: () => const AdminPlaceholderView(title: 'Billing'),
+      binding: AuthBinding(),
+      middlewares: [AuthMiddlewareFactory.withRoles(['platform_admin'])],
+    ),
+
+    // Support Tickets (Admin/Support)
+    GetPage(
+      name: AppRoutes.adminSupport,
+      page: () => const AdminPlaceholderView(title: 'Support Tickets'),
+      binding: AuthBinding(),
+      middlewares: [AuthMiddlewareFactory.support()],
+    ),
+
+    // =========================================================================
+    // COMMON ROUTES (All authenticated users)
+    // =========================================================================
+
+    // User Profile
+    GetPage(
+      name: AppRoutes.profile,
+      page: () => const ProfilePlaceholderView(),
+      binding: AuthBinding(),
+      middlewares: [AuthMiddlewareFactory.basic()],
+    ),
+
+    // Settings
+    GetPage(
+      name: AppRoutes.settings,
+      page: () => const SettingsPlaceholderView(),
+      binding: AuthBinding(),
+      middlewares: [AuthMiddlewareFactory.basic()],
+    ),
+
+    // Notifications
+    GetPage(
+      name: AppRoutes.notifications,
+      page: () => const NotificationsPlaceholderView(),
+      binding: AuthBinding(),
+      middlewares: [AuthMiddlewareFactory.basic()],
+    ),
+
+    // =========================================================================
+    // SPECIAL ROUTES
+    // =========================================================================
 
     // Legacy dashboard route - redirects to appropriate platform
     GetPage(
       name: AppRoutes.dashboard,
       page: () => const DashboardRedirectView(),
       binding: AuthBinding(),
-      middlewares: [
-        AuthMiddleware(priority: 1),
-      ],
+      middlewares: [AuthMiddlewareFactory.basic()],
     ),
 
     // Initial route - redirects to login or dashboard based on auth state
@@ -156,9 +233,50 @@ class AppPages {
   ];
 }
 
-// Placeholder views for routes that aren't implemented yet
-// TODO: Replace these with actual implementations
+// =============================================================================
+// PLACEHOLDER VIEWS FOR UNIMPLEMENTED ROUTES
+// =============================================================================
 
+// Generic admin placeholder view
+class AdminPlaceholderView extends StatelessWidget {
+  final String title;
+  final IconData icon;
+
+  const AdminPlaceholderView({
+    super.key,
+    required this.title,
+    this.icon = Icons.construction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(title),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'This feature is coming soon',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Active Schools placeholder
 class ActiveSchoolsPlaceholderView extends StatelessWidget {
   const ActiveSchoolsPlaceholderView({super.key});
 
@@ -190,6 +308,7 @@ class ActiveSchoolsPlaceholderView extends StatelessWidget {
   }
 }
 
+// Sales Pipeline placeholder
 class SalesPipelinePlaceholderView extends StatelessWidget {
   const SalesPipelinePlaceholderView({super.key});
 
@@ -221,6 +340,7 @@ class SalesPipelinePlaceholderView extends StatelessWidget {
   }
 }
 
+// Market Explorer Detail placeholder
 class MarketExplorerDetailPlaceholderView extends StatelessWidget {
   const MarketExplorerDetailPlaceholderView({super.key});
 
@@ -258,6 +378,106 @@ class MarketExplorerDetailPlaceholderView extends StatelessWidget {
     );
   }
 }
+
+// Profile placeholder
+class ProfilePlaceholderView extends StatelessWidget {
+  const ProfilePlaceholderView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Profile'),
+      ),
+      body: const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.person, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
+            Text(
+              'User Profile',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'This feature is coming soon',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Settings placeholder
+class SettingsPlaceholderView extends StatelessWidget {
+  const SettingsPlaceholderView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Settings'),
+      ),
+      body: const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.settings, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
+            Text(
+              'Settings',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'This feature is coming soon',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Notifications placeholder
+class NotificationsPlaceholderView extends StatelessWidget {
+  const NotificationsPlaceholderView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Notifications'),
+      ),
+      body: const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.notifications, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
+            Text(
+              'Notifications',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'This feature is coming soon',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// REDIRECT VIEWS
+// =============================================================================
 
 // Initial redirect view that checks auth state and redirects appropriately
 class InitialRedirectView extends StatelessWidget {
@@ -311,7 +531,7 @@ class InitialRedirectView extends StatelessWidget {
   }
 }
 
-// Redirect view that determines which platform to navigate to
+// Dashboard redirect view that determines which platform to navigate to
 class DashboardRedirectView extends StatelessWidget {
   const DashboardRedirectView({super.key});
 
@@ -348,165 +568,5 @@ class DashboardRedirectView extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-// Auth middleware to check if user is authenticated
-class AuthMiddleware extends GetMiddleware {
-  AuthMiddleware({required int priority}) : super(priority: priority);
-
-  @override
-  RouteSettings? redirect(String? route) {
-    try {
-      final authController = Get.find<AuthController>();
-
-      // Check if auth is initialized
-      if (!authController.isInitialized.value) {
-        // Wait for initialization - let the route load and handle redirect in widget
-        return null;
-      }
-
-      if (!authController.isAuthenticated.value) {
-        return const RouteSettings(name: AppRoutes.login);
-      }
-
-      return null;
-    } catch (e) {
-      // AuthController not found, redirect to login
-      return const RouteSettings(name: AppRoutes.login);
-    }
-  }
-}
-
-// Role middleware to check user roles (matching backend role structure)
-class RoleMiddleware extends GetMiddleware {
-  final List<String> requiredRoles;
-  final List<String> requiredPermissions;
-
-  RoleMiddleware({
-    required this.requiredRoles,
-    this.requiredPermissions = const [],
-    required int priority,
-  }) : super(priority: priority);
-
-  @override
-  RouteSettings? redirect(String? route) {
-    try {
-      final authController = Get.find<AuthController>();
-
-      if (!authController.isAuthenticated.value) {
-        return const RouteSettings(name: AppRoutes.login);
-      }
-
-      final user = authController.currentUser.value;
-      if (user == null) {
-        return const RouteSettings(name: AppRoutes.login);
-      }
-
-      // Check roles if specified
-      if (requiredRoles.isNotEmpty) {
-        bool hasRole = user.hasAnyRole(requiredRoles);
-        if (!hasRole) {
-          // Show access denied message
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            Get.snackbar(
-              'Access Denied',
-              'You do not have permission to access this page.',
-              snackPosition: SnackPosition.TOP,
-              backgroundColor: Colors.red,
-              colorText: Colors.white,
-              duration: const Duration(seconds: 4),
-            );
-          });
-
-          // Redirect to appropriate home based on their actual roles
-          final homeRoute = AppRoutes.getHomeRouteForRoles(user.roleNames);
-          return RouteSettings(name: homeRoute);
-        }
-      }
-
-      // Check permissions if specified
-      if (requiredPermissions.isNotEmpty) {
-        bool hasPermission = user.hasAnyPermission(requiredPermissions);
-        if (!hasPermission) {
-          // Show access denied message
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            Get.snackbar(
-              'Access Denied',
-              'You do not have permission to perform this action.',
-              snackPosition: SnackPosition.TOP,
-              backgroundColor: Colors.red,
-              colorText: Colors.white,
-              duration: const Duration(seconds: 4),
-            );
-          });
-
-          // Redirect to appropriate home based on their actual roles
-          final homeRoute = AppRoutes.getHomeRouteForRoles(user.roleNames);
-          return RouteSettings(name: homeRoute);
-        }
-      }
-
-      return null;
-    } catch (e) {
-      // Error occurred, redirect to login
-      return const RouteSettings(name: AppRoutes.login);
-    }
-  }
-}
-
-// Tenant middleware to check tenant access (updated for new tenant structure)
-class TenantMiddleware extends GetMiddleware {
-  TenantMiddleware({required int priority}) : super(priority: priority);
-
-  @override
-  RouteSettings? redirect(String? route) {
-    try {
-      final authController = Get.find<AuthController>();
-      final user = authController.currentUser.value;
-      final tenant = authController.currentTenant.value;
-
-      if (user == null) {
-        return const RouteSettings(name: AppRoutes.login);
-      }
-
-      // Check if user's tenant is active
-      if (tenant != null && !tenant.checkSubscriptionStatus()) {
-        // Show tenant inactive message
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          String message = 'Your school account is inactive. Please contact support.';
-
-          if (tenant.isExpired) {
-            message = 'Your subscription has expired. Please renew to continue.';
-          } else if (tenant.isSuspended) {
-            message = 'Your account has been suspended. Please contact support.';
-          } else if (tenant.isInTrial && tenant.trialEndsAt != null) {
-            final daysLeft = tenant.daysUntilExpiry;
-            if (daysLeft <= 0) {
-              message = 'Your trial has expired. Please upgrade to continue.';
-            } else {
-              message = 'Your trial expires in $daysLeft days. Please upgrade soon.';
-            }
-          }
-
-          Get.snackbar(
-            'Account Status',
-            message,
-            snackPosition: SnackPosition.TOP,
-            backgroundColor: tenant.isExpired || tenant.isSuspended ? Colors.red : Colors.orange,
-            colorText: Colors.white,
-            duration: const Duration(seconds: 6),
-          );
-        });
-
-        // For now, still allow access but show warning
-        // In production, you might want to redirect to a "subscription required" page
-        // return const RouteSettings(name: AppRoutes.subscriptionRequired);
-      }
-
-      return null;
-    } catch (e) {
-      return const RouteSettings(name: AppRoutes.login);
-    }
   }
 }

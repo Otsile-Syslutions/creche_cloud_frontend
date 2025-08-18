@@ -1433,6 +1433,67 @@ class AuthController extends GetxController {
     }
   }
 
+  /// Public method for refreshing token silently (used by middleware and other services)
+  Future<bool> refreshTokenSilently() async {
+    try {
+      final refreshTokenValue = await _storageService.getString('refresh_token');
+      if (refreshTokenValue == null) return false;
+
+      final response = await _apiService.refreshTokenRequest();
+
+      if (response.success && response.data != null) {
+        final data = response.data!;
+
+        // Handle both field name variations for compatibility with safe type checking
+        String? accessToken;
+        String? refreshToken;
+
+        final accessTokenRaw = data['access_token'] ?? data['accessToken'];
+        final refreshTokenRaw = data['refresh_token'] ?? data['refreshToken'];
+
+        if (accessTokenRaw != null) {
+          if (accessTokenRaw is String) {
+            accessToken = accessTokenRaw;
+          } else {
+            accessToken = accessTokenRaw.toString();
+          }
+        }
+
+        if (refreshTokenRaw != null) {
+          if (refreshTokenRaw is String) {
+            refreshToken = refreshTokenRaw;
+          } else {
+            refreshToken = refreshTokenRaw.toString();
+          }
+        }
+
+        // Update stored tokens
+        if (accessToken != null && accessToken.isNotEmpty) {
+          await _storageService.setString('access_token', accessToken);
+          await _apiService.setAccessToken(accessToken);
+        }
+
+        if (refreshToken != null && refreshToken.isNotEmpty) {
+          await _storageService.setString('refresh_token', refreshToken);
+        }
+
+        // Update user data if provided
+        if (data['user'] != null) {
+          final user = UserModel.fromJson(data['user']);
+          currentUser.value = user;
+          await _storageService.setString('user_data', jsonEncode(data['user']));
+        }
+
+        AppLogger.d('Token refreshed successfully');
+        return true;
+      }
+      return false;
+    } catch (e) {
+      AppLogger.w('Silent token refresh failed', e);
+      return false;
+    }
+  }
+
   /// Handle session expiration
   Future<void> _handleSessionExpired() async {
     AppLogger.w('Session expired, logging out user');
