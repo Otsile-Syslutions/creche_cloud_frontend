@@ -28,6 +28,15 @@ abstract class AppRoutes {
   static const String adminReports = '/admin/reports';
   static const String adminSettings = '/admin/settings';
   static const String adminAnalytics = '/admin/analytics';
+  static const String adminBilling = '/admin/billing';
+  static const String adminSupport = '/admin/support';
+  static const String adminAnnouncements = '/admin/announcements';
+
+  // Schools Management Routes (Under Admin Platform)
+  static const String adminActiveSchools = '/admin/schools/active';
+  static const String adminSalesPipeline = '/admin/schools/pipeline';
+  static const String adminMarketExplorer = '/admin/schools/market-explorer';
+  static const String adminMarketExplorerDetail = '/admin/schools/market-explorer/:id';
 
   // Parent Platform (Parents)
   static const String parentChildren = '/parent/children';
@@ -143,6 +152,15 @@ abstract class AppRoutes {
       adminReports: ['platform_admin', 'platform_support'],
       adminSettings: ['platform_admin'],
       adminAnalytics: ['platform_admin', 'platform_support'],
+      adminBilling: ['platform_admin'],
+      adminSupport: ['platform_admin', 'platform_support'],
+      adminAnnouncements: ['platform_admin', 'platform_support'],
+
+      // Schools Management routes
+      adminActiveSchools: ['platform_admin', 'platform_support'],
+      adminSalesPipeline: ['platform_admin', 'platform_support'],
+      adminMarketExplorer: ['platform_admin', 'platform_support'],
+      adminMarketExplorerDetail: ['platform_admin', 'platform_support'],
 
       // Parent platform routes
       parentHome: ['parent'],
@@ -199,6 +217,13 @@ abstract class AppRoutes {
         adminReports,
         adminSettings,
         adminAnalytics,
+        adminBilling,
+        adminSupport,
+        adminAnnouncements,
+        adminActiveSchools,
+        adminSalesPipeline,
+        adminMarketExplorer,
+        adminMarketExplorerDetail,
       ] : [],
       ...getHomeRouteForRoles(userRoles) == parentHome ? [
         parentHome,
@@ -233,7 +258,11 @@ abstract class AppRoutes {
       case 'admin':
         return [
           NavigationItem('Dashboard', adminHome, 'dashboard'),
-          NavigationItem('Tenants', adminTenants, 'business'),
+          NavigationItem('Schools', adminActiveSchools, 'business', [
+            NavigationItem('Active Customers', adminActiveSchools, 'business'),
+            NavigationItem('Sales Pipeline', adminSalesPipeline, 'trending_up'),
+            NavigationItem('Market Explorer', adminMarketExplorer, 'explore'),
+          ]),
           NavigationItem('Users', adminUsers, 'people'),
           NavigationItem('Reports', adminReports, 'analytics'),
           NavigationItem('Settings', adminSettings, 'settings'),
@@ -291,6 +320,10 @@ abstract class AppRoutes {
     profile: 'Profile',
     settings: 'Settings',
     notifications: 'Notifications',
+    adminActiveSchools: 'Active Schools',
+    adminSalesPipeline: 'Sales Pipeline',
+    adminMarketExplorer: 'Market Explorer',
+    adminMarketExplorerDetail: 'Market Explorer Detail',
   };
 
   /// Get route name

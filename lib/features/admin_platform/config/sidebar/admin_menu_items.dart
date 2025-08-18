@@ -1,7 +1,9 @@
 // lib/features/admin_platform/config/sidebar/admin_menu_items.dart
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:sidebarx/sidebarx.dart' hide SidebarXItem; // Hide SidebarXItem to avoid conflicts
 import 'package:hugeicons/hugeicons.dart';
+import '../../../../routes/app_routes.dart';
 import '../../../../shared/components/sidebar/app_sidebar.dart';
 
 class AdminMenuItems {
@@ -49,7 +51,7 @@ class AdminMenuItems {
             AppSidebarItem(
               label: 'Market Explorer',
               onTap: () {
-                // Get.toNamed(AppRoutes.adminMarketExplorer);
+                Get.toNamed(AppRoutes.adminMarketExplorer);
               },
             ),
           ],

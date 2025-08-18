@@ -16,6 +16,7 @@ class ApiEndpoints {
   static const String _reports = '/reports';
   static const String _billing = '/billing';
   static const String _settings = '/settings';
+  static const String _marketExplorer = '/market-explorer';
 
   // =============================================================================
   // AUTHENTICATION ENDPOINTS (matching backend)
@@ -162,6 +163,64 @@ class ApiEndpoints {
   static String regenerateApiKey(String tenantId) => '$_tenants/$tenantId/regenerate-api-key';
 
   // =============================================================================
+  // MARKET EXPLORER ENDPOINTS (NEW)
+  // =============================================================================
+
+  /// GET /market-explorer - Get all ECD Centers with filtering
+  static const String getECDCenters = _marketExplorer;
+
+  /// GET /market-explorer/analytics - Get market analytics
+  static const String getMarketAnalytics = '$_marketExplorer/analytics';
+
+  /// GET /market-explorer/export - Export ECD Centers data
+  static const String exportECDCenters = '$_marketExplorer/export';
+
+  /// GET /market-explorer/:id - Get single ECD Center
+  static String getECDCenterById(String centerId) => '$_marketExplorer/$centerId';
+
+  /// PUT /market-explorer/:id - Update ECD Center
+  static String updateECDCenter(String centerId) => '$_marketExplorer/$centerId';
+
+  /// POST /market-explorer/:id/notes - Add note to ECD Center
+  static String addNoteToCenter(String centerId) => '$_marketExplorer/$centerId/notes';
+
+  /// PUT /market-explorer/:id/status - Update lead status
+  static String updateCenterLeadStatus(String centerId) => '$_marketExplorer/$centerId/status';
+
+  /// POST /market-explorer/:id/convert - Convert ECD Center to Tenant
+  static String convertCenterToTenant(String centerId) => '$_marketExplorer/$centerId/convert';
+
+  /// POST /market-explorer/assign - Assign sales rep to ECD Centers
+  static const String assignSalesRep = '$_marketExplorer/assign';
+
+  /// PUT /market-explorer/bulk - Bulk update ECD Centers
+  static const String bulkUpdateCenters = '$_marketExplorer/bulk';
+
+  /// POST /market-explorer/:id/tasks - Add task to ECD Center
+  static String addTaskToCenter(String centerId) => '$_marketExplorer/$centerId/tasks';
+
+  /// PUT /market-explorer/:id/tasks/:taskId - Update task
+  static String updateCenterTask(String centerId, String taskId) => '$_marketExplorer/$centerId/tasks/$taskId';
+
+  /// POST /market-explorer/:id/schedule-demo - Schedule demo for center
+  static String scheduleDemoForCenter(String centerId) => '$_marketExplorer/$centerId/schedule-demo';
+
+  /// GET /market-explorer/territories - Get sales territories
+  static const String getSalesTerritories = '$_marketExplorer/territories';
+
+  /// POST /market-explorer/territories - Create sales territory
+  static const String createSalesTerritory = '$_marketExplorer/territories';
+
+  /// PUT /market-explorer/territories/:id - Update territory
+  static String updateSalesTerritory(String territoryId) => '$_marketExplorer/territories/$territoryId';
+
+  /// GET /market-explorer/opportunities - Get top opportunities
+  static const String getTopOpportunities = '$_marketExplorer/opportunities';
+
+  /// GET /market-explorer/pipeline - Get pipeline funnel data
+  static const String getPipelineFunnel = '$_marketExplorer/pipeline';
+
+  // =============================================================================
   // FUTURE ENDPOINTS (Placeholders for upcoming features)
   // =============================================================================
 
@@ -271,6 +330,17 @@ class ApiEndpoints {
     'getExpiringTrials': getExpiringTrials,
     'getTenantDashboard': getTenantDashboard,
     'getTenantSettings': getTenantSettings,
+
+    // Market Explorer endpoints
+    'getECDCenters': getECDCenters,
+    'getMarketAnalytics': getMarketAnalytics,
+    'exportECDCenters': exportECDCenters,
+    'assignSalesRep': assignSalesRep,
+    'bulkUpdateCenters': bulkUpdateCenters,
+    'getSalesTerritories': getSalesTerritories,
+    'createSalesTerritory': createSalesTerritory,
+    'getTopOpportunities': getTopOpportunities,
+    'getPipelineFunnel': getPipelineFunnel,
 
     // Future endpoints
     'getChildren': getChildren,

@@ -17,6 +17,14 @@ import '../features/admin_platform/home/views/admin_home_view.dart';
 import '../features/parent_platform/home/views/parent_home_view.dart';
 import '../features/tenant_platform/home/views/tenant_home_view.dart';
 
+// Schools Management views
+import '../features/admin_platform/schools_management/market_explorer/views/market_explorer_view.dart';
+import '../features/admin_platform/schools_management/market_explorer/bindings/market_explorer_binding.dart';
+// import '../features/admin_platform/schools_management/active_schools/views/active_schools_view.dart';
+// import '../features/admin_platform/schools_management/active_schools/bindings/active_schools_binding.dart';
+// import '../features/admin_platform/schools_management/sales_pipeline/views/sales_pipeline_view.dart';
+// import '../features/admin_platform/schools_management/sales_pipeline/bindings/sales_pipeline_binding.dart';
+
 class AppPages {
   static final List<GetPage> pages = [
     // Auth routes
@@ -45,7 +53,7 @@ class AppPages {
     GetPage(
       name: AppRoutes.adminHome,
       page: () => const AdminHomeView(),
-      binding: AdminBinding(), // CHANGED FROM AuthBinding TO AdminBinding
+      binding: AdminBinding(),
       middlewares: [
         AuthMiddleware(priority: 1),
         RoleMiddleware(
@@ -79,6 +87,56 @@ class AppPages {
       ],
     ),
 
+    // Schools Management routes (Admin Platform)
+    GetPage(
+      name: AppRoutes.adminActiveSchools,
+      page: () => const ActiveSchoolsPlaceholderView(), // TODO: Replace with actual view
+      binding: AuthBinding(), // TODO: Replace with ActiveSchoolsBinding
+      middlewares: [
+        AuthMiddleware(priority: 1),
+        RoleMiddleware(
+          requiredRoles: ['platform_admin', 'platform_support'],
+          priority: 2,
+        ),
+      ],
+    ),
+    GetPage(
+      name: AppRoutes.adminSalesPipeline,
+      page: () => const SalesPipelinePlaceholderView(), // TODO: Replace with actual view
+      binding: AuthBinding(), // TODO: Replace with SalesPipelineBinding
+      middlewares: [
+        AuthMiddleware(priority: 1),
+        RoleMiddleware(
+          requiredRoles: ['platform_admin', 'platform_support'],
+          priority: 2,
+        ),
+      ],
+    ),
+    GetPage(
+      name: AppRoutes.adminMarketExplorer,
+      page: () => const MarketExplorerPage(),
+      binding: MarketExplorerBinding(),
+      middlewares: [
+        AuthMiddleware(priority: 1),
+        RoleMiddleware(
+          requiredRoles: ['platform_admin', 'platform_support'],
+          priority: 2,
+        ),
+      ],
+    ),
+    GetPage(
+      name: AppRoutes.adminMarketExplorerDetail,
+      page: () => MarketExplorerDetailPlaceholderView(), // TODO: Create detail view
+      binding: MarketExplorerBinding(),
+      middlewares: [
+        AuthMiddleware(priority: 1),
+        RoleMiddleware(
+          requiredRoles: ['platform_admin', 'platform_support'],
+          priority: 2,
+        ),
+      ],
+    ),
+
     // Legacy dashboard route - redirects to appropriate platform
     GetPage(
       name: AppRoutes.dashboard,
@@ -96,6 +154,109 @@ class AppPages {
       binding: AuthBinding(),
     ),
   ];
+}
+
+// Placeholder views for routes that aren't implemented yet
+// TODO: Replace these with actual implementations
+
+class ActiveSchoolsPlaceholderView extends StatelessWidget {
+  const ActiveSchoolsPlaceholderView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Active Schools'),
+      ),
+      body: const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.school, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
+            Text(
+              'Active Schools',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'This feature is coming soon',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class SalesPipelinePlaceholderView extends StatelessWidget {
+  const SalesPipelinePlaceholderView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Sales Pipeline'),
+      ),
+      body: const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.trending_up, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
+            Text(
+              'Sales Pipeline',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'This feature is coming soon',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class MarketExplorerDetailPlaceholderView extends StatelessWidget {
+  const MarketExplorerDetailPlaceholderView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final String centerId = Get.parameters['id'] ?? '';
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Market Explorer Detail'),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.explore, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            const Text(
+              'Market Explorer Detail',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Center ID: $centerId',
+              style: const TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'This feature is coming soon',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // Initial redirect view that checks auth state and redirects appropriately
