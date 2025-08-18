@@ -41,7 +41,7 @@ class _SidebarToggleButtonState extends State<SidebarToggleButton>
     );
     _scaleAnimation = Tween<double>(
       begin: 1.0,
-      end: 1.05,
+      end: 1.03,
     ).animate(CurvedAnimation(
       parent: _hoverController,
       curve: Curves.easeInOut,
@@ -98,19 +98,19 @@ class _SidebarToggleButtonState extends State<SidebarToggleButton>
                       decoration: BoxDecoration(
                         color: _isHovering
                             ? Colors.white
-                            : Colors.white.withOpacity(0.95),
+                            : Colors.white.withOpacity(0.8),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
                           color: _isHovering
-                              ? AppColors.loginButton.withOpacity(0.3)
-                              : const Color(0xFFE0E0E0),
-                          width: 1,
+                              ? AppColors.loginButton.withOpacity(0.4)
+                              : Colors.grey.withOpacity(0.1),
+                          width: _isHovering ? 1.5 : 1,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(_isHovering ? 0.08 : 0.05),
-                            blurRadius: _isHovering ? 6 : 4,
-                            offset: const Offset(0, 2),
+                            color: Colors.black.withOpacity(_isHovering ? 0.1 : 0.01),
+                            blurRadius: _isHovering ? 8 : 1,
+                            offset: Offset(0, _isHovering ? 2 : 0.5),
                           ),
                         ],
                       ),

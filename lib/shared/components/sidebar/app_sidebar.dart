@@ -243,47 +243,14 @@ class _AppSidebarState extends State<AppSidebar> with SingleTickerProviderStateM
                   },
                 ),
 
-                // Toggle Button - positioned to be visible and above content
+                // Toggle Button - Now using the SidebarToggleButton class with the new hover effects
                 if (widget.showToggleButton)
-                  Positioned(
+                  SidebarToggleButton(
+                    controller: _controller,
                     top: 12,
                     right: _isExpanded ? 12 : null,
                     left: _isExpanded ? null : ((widget.collapsedWidth - 40) / 2), // Center horizontally when collapsed
-                    child: MouseRegion(
-                      cursor: SystemMouseCursors.click,
-                      child: Material(
-                        color: Colors.transparent,
-                        elevation: 2, // Ensure button is above other content
-                        borderRadius: BorderRadius.circular(8),
-                        child: InkWell(
-                          onTap: _handleToggle,
-                          borderRadius: BorderRadius.circular(8),
-                          child: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.95),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: const Color(0xFFE0E0E0),
-                                width: 1,
-                              ),
-                            ),
-                            child: Center(
-                              child: AnimatedRotation(
-                                duration: const Duration(milliseconds: 250),
-                                turns: _isExpanded ? 0.0 : 0.5,
-                                child: Icon(
-                                  Icons.chevron_left_rounded,
-                                  size: 24,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+                    onToggle: widget.onToggle,
                   ),
               ],
             ),
