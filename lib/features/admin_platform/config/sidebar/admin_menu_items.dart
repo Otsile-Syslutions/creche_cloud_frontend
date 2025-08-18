@@ -32,24 +32,24 @@ class AdminMenuItems {
             color: selected ? Colors.white : const Color(0xFF6B7280),
             size: 22,
           ),
-          label: 'Tenants',
+          label: 'Schools',
           subItems: [
             AppSidebarItem(
-              label: 'All Tenants',
+              label: 'Active Schools',
               onTap: () {
-                // Get.toNamed(AppRoutes.adminTenants);
+                // Get.toNamed(AppRoutes.adminActiveSchools);
               },
             ),
             AppSidebarItem(
-              label: 'Add Tenant',
+              label: 'Sales Pipeline',
               onTap: () {
-                // Get.toNamed(AppRoutes.adminAddTenant);
+                // Get.toNamed(AppRoutes.adminSalesPipeline);
               },
             ),
             AppSidebarItem(
-              label: 'Inactive Tenants',
+              label: 'Market Explorer',
               onTap: () {
-                // Get.toNamed(AppRoutes.adminInactiveTenants);
+                // Get.toNamed(AppRoutes.adminMarketExplorer);
               },
             ),
           ],
@@ -61,26 +61,10 @@ class AdminMenuItems {
             size: 22,
           ),
           label: 'Users',
-          subItems: [
-            AppSidebarItem(
-              label: 'All Users',
-              onTap: () {
-                // Get.toNamed(AppRoutes.adminUsers);
-              },
-            ),
-            AppSidebarItem(
-              label: 'Platform Admins',
-              onTap: () {
-                // Get.toNamed(AppRoutes.adminPlatformAdmins);
-              },
-            ),
-            AppSidebarItem(
-              label: 'User Roles',
-              onTap: () {
-                // Get.toNamed(AppRoutes.adminUserRoles);
-              },
-            ),
-          ],
+          onTap: () {
+            // Navigate to users
+            // Get.toNamed(AppRoutes.adminUsers);
+          },
         ),
         AppSidebarItem(
           iconBuilder: (selected, hovered) => HugeIcon(
@@ -101,26 +85,10 @@ class AdminMenuItems {
             size: 22,
           ),
           label: 'Billing',
-          subItems: [
-            AppSidebarItem(
-              label: 'Subscriptions',
-              onTap: () {
-                // Get.toNamed(AppRoutes.adminSubscriptions);
-              },
-            ),
-            AppSidebarItem(
-              label: 'Invoices',
-              onTap: () {
-                // Get.toNamed(AppRoutes.adminInvoices);
-              },
-            ),
-            AppSidebarItem(
-              label: 'Payment Methods',
-              onTap: () {
-                // Get.toNamed(AppRoutes.adminPaymentMethods);
-              },
-            ),
-          ],
+          onTap: () {
+            // Navigate to billing
+            // Get.toNamed(AppRoutes.adminBilling);
+          },
         ),
       ]);
     }
@@ -137,26 +105,10 @@ class AdminMenuItems {
             size: 22,
           ),
           label: 'Support',
-          subItems: [
-            AppSidebarItem(
-              label: 'Open Tickets',
-              onTap: () {
-                // Get.toNamed(AppRoutes.adminOpenTickets);
-              },
-            ),
-            AppSidebarItem(
-              label: 'Resolved Tickets',
-              onTap: () {
-                // Get.toNamed(AppRoutes.adminResolvedTickets);
-              },
-            ),
-            AppSidebarItem(
-              label: 'Knowledge Base',
-              onTap: () {
-                // Get.toNamed(AppRoutes.adminKnowledgeBase);
-              },
-            ),
-          ],
+          onTap: () {
+            // Navigate to support
+            // Get.toNamed(AppRoutes.adminSupport);
+          },
         ),
         AppSidebarItem(
           iconBuilder: (selected, hovered) => HugeIcon(
@@ -182,32 +134,10 @@ class AdminMenuItems {
           size: 22,
         ),
         label: 'Settings',
-        subItems: [
-          AppSidebarItem(
-            label: 'Platform Settings',
-            onTap: () {
-              // Get.toNamed(AppRoutes.adminPlatformSettings);
-            },
-          ),
-          AppSidebarItem(
-            label: 'Security',
-            onTap: () {
-              // Get.toNamed(AppRoutes.adminSecurity);
-            },
-          ),
-          AppSidebarItem(
-            label: 'API Configuration',
-            onTap: () {
-              // Get.toNamed(AppRoutes.adminApiConfig);
-            },
-          ),
-          AppSidebarItem(
-            label: 'Logs',
-            onTap: () {
-              // Get.toNamed(AppRoutes.adminLogs);
-            },
-          ),
-        ],
+        onTap: () {
+          // Navigate to settings
+          // Get.toNamed(AppRoutes.adminSettings);
+        },
       ),
     );
 

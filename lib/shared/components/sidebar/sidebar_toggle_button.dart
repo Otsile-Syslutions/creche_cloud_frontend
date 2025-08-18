@@ -55,7 +55,7 @@ class _SidebarToggleButtonState extends State<SidebarToggleButton>
   }
 
   void _handleToggle() {
-    widget.controller.toggleSidebar();
+    // Call the onToggle callback which handles both controller and animation updates
     widget.onToggle?.call();
   }
 
@@ -63,7 +63,7 @@ class _SidebarToggleButtonState extends State<SidebarToggleButton>
   Widget build(BuildContext context) {
     return Positioned(
       top: widget.top ?? 12,
-      right: widget.right ?? 12,
+      right: widget.right,
       left: widget.left,
       bottom: widget.bottom,
       child: MouseRegion(

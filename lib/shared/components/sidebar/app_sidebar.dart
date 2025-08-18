@@ -62,6 +62,7 @@ class _AppSidebarState extends State<AppSidebar> with SingleTickerProviderStateM
   late bool _isExpanded;
   late AnimationController _animationController;
   late Animation<double> _widthAnimation;
+  bool _isInitialized = false;
 
   @override
   void initState() {
@@ -79,19 +80,6 @@ class _AppSidebarState extends State<AppSidebar> with SingleTickerProviderStateM
       vsync: this,
     );
 
-    _widthAnimation = Tween<double>(
-      begin: widget.collapsedWidth,
-      end: widget.expandedWidth,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    ));
-
-    // Set initial animation state
-    if (_isExpanded) {
-      _animationController.value = 1.0;
-    }
-
     // Initialize controller with try-catch for safety
     try {
       _controller = Get.put(
@@ -102,14 +90,17 @@ class _AppSidebarState extends State<AppSidebar> with SingleTickerProviderStateM
       // Store the controller tag in the controller itself
       _controller.controllerTag = _controllerTag;
 
-      // Set initial values
+      // Set initial values - Dashboard is selected by default (index 0)
       _controller.isExpanded.value = _isExpanded;
-      _controller.selectedIndex.value = widget.selectedIndex ?? 0;
+      _controller.selectedIndex.value = widget.selectedIndex ?? 0; // Default to Dashboard
       _controller.sidebarWidth.value = widget.expandedWidth;
       _controller.collapsedWidth.value = widget.collapsedWidth;
 
       // Initialize focus nodes for keyboard navigation
       _controller.initializeFocusNodes(widget.items.length);
+
+      // Setup animations after controller is initialized
+      _setupAnimations();
 
       // Listen to controller changes
       _controller.isExpanded.listen((value) {
@@ -124,11 +115,30 @@ class _AppSidebarState extends State<AppSidebar> with SingleTickerProviderStateM
           }
         }
       });
+
+      _isInitialized = true;
     } catch (e) {
       AppLogger.e('Error initializing AppSidebar controller', e);
       // Initialize with a fallback controller if needed
       _controller = AppSidebarController();
       _controller.controllerTag = _controllerTag;
+    }
+  }
+
+  void _setupAnimations() {
+    _widthAnimation = Tween<double>(
+      begin: widget.collapsedWidth,
+      end: widget.expandedWidth,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
+
+    // Set initial animation state based on expansion
+    if (_isExpanded) {
+      _animationController.value = 1.0;
+    } else {
+      _animationController.value = 0.0;
     }
   }
 
@@ -194,6 +204,8 @@ class _AppSidebarState extends State<AppSidebar> with SingleTickerProviderStateM
   }
 
   void _handleToggle() {
+    if (!_isInitialized) return;
+
     setState(() {
       _isExpanded = !_isExpanded;
     });
@@ -203,6 +215,8 @@ class _AppSidebarState extends State<AppSidebar> with SingleTickerProviderStateM
       _animationController.forward();
     } else {
       _animationController.reverse();
+      // Clear expanded menu items when collapsing
+      _controller.expandedMenuItems.clear();
     }
 
     widget.onToggle?.call();
@@ -210,6 +224,14 @@ class _AppSidebarState extends State<AppSidebar> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
+    // Wait for initialization before building
+    if (!_isInitialized) {
+      return Container(
+        width: widget.expandedWidth,
+        color: AppColors.surface,
+      );
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
         // Update responsive width based on screen size
@@ -270,7 +292,9 @@ class _AppSidebarState extends State<AppSidebar> with SingleTickerProviderStateM
                     top: 12,
                     right: _isExpanded ? 12 : null,
                     left: _isExpanded ? null : ((widget.collapsedWidth - 40) / 2), // Center horizontally when collapsed
-                    onToggle: widget.onToggle,
+                    onToggle: () {
+                      _handleToggle();
+                    },
                   ),
               ],
             ),
@@ -470,7 +494,7 @@ class _ResponsiveAppSidebarState extends State<ResponsiveAppSidebar> {
           items: widget.items,
           header: widget.header,
           footer: widget.footer,
-          selectedIndex: widget.selectedIndex,
+          selectedIndex: widget.selectedIndex ?? 0, // Default to Dashboard
           startExpanded: effectiveExpanded,
           expandedWidth: screenWidth < 1400 ? 220 : 250,
           collapsedWidth: 85,

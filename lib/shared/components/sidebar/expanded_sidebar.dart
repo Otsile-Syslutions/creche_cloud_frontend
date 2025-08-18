@@ -305,7 +305,7 @@ class ExpandedSidebar extends StatelessWidget {
                       ),
                   const SizedBox(width: 10),
                   // Label
-                  Flexible(
+                  Expanded(
                     child: AnimatedBuilder(
                       animation: controller.fadeAnimation,
                       builder: (context, child) {
@@ -326,21 +326,21 @@ class ExpandedSidebar extends StatelessWidget {
                       },
                     ),
                   ),
-                  // Chevron for items with subitems
-                  if (hasSubItems) ...[
-                    const SizedBox(width: 8),
-                    AnimatedRotation(
-                      duration: const Duration(milliseconds: 200),
-                      turns: isExpanded ? 0.25 : 0,
-                      child: Icon(
-                        Icons.chevron_right,
-                        size: 18,
-                        color: isSelected
-                            ? Colors.white.withOpacity(0.8)
-                            : AppColors.textSecondary.withOpacity(0.6),
+                  // Chevron for items with subitems - positioned to the far right
+                  if (hasSubItems)
+                    Container(
+                      width: 24,  // Fixed width to align all chevrons
+                      alignment: Alignment.centerRight,
+                      child: AnimatedRotation(
+                        duration: const Duration(milliseconds: 200),
+                        turns: isExpanded ? 0.25 : 0,
+                        child: Icon(
+                          Icons.chevron_right,
+                          size: 18,
+                          color: AppColors.textSecondary.withOpacity(0.6), // Static color for all states
+                        ),
                       ),
                     ),
-                  ],
                 ],
               ),
             ),
