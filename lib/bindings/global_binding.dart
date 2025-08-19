@@ -4,6 +4,8 @@ import 'package:get/get.dart';
 import '../core/services/storage_service.dart';
 import '../core/services/api_service.dart';
 import '../features/auth/controllers/auth_controller.dart';
+import '../features/auth/bindings/login_binding.dart';
+import '../features/auth/views/login/controllers/login_form_controller.dart';
 import '../utils/app_logger.dart';
 
 /// Global bindings that should be initialized at app startup
@@ -30,6 +32,10 @@ class GlobalBindings extends Bindings {
         permanent: true
     );
 
+    // Initialize login dependencies
+    // This ensures LoginFormController is available when needed
+    LoginBinding().dependencies();
+
     AppLogger.i('Global bindings initialized successfully');
   }
 }
@@ -41,6 +47,16 @@ class DependencyManager {
     if (!Get.isRegistered<AuthController>()) {
       AppLogger.w('AuthController not found, recreating...');
       Get.put<AuthController>(AuthController(), permanent: true);
+    }
+  }
+
+  /// Ensure LoginFormController is available
+  static void ensureLoginController() {
+    // Since LoginFormController uses lazyPut with fenix: true,
+    // we just need to reinitialize the binding if needed
+    if (!Get.isRegistered<LoginFormController>()) {
+      AppLogger.w('LoginFormController not found, recreating...');
+      LoginBinding().dependencies();
     }
   }
 
@@ -57,6 +73,7 @@ class DependencyManager {
     }
 
     ensureAuthController();
+    ensureLoginController();  // Add this to ensure login controller
   }
 
   /// Check if all critical dependencies are available
@@ -64,6 +81,9 @@ class DependencyManager {
     final hasStorage = Get.isRegistered<StorageService>();
     final hasApi = Get.isRegistered<ApiService>();
     final hasAuth = Get.isRegistered<AuthController>();
+
+    // Note: LoginFormController might not always be registered due to lazyPut
+    // That's okay - it will be created when first accessed
 
     if (!hasStorage || !hasApi || !hasAuth) {
       AppLogger.w('Missing dependencies - Storage: $hasStorage, API: $hasApi, Auth: $hasAuth');
@@ -112,6 +132,15 @@ class DependencyManager {
       }
     } catch (e) {
       AppLogger.e('Error clearing StorageService', e);
+    }
+
+    // Clear LoginFormController if it exists
+    try {
+      if (Get.isRegistered<LoginFormController>()) {
+        await Get.delete<LoginFormController>(force: true);
+      }
+    } catch (e) {
+      AppLogger.e('Error clearing LoginFormController', e);
     }
 
     AppLogger.w('Dependencies cleared');
