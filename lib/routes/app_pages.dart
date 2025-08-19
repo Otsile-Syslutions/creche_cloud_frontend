@@ -1,12 +1,14 @@
 // lib/routes/app_pages.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'dart:async';
 import '../bindings/global_bindings.dart';
 import '../features/admin_platform/home/bindings/admin_home_binding.dart';
 import '../features/auth/bindings/auth_binding.dart';
 import '../features/auth/controllers/auth_controller.dart';
 import '../middlewares/auth_middleware.dart';
 import 'app_routes.dart';
+import '../utils/app_logger.dart';
 
 // Auth views
 import '../features/auth/views/login/login_view.dart';
@@ -477,12 +479,42 @@ class NotificationsPlaceholderView extends StatelessWidget {
 }
 
 // =============================================================================
-// REDIRECT VIEWS
+// REDIRECT VIEWS - UPDATED WITH TIMEOUT HANDLING
 // =============================================================================
 
 // Initial redirect view that checks auth state and redirects appropriately
-class InitialRedirectView extends StatelessWidget {
+class InitialRedirectView extends StatefulWidget {
   const InitialRedirectView({super.key});
+
+  @override
+  State<InitialRedirectView> createState() => _InitialRedirectViewState();
+}
+
+class _InitialRedirectViewState extends State<InitialRedirectView> {
+  Timer? _timeoutTimer;
+  bool _hasTimedOut = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Set a maximum wait time of 10 seconds
+    _timeoutTimer = Timer(const Duration(seconds: 10), () {
+      if (mounted) {
+        setState(() {
+          _hasTimedOut = true;
+        });
+        AppLogger.w('InitialRedirectView: Authentication check timed out, redirecting to login');
+        Get.offAllNamed(AppRoutes.login);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timeoutTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -490,46 +522,97 @@ class InitialRedirectView extends StatelessWidget {
     DependencyManager.ensureAuthController();
 
     return GetBuilder<AuthController>(
-      init: Get.find<AuthController>(), // Use Get.find since we ensured it exists
+      init: Get.find<AuthController>(),
       builder: (authController) {
-        // Wait for auth initialization
-        if (!authController.isInitialized.value) {
-          return const Scaffold(
+        // If we've timed out, show a message
+        if (_hasTimedOut) {
+          return Scaffold(
             body: Center(
-              child: CircularProgressIndicator(),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.warning, size: 64, color: Colors.orange),
+                  const SizedBox(height: 16),
+                  const Text('Taking longer than expected...'),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => Get.offAllNamed(AppRoutes.login),
+                    child: const Text('Continue to Login'),
+                  ),
+                ],
+              ),
             ),
           );
         }
 
+        // Wait for auth initialization with loading screen
+        if (!authController.isInitialized.value) {
+          return Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  const Text('Checking authentication...'),
+                  const SizedBox(height: 8),
+                  Text(
+                    'This should only take a moment',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.grey,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // Cancel timeout timer since we're ready
+        _timeoutTimer?.cancel();
+
         // Check if user is authenticated
         if (authController.isAuthenticated.value && authController.currentUser.value != null) {
           final user = authController.currentUser.value!;
-          final homeRoute = AppRoutes.getHomeRouteForRoles(user.roleNames);
 
-          // Schedule navigation for next frame to avoid navigation during build
+          // Redirect based on user role
           WidgetsBinding.instance.addPostFrameCallback((_) {
+            final homeRoute = AppRoutes.getHomeRouteForRoles(user.roleNames);
             Get.offAllNamed(homeRoute);
           });
+
+          // Show loading while redirecting
+          return const Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Welcome back! Redirecting...'),
+                ],
+              ),
+            ),
+          );
         } else {
-          // No user, redirect to login
+          // User not authenticated, redirect to login
           WidgetsBinding.instance.addPostFrameCallback((_) {
             Get.offAllNamed(AppRoutes.login);
           });
-        }
 
-        // Show loading while redirecting
-        return const Scaffold(
-          body: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 16),
-                Text('Loading Creche Cloud...'),
-              ],
+          return const Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Redirecting to login...'),
+                ],
+              ),
             ),
-          ),
-        );
+          );
+        }
       },
     );
   }

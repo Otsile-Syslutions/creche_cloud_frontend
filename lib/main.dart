@@ -1,4 +1,4 @@
-// lib/main.dart - Update your main.dart file with these changes
+// lib/main.dart
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -37,8 +37,9 @@ class MyApp extends StatelessWidget {
       // Don't use initial binding since we already initialized in main()
       // initialBinding: GlobalBindings(), // Remove this
 
-      // Routes
-      initialRoute: AppRoutes.initial,
+      // OPTION 2: Direct to Login with Background Auth Check
+      // This provides instant login screen with background authentication
+      initialRoute: AppRoutes.login, // Changed from AppRoutes.initial
       getPages: AppPages.pages,
 
       // Unknown route fallback
@@ -96,7 +97,7 @@ class NotFoundView extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () => Get.offAllNamed(AppRoutes.initial),
+              onPressed: () => Get.offAllNamed(AppRoutes.login), // Changed from AppRoutes.initial
               child: const Text('Go Home'),
             ),
           ],

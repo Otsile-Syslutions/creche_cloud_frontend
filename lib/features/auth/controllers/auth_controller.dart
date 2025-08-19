@@ -1,4 +1,6 @@
 // lib/features/auth/controllers/auth_controller.dart
+// FIXED: Removed ApiService readiness dependency + Added missing method
+
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
@@ -27,6 +29,10 @@ class AuthController extends GetxController {
   final RxBool isAuthenticated = false.obs;
   final RxString errorMessage = ''.obs;
   final RxBool isInitialized = false.obs;
+
+  // Background authentication state
+  final RxBool isBackgroundAuthInProgress = false.obs;
+  final RxBool backgroundAuthCompleted = false.obs;
 
   // Background reinitialization state
   final RxBool isBackgroundReinitializing = false.obs;
@@ -82,55 +88,122 @@ class AuthController extends GetxController {
   }
 
   // =============================================================================
-  // INITIALIZATION - UPDATED FOR FRESH_DIO
+  // OPTION 2: BACKGROUND AUTHENTICATION INITIALIZATION - FIXED
   // =============================================================================
 
   Future<void> _initializeAuth() async {
     try {
-      AppLogger.i('Initializing authentication...');
+      AppLogger.i('Starting background authentication...');
 
+      // IMMEDIATE: Mark as initialized so UI shows instantly (no spinner!)
+      isInitialized.value = true;
+
+      // Load basic stored data synchronously
+      await _loadStoredData();
+
+      // BACKGROUND: Check authentication without blocking UI (with delay)
+      _checkAuthenticationInBackground();
+
+      AppLogger.i('Authentication initialization complete - UI ready immediately');
+    } catch (e) {
+      AppLogger.e('Auth initialization failed', e);
+      isInitialized.value = true; // Always let UI show
+    }
+  }
+
+  /// Load stored data immediately (fast operation)
+  Future<void> _loadStoredData() async {
+    try {
       // Load stored tenant ID
       final storedTenantId = await _storageService.getString('current_tenant_id');
       if (storedTenantId != null && storedTenantId.isNotEmpty) {
         currentTenantId.value = storedTenantId;
       }
 
-      // Check if user is already authenticated using fresh_dio
-      final isAuth = await _apiService.isAuthenticatedAsync();
+      // Load remembered credentials for login form
+      await loadRememberedCredentials();
 
-      if (isAuth) {
-        try {
-          // Token is already loaded by ApiService, just get current user
-          await getCurrentUser();
+      AppLogger.d('Stored data loaded successfully');
+    } catch (e) {
+      AppLogger.w('Failed to load stored data', e);
+    }
+  }
 
-          // Load current tenant if user is authenticated
-          if (isAuthenticated.value && currentUser.value?.tenantId != null) {
-            await getCurrentTenant();
-          }
+  /// Check authentication in background without blocking UI
+  void _checkAuthenticationInBackground() {
+    // Add a small delay to ensure UI renders first
+    Future.delayed(const Duration(milliseconds: 1000), () {
+      isBackgroundAuthInProgress.value = true;
 
-          // Start session management
-          _startSessionManagement();
+      _performBackgroundAuthCheck().then((success) {
+        backgroundAuthCompleted.value = true;
+        isBackgroundAuthInProgress.value = false;
 
-          AppLogger.i('User session restored successfully');
-        } catch (e) {
-          AppLogger.w('Failed to restore session', e);
-          await clearSession();
+        if (success) {
+          AppLogger.i('Background authentication successful - user was already logged in');
+        } else {
+          AppLogger.d('Background authentication: User not authenticated (staying on login screen)');
         }
+      }).catchError((e) {
+        AppLogger.w('Background auth check failed', e);
+        isBackgroundAuthInProgress.value = false;
+        backgroundAuthCompleted.value = true;
+        // User stays on login screen - perfect fallback
+      });
+    });
+  }
+
+  /// Perform the actual auth check in background - SIMPLIFIED
+  Future<bool> _performBackgroundAuthCheck() async {
+    try {
+      // Add a reasonable timeout
+      final isAuth = await _apiService.isAuthenticatedAsync()
+          .timeout(const Duration(seconds: 10));
+
+      if (!isAuth) {
+        AppLogger.d('No valid authentication found');
+        return false;
       }
 
-      isInitialized.value = true;
-      AppLogger.i('Authentication initialization complete');
+      // Try to get user data
+      await getCurrentUser().timeout(const Duration(seconds: 10));
+
+      if (!isAuthenticated.value || currentUser.value == null) {
+        AppLogger.w('Failed to load user data');
+        return false;
+      }
+
+      // Load tenant if needed
+      if (currentUser.value?.tenantId != null) {
+        await getCurrentTenant().timeout(const Duration(seconds: 5));
+      }
+
+      // Start session management
+      _startSessionManagement();
+
+      // AUTO-REDIRECT: User was logged in, redirect to dashboard
+      final user = currentUser.value!;
+      final homeRoute = AppRoutes.getHomeRouteForRoles(user.roleNames);
+
+      AppLogger.i('Background auth successful - redirecting to $homeRoute');
+
+      // Small delay to ensure login screen has rendered
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      Get.offAllNamed(homeRoute);
+      return true;
+
     } catch (e) {
-      AppLogger.e('Auth initialization failed', e);
-      isInitialized.value = true;
+      AppLogger.w('Background auth check failed', e);
+      return false;
     }
   }
 
   // =============================================================================
-  // AUTHENTICATION METHODS - UPDATED FOR FRESH_DIO
+  // AUTHENTICATION METHODS - SIMPLIFIED (NO API SERVICE READINESS CHECK)
   // =============================================================================
 
-  /// Login user - SIMPLIFIED WITH FRESH_DIO
+  /// Login user - SIMPLIFIED without ApiService readiness check
   Future<void> login() async {
     final formController = loginFormController;
     if (formController == null || !formController.validateForm()) {
@@ -147,12 +220,12 @@ class AuthController extends GetxController {
 
       AppLogger.i('Attempting login for user: $email');
 
-      // Call API service - tokens are handled automatically by fresh_dio
+      // Call API service directly - let it handle its own initialization
       final response = await _apiService.login(
         email: email,
         password: password,
         rememberMe: formController.rememberMe.value,
-      );
+      ).timeout(const Duration(seconds: 30)); // Add timeout
 
       AppLogger.d('Login API response: success=${response.success}, message=${response.message}');
 
@@ -309,7 +382,7 @@ class AuthController extends GetxController {
         password: formController.signUpPasswordController.text,
         role: 'parent', // Default role for self-registration
         tenantId: currentTenantId.value.isNotEmpty ? currentTenantId.value : null,
-      );
+      ).timeout(const Duration(seconds: 30));
 
       if (response.success) {
         AppLogger.i('Registration successful');
@@ -937,7 +1010,7 @@ class AuthController extends GetxController {
         !isBackgroundReinitializing.value;
   }
 
-  /// Force complete background reinitialization (called from splash screen)
+  /// ADDED: Force complete background reinitialization (called from splash screen)
   Future<void> ensureLoginReady() async {
     if (backgroundReinitComplete.value) {
       return; // Already ready
@@ -963,7 +1036,7 @@ class AuthController extends GetxController {
   // SESSION AND USER MANAGEMENT
   // =============================================================================
 
-  /// Clear all session data - UPDATED FOR FRESH_DIO
+  /// Clear all session data - UPDATED FOR FRESH_DIO with timeout
   Future<void> clearSession() async {
     try {
       // Cancel timers
@@ -974,8 +1047,12 @@ class AuthController extends GetxController {
       await _storageService.remove('user_data');
       await _storageService.remove('tenant_data');
 
-      // Clear tokens via API service (fresh_dio handles this)
-      await _apiService.clearTokens();
+      // Clear tokens via API service (fresh_dio handles this) with timeout
+      try {
+        await _apiService.clearTokens().timeout(const Duration(seconds: 3));
+      } catch (e) {
+        AppLogger.w('Failed to clear tokens from API service', e);
+      }
 
       // Reset state
       currentUser.value = null;
@@ -983,6 +1060,10 @@ class AuthController extends GetxController {
       isAuthenticated.value = false;
       sessionExpired.value = false;
       errorMessage.value = '';
+
+      // Reset background auth state
+      isBackgroundAuthInProgress.value = false;
+      backgroundAuthCompleted.value = false;
 
       AppLogger.i('Session cleared successfully');
     } catch (e) {
@@ -1062,7 +1143,7 @@ class AuthController extends GetxController {
 
       final response = await _apiService.forgotPassword(
         email: resetEmailController.text.trim(),
-      );
+      ).timeout(const Duration(seconds: 30));
 
       if (response.success) {
         _showSuccessSnackbar(
@@ -1099,7 +1180,7 @@ class AuthController extends GetxController {
       final response = await _apiService.resetPassword(
         token: token,
         password: newPasswordController.text,
-      );
+      ).timeout(const Duration(seconds: 30));
 
       if (response.success) {
         _showSuccessSnackbar(
@@ -1129,7 +1210,8 @@ class AuthController extends GetxController {
     try {
       isLoading.value = true;
 
-      final response = await _apiService.resendVerification(email: email);
+      final response = await _apiService.resendVerification(email: email)
+          .timeout(const Duration(seconds: 30));
 
       if (response.success) {
         _showSuccessSnackbar(

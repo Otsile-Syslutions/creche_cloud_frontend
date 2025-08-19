@@ -7,15 +7,13 @@ import 'package:fresh_dio/fresh_dio.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:get/get.dart' as getx;
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../config/env.dart';
 import '../config/api_endpoints.dart';
 import 'storage_service.dart';
 import '../../utils/app_logger.dart';
 
-// =============================================================================
-// API RESPONSE MODELS
-// =============================================================================
-
+// [Keep all the existing response models and exceptions as they are]
 class ApiResponse<T> {
   final bool success;
   final String? message;
@@ -34,7 +32,6 @@ class ApiResponse<T> {
   factory ApiResponse.fromResponse(Response response) {
     final data = response.data;
 
-    // Debug logging for response structure
     try {
       AppLogger.d('=== API RESPONSE DEBUG ===');
       AppLogger.d('Response status: ${response.statusCode}');
@@ -138,10 +135,7 @@ class ApiException implements Exception {
   }
 }
 
-// =============================================================================
-// TOKEN STORAGE IMPLEMENTATION FOR FRESH_DIO
-// =============================================================================
-
+// Token Storage Implementation
 class SecureTokenStorage extends TokenStorage<OAuth2Token> {
   final StorageService _storage;
   OAuth2Token? _cachedToken;
@@ -158,9 +152,7 @@ class SecureTokenStorage extends TokenStorage<OAuth2Token> {
 
   @override
   Future<OAuth2Token?> read() async {
-    // Return cached token if available
     if (_cachedToken != null) {
-      // Validate cached token is not expired
       try {
         if (!JwtDecoder.isExpired(_cachedToken!.accessToken)) {
           return _cachedToken;
@@ -172,7 +164,6 @@ class SecureTokenStorage extends TokenStorage<OAuth2Token> {
       }
     }
 
-    // Try to load from storage
     final accessToken = await _storage.getString('access_token');
     final refreshToken = await _storage.getString('refresh_token');
 
@@ -182,7 +173,6 @@ class SecureTokenStorage extends TokenStorage<OAuth2Token> {
         refreshToken: refreshToken,
       );
 
-      // Log token status
       try {
         final isExpired = JwtDecoder.isExpired(accessToken);
         if (isExpired) {
@@ -209,7 +199,6 @@ class SecureTokenStorage extends TokenStorage<OAuth2Token> {
       await _storage.setString('refresh_token', token.refreshToken!);
     }
 
-    // Log token info
     try {
       final expDate = JwtDecoder.getExpirationDate(token.accessToken);
       AppLogger.d('Token stored, expires: $expDate');
@@ -218,61 +207,110 @@ class SecureTokenStorage extends TokenStorage<OAuth2Token> {
     }
   }
 
-  // Helper method to check if token exists
   Future<bool> hasToken() async {
     final token = await read();
     return token != null;
   }
 
-  // Helper to get access token directly
   Future<String?> getAccessToken() async {
     final token = await read();
     return token?.accessToken;
   }
 
-  // Get cached token synchronously
   OAuth2Token? getCachedToken() => _cachedToken;
 }
 
 // =============================================================================
-// API SERVICE WITH FRESH_DIO JWT HANDLING
+// API SERVICE WITH EARLY INITIALIZATION
 // =============================================================================
 
 class ApiService extends getx.GetxService {
   static ApiService get to => getx.Get.find();
 
-  late Dio _dio;
-  late Dio _tokenDio; // Separate Dio instance for token refresh
-  late CookieJar _cookieJar;
-  late Fresh<OAuth2Token> _fresh;
-  late SecureTokenStorage _tokenStorage;
+  // Make these nullable and check before use
+  Dio? _dio;
+  Dio? _tokenDio;
+  CookieJar? _cookieJar;
+  Fresh<OAuth2Token>? _fresh;
+  SecureTokenStorage? _tokenStorage;
+
+  // Add initialization flag
+  bool _isInitialized = false;
+  final _initCompleter = <Function>[];
 
   @override
   Future<void> onInit() async {
     super.onInit();
-    await _initializeCookieJar();
-    await _initializeDio();
+    // Initialize immediately when service is created
+    await _initialize();
+  }
+
+  /// Initialize the service (can be called multiple times safely)
+  Future<void> _initialize() async {
+    if (_isInitialized) {
+      AppLogger.d('ApiService already initialized');
+      return;
+    }
+
+    try {
+      AppLogger.d('Initializing ApiService...');
+      AppLogger.d('Platform: ${kIsWeb ? "Web" : "Native"}');
+
+      await _initializeCookieJar();
+      await _initializeDio();
+      _isInitialized = true;
+
+      // Call any pending operations
+      for (var completer in _initCompleter) {
+        completer();
+      }
+      _initCompleter.clear();
+
+      AppLogger.d('ApiService initialization complete');
+    } catch (e) {
+      AppLogger.e('Failed to initialize ApiService', e);
+      rethrow;
+    }
+  }
+
+  /// Ensure the service is initialized before use
+  Future<void> ensureInitialized() async {
+    if (_isInitialized) return;
+
+    // Wait for initialization if it's in progress
+    if (_dio == null || _tokenDio == null) {
+      AppLogger.d('Waiting for ApiService initialization...');
+      await _initialize();
+    }
   }
 
   @override
   void onClose() {
-    _dio.close();
-    _tokenDio.close();
+    _dio?.close();
+    _tokenDio?.close();
     super.onClose();
   }
 
   /// Initialize cookie jar for persistent cookies
   Future<void> _initializeCookieJar() async {
     try {
-      final Directory appDocDir = await getApplicationDocumentsDirectory();
-      final String cookiePath = '${appDocDir.path}/.cookies/';
+      if (kIsWeb) {
+        // On web, browsers handle cookies automatically
+        AppLogger.d('Running on web - browser handles cookies automatically');
+        // Use a memory-only cookie jar for web to avoid issues
+        _cookieJar = CookieJar();
+      } else {
+        // On mobile/desktop, use persistent cookie storage
+        final Directory appDocDir = await getApplicationDocumentsDirectory();
+        final String cookiePath = '${appDocDir.path}/.cookies/';
 
-      _cookieJar = PersistCookieJar(
-        ignoreExpires: false,
-        storage: FileStorage(cookiePath),
-      );
+        _cookieJar = PersistCookieJar(
+          ignoreExpires: false,
+          storage: FileStorage(cookiePath),
+        );
 
-      AppLogger.d('Cookie jar initialized at: $cookiePath');
+        AppLogger.d('Cookie jar initialized at: $cookiePath');
+      }
     } catch (e) {
       AppLogger.w('Failed to initialize persistent cookie jar, using default', e);
       _cookieJar = CookieJar();
@@ -284,7 +322,7 @@ class ApiService extends getx.GetxService {
     // Initialize token storage
     _tokenStorage = SecureTokenStorage(StorageService.to);
 
-    // Create a separate Dio instance for token refresh (to avoid circular dependencies)
+    // Create a separate Dio instance for token refresh
     _tokenDio = Dio(BaseOptions(
       baseUrl: Env.apiBaseUrl,
       connectTimeout: Env.connectTimeout,
@@ -295,18 +333,19 @@ class ApiService extends getx.GetxService {
       },
     ));
 
-    // Add cookie manager to token dio
-    _tokenDio.interceptors.add(CookieManager(_cookieJar));
+    // Add cookie manager to token dio (only for non-web platforms)
+    if (!kIsWeb && _cookieJar != null) {
+      _tokenDio!.interceptors.add(CookieManager(_cookieJar!));
+    }
 
     // Initialize Fresh with OAuth2
     _fresh = Fresh.oAuth2(
-      tokenStorage: _tokenStorage,
+      tokenStorage: _tokenStorage!,
       refreshToken: (token, client) async {
         try {
           AppLogger.d('Attempting token refresh...');
 
-          // Use the separate tokenDio for refresh to avoid interceptor loops
-          final response = await _tokenDio.post(
+          final response = await _tokenDio!.post(
             ApiEndpoints.refreshToken,
             data: token?.refreshToken != null
                 ? {'refreshToken': token!.refreshToken}
@@ -318,15 +357,12 @@ class ApiService extends getx.GetxService {
             String? newAccessToken;
             String? newRefreshToken;
 
-            // Extract tokens from response - handle multiple possible structures
             if (data is Map<String, dynamic>) {
-              // Check if tokens are in a 'data' field
               if (data.containsKey('data') && data['data'] is Map<String, dynamic>) {
                 final innerData = data['data'] as Map<String, dynamic>;
                 newAccessToken = innerData['access_token'] ?? innerData['accessToken'];
                 newRefreshToken = innerData['refresh_token'] ?? innerData['refreshToken'];
               } else {
-                // Tokens at root level
                 newAccessToken = data['access_token'] ?? data['accessToken'];
                 newRefreshToken = data['refresh_token'] ?? data['refreshToken'];
               }
@@ -349,7 +385,6 @@ class ApiService extends getx.GetxService {
         }
       },
       shouldRefresh: (response) {
-        // Refresh on 401, but not for auth endpoints
         if (response?.statusCode == 401) {
           final path = response!.requestOptions.path;
           final shouldRefresh = !path.contains('/auth/login') &&
@@ -381,13 +416,16 @@ class ApiService extends getx.GetxService {
       validateStatus: (status) => status! < 500,
     ));
 
-    // Add interceptors in correct order
-    _dio.interceptors.add(CookieManager(_cookieJar)); // Cookie manager first
-    _dio.interceptors.add(_fresh); // Fresh JWT handling second
+    // Add interceptors
+    // Only add cookie manager for non-web platforms
+    if (!kIsWeb && _cookieJar != null) {
+      _dio!.interceptors.add(CookieManager(_cookieJar!));
+    }
+    _dio!.interceptors.add(_fresh!);
 
     // Add logging interceptor in development
     if (Env.enableHttpLogging && Env.isDevelopment) {
-      _dio.interceptors.add(LogInterceptor(
+      _dio!.interceptors.add(LogInterceptor(
         requestBody: true,
         responseBody: true,
         requestHeader: true,
@@ -397,8 +435,8 @@ class ApiService extends getx.GetxService {
       ));
     }
 
-    // Add custom interceptor for additional logging
-    _dio.interceptors.add(InterceptorsWrapper(
+    // Add custom interceptor
+    _dio!.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) {
         AppLogger.d('Request: ${options.method} ${options.path}');
         handler.next(options);
@@ -416,14 +454,14 @@ class ApiService extends getx.GetxService {
     AppLogger.d('Dio initialized with Fresh JWT handling');
 
     // Load any existing token
-    final existingToken = await _tokenStorage.read();
+    final existingToken = await _tokenStorage!.read();
     if (existingToken != null) {
       AppLogger.d('Found existing token in storage');
     }
   }
 
   // =============================================================================
-  // AUTHENTICATION METHODS
+  // AUTHENTICATION METHODS WITH INITIALIZATION CHECK
   // =============================================================================
 
   /// Login user
@@ -433,6 +471,13 @@ class ApiService extends getx.GetxService {
     bool rememberMe = false,
     String? tenantId,
   }) async {
+    // Ensure service is initialized
+    await ensureInitialized();
+
+    if (_dio == null) {
+      throw Exception('ApiService not properly initialized');
+    }
+
     final data = {
       'email': email,
       'password': password,
@@ -446,8 +491,7 @@ class ApiService extends getx.GetxService {
     AppLogger.d('Attempting login for: $email');
 
     try {
-      // Don't use Fresh for login endpoint
-      final response = await _dio.post(
+      final response = await _dio!.post(
         ApiEndpoints.login,
         data: data,
         options: Options(
@@ -465,35 +509,27 @@ class ApiService extends getx.GetxService {
 
         AppLogger.d('Login response keys: ${responseData.keys}');
 
-        // Extract tokens from response
         if (responseData is Map<String, dynamic>) {
-          // Check multiple possible response structures
-
-          // Structure 1: Tokens in 'data' field
           if (responseData.containsKey('data') && responseData['data'] is Map<String, dynamic>) {
             final innerData = responseData['data'] as Map<String, dynamic>;
             AppLogger.d('Found data field with keys: ${innerData.keys}');
 
             accessToken = innerData['access_token']?.toString() ?? innerData['accessToken']?.toString();
             refreshToken = innerData['refresh_token']?.toString() ?? innerData['refreshToken']?.toString();
-          }
-          // Structure 2: Tokens at root level
-          else {
+          } else {
             accessToken = responseData['access_token']?.toString() ?? responseData['accessToken']?.toString();
             refreshToken = responseData['refresh_token']?.toString() ?? responseData['refreshToken']?.toString();
           }
         }
 
         if (accessToken != null && accessToken.isNotEmpty) {
-          // Store tokens using Fresh
-          await _fresh.setToken(OAuth2Token(
+          await _fresh!.setToken(OAuth2Token(
             accessToken: accessToken,
             refreshToken: refreshToken,
           ));
 
           AppLogger.d('✅ Login successful, tokens stored');
 
-          // Validate and log token info
           try {
             final decodedToken = JwtDecoder.decode(accessToken);
             final expDate = JwtDecoder.getExpirationDate(accessToken);
@@ -503,10 +539,12 @@ class ApiService extends getx.GetxService {
             AppLogger.w('Could not decode JWT', e);
           }
 
-          // Log cookies received
-          final cookies = await getCookies(Env.apiBaseUrl);
-          if (cookies.isNotEmpty) {
-            AppLogger.d('Cookies received: ${cookies.map((c) => c.name).toList()}');
+          // Log cookies only on non-web platforms
+          if (!kIsWeb) {
+            final cookies = await getCookies(Env.apiBaseUrl);
+            if (cookies.isNotEmpty) {
+              AppLogger.d('Cookies received: ${cookies.map((c) => c.name).toList()}');
+            }
           }
         } else {
           AppLogger.e('❌ No access token found in login response!');
@@ -535,6 +573,8 @@ class ApiService extends getx.GetxService {
     String? role,
     String? tenantId,
   }) async {
+    await ensureInitialized();
+
     final data = {
       'firstName': firstName,
       'lastName': lastName,
@@ -553,9 +593,10 @@ class ApiService extends getx.GetxService {
 
   /// Refresh access token manually
   Future<ApiResponse<Map<String, dynamic>>> refreshTokenRequest() async {
+    await ensureInitialized();
+
     try {
-      // Get current token
-      final currentToken = await _tokenStorage.read();
+      final currentToken = await _tokenStorage!.read();
 
       if (currentToken?.refreshToken == null) {
         throw ApiException(
@@ -564,8 +605,7 @@ class ApiService extends getx.GetxService {
         );
       }
 
-      // Make refresh request directly
-      final response = await _tokenDio.post(
+      final response = await _tokenDio!.post(
         ApiEndpoints.refreshToken,
         data: {'refreshToken': currentToken!.refreshToken},
       );
@@ -575,7 +615,6 @@ class ApiService extends getx.GetxService {
         String? newAccessToken;
         String? newRefreshToken;
 
-        // Extract tokens from response
         if (data is Map<String, dynamic>) {
           if (data.containsKey('data') && data['data'] is Map<String, dynamic>) {
             final innerData = data['data'] as Map<String, dynamic>;
@@ -588,8 +627,7 @@ class ApiService extends getx.GetxService {
         }
 
         if (newAccessToken != null) {
-          // Store new tokens
-          await _fresh.setToken(OAuth2Token(
+          await _fresh!.setToken(OAuth2Token(
             accessToken: newAccessToken,
             refreshToken: newRefreshToken ?? currentToken.refreshToken,
           ));
@@ -622,17 +660,17 @@ class ApiService extends getx.GetxService {
 
   /// Logout user
   Future<ApiResponse<Map<String, dynamic>>> logout() async {
+    await ensureInitialized();
+
     try {
       final response = await post<Map<String, dynamic>>(
         ApiEndpoints.logout,
       );
 
-      // Clear tokens and cookies
       await clearTokens();
 
       return response;
     } catch (e) {
-      // Clear tokens even if logout fails
       await clearTokens();
 
       return ApiResponse(
@@ -646,16 +684,19 @@ class ApiService extends getx.GetxService {
 
   /// Get current user profile
   Future<ApiResponse<Map<String, dynamic>>> getCurrentUser() async {
+    await ensureInitialized();
     return await get<Map<String, dynamic>>(ApiEndpoints.getMe);
   }
 
   /// Get current tenant
   Future<ApiResponse<Map<String, dynamic>>> getCurrentTenant() async {
+    await ensureInitialized();
     return await get<Map<String, dynamic>>(ApiEndpoints.getCurrentTenant);
   }
 
   /// Debug user data and roles
   Future<ApiResponse<Map<String, dynamic>>> debugUser() async {
+    await ensureInitialized();
     return await get<Map<String, dynamic>>(ApiEndpoints.debugUser);
   }
 
@@ -663,6 +704,7 @@ class ApiService extends getx.GetxService {
   Future<ApiResponse<Map<String, dynamic>>> forgotPassword({
     required String email,
   }) async {
+    await ensureInitialized();
     return await post<Map<String, dynamic>>(
       ApiEndpoints.forgotPassword,
       data: {'email': email},
@@ -674,6 +716,7 @@ class ApiService extends getx.GetxService {
     required String token,
     required String password,
   }) async {
+    await ensureInitialized();
     return await post<Map<String, dynamic>>(
       ApiEndpoints.resetPassword(token),
       data: {'password': password},
@@ -684,6 +727,7 @@ class ApiService extends getx.GetxService {
   Future<ApiResponse<Map<String, dynamic>>> verifyEmail({
     required String token,
   }) async {
+    await ensureInitialized();
     return await get<Map<String, dynamic>>(
       ApiEndpoints.verifyEmail(token),
     );
@@ -693,6 +737,7 @@ class ApiService extends getx.GetxService {
   Future<ApiResponse<Map<String, dynamic>>> resendVerification({
     required String email,
   }) async {
+    await ensureInitialized();
     return await post<Map<String, dynamic>>(
       ApiEndpoints.resendVerification,
       data: {'email': email},
@@ -701,6 +746,7 @@ class ApiService extends getx.GetxService {
 
   /// Check API health
   Future<bool> checkHealth() async {
+    await ensureInitialized();
     try {
       final response = await get<Map<String, dynamic>>('/health');
       return response.success;
@@ -710,7 +756,7 @@ class ApiService extends getx.GetxService {
   }
 
   // =============================================================================
-  // HTTP METHODS
+  // HTTP METHODS WITH INITIALIZATION CHECK
   // =============================================================================
 
   /// Generic GET request
@@ -720,8 +766,14 @@ class ApiService extends getx.GetxService {
         Map<String, dynamic>? headers,
         CancelToken? cancelToken,
       }) async {
+    await ensureInitialized();
+
+    if (_dio == null) {
+      throw Exception('ApiService not properly initialized');
+    }
+
     try {
-      final response = await _dio.get(
+      final response = await _dio!.get(
         endpoint,
         queryParameters: queryParameters,
         options: Options(headers: headers),
@@ -742,8 +794,14 @@ class ApiService extends getx.GetxService {
         Map<String, dynamic>? headers,
         CancelToken? cancelToken,
       }) async {
+    await ensureInitialized();
+
+    if (_dio == null) {
+      throw Exception('ApiService not properly initialized');
+    }
+
     try {
-      final response = await _dio.post(
+      final response = await _dio!.post(
         endpoint,
         data: data,
         queryParameters: queryParameters,
@@ -765,8 +823,14 @@ class ApiService extends getx.GetxService {
         Map<String, dynamic>? headers,
         CancelToken? cancelToken,
       }) async {
+    await ensureInitialized();
+
+    if (_dio == null) {
+      throw Exception('ApiService not properly initialized');
+    }
+
     try {
-      final response = await _dio.put(
+      final response = await _dio!.put(
         endpoint,
         data: data,
         queryParameters: queryParameters,
@@ -788,8 +852,14 @@ class ApiService extends getx.GetxService {
         Map<String, dynamic>? headers,
         CancelToken? cancelToken,
       }) async {
+    await ensureInitialized();
+
+    if (_dio == null) {
+      throw Exception('ApiService not properly initialized');
+    }
+
     try {
-      final response = await _dio.delete(
+      final response = await _dio!.delete(
         endpoint,
         data: data,
         queryParameters: queryParameters,
@@ -811,8 +881,14 @@ class ApiService extends getx.GetxService {
         Map<String, dynamic>? headers,
         CancelToken? cancelToken,
       }) async {
+    await ensureInitialized();
+
+    if (_dio == null) {
+      throw Exception('ApiService not properly initialized');
+    }
+
     try {
-      final response = await _dio.patch(
+      final response = await _dio!.patch(
         endpoint,
         data: data,
         queryParameters: queryParameters,
@@ -827,6 +903,7 @@ class ApiService extends getx.GetxService {
   }
 
   /// File upload with progress
+  /// Note: On web, File handling is different. Consider using MultipartFile.fromBytes for web
   Future<ApiResponse<T>> uploadFile<T>(
       String endpoint,
       File file, {
@@ -835,14 +912,27 @@ class ApiService extends getx.GetxService {
         ProgressCallback? onSendProgress,
         CancelToken? cancelToken,
       }) async {
+    await ensureInitialized();
+
+    if (_dio == null) {
+      throw Exception('ApiService not properly initialized');
+    }
+
     try {
       final fileName = file.path.split('/').last;
+
+      // Create multipart file
+      // Note: On web, you might need to use MultipartFile.fromBytes instead
+      final multipartFile = kIsWeb
+          ? throw Exception('File upload on web requires different implementation')
+          : await MultipartFile.fromFile(file.path, filename: fileName);
+
       final formData = FormData.fromMap({
-        fieldName: await MultipartFile.fromFile(file.path, filename: fileName),
+        fieldName: multipartFile,
         ...?additionalData,
       });
 
-      final response = await _dio.post(
+      final response = await _dio!.post(
         endpoint,
         data: formData,
         onSendProgress: onSendProgress,
@@ -855,11 +945,9 @@ class ApiService extends getx.GetxService {
     }
   }
 
-  // =============================================================================
-  // USER MANAGEMENT METHODS
-  // =============================================================================
+  // [Keep all the remaining methods as they are, just add ensureInitialized() at the start of each]
 
-  /// Get users in tenant
+  // USER MANAGEMENT METHODS
   Future<ApiResponse<Map<String, dynamic>>> getUsers({
     int page = 1,
     int limit = 10,
@@ -867,6 +955,8 @@ class ApiService extends getx.GetxService {
     String? status,
     String? search,
   }) async {
+    await ensureInitialized();
+
     final queryParams = <String, dynamic>{
       'page': page,
       'limit': limit,
@@ -882,7 +972,6 @@ class ApiService extends getx.GetxService {
     );
   }
 
-  /// Create new user
   Future<ApiResponse<Map<String, dynamic>>> createUser({
     required String firstName,
     required String lastName,
@@ -892,6 +981,8 @@ class ApiService extends getx.GetxService {
     String? phoneNumber,
     Map<String, dynamic>? address,
   }) async {
+    await ensureInitialized();
+
     final Map<String, dynamic> data = {
       'firstName': firstName,
       'lastName': lastName,
@@ -909,35 +1000,33 @@ class ApiService extends getx.GetxService {
     );
   }
 
-  /// Update user
   Future<ApiResponse<Map<String, dynamic>>> updateUser(
       String userId,
       Map<String, dynamic> updateData,
       ) async {
+    await ensureInitialized();
     return await put<Map<String, dynamic>>(
       ApiEndpoints.updateUser(userId),
       data: updateData,
     );
   }
 
-  /// Delete user
   Future<ApiResponse<Map<String, dynamic>>> deleteUser(String userId) async {
+    await ensureInitialized();
     return await delete<Map<String, dynamic>>(
       ApiEndpoints.deleteUser(userId),
     );
   }
 
-  // =============================================================================
   // TENANT MANAGEMENT METHODS
-  // =============================================================================
-
-  /// Get tenants (platform admin only)
   Future<ApiResponse<Map<String, dynamic>>> getTenants({
     int page = 1,
     int limit = 10,
     String? status,
     String? search,
   }) async {
+    await ensureInitialized();
+
     final queryParams = <String, dynamic>{
       'page': page,
       'limit': limit,
@@ -952,7 +1041,6 @@ class ApiService extends getx.GetxService {
     );
   }
 
-  /// Create new tenant
   Future<ApiResponse<Map<String, dynamic>>> createTenant({
     required String name,
     required String slug,
@@ -960,6 +1048,8 @@ class ApiService extends getx.GetxService {
     String? description,
     Map<String, dynamic>? settings,
   }) async {
+    await ensureInitialized();
+
     final Map<String, dynamic> data = {
       'name': name,
       'slug': slug,
@@ -975,51 +1065,59 @@ class ApiService extends getx.GetxService {
     );
   }
 
-  /// Update tenant
   Future<ApiResponse<Map<String, dynamic>>> updateTenant(
       String tenantId,
       Map<String, dynamic> updateData,
       ) async {
+    await ensureInitialized();
     return await put<Map<String, dynamic>>(
       ApiEndpoints.updateTenant(tenantId),
       data: updateData,
     );
   }
 
-  /// Delete tenant
   Future<ApiResponse<Map<String, dynamic>>> deleteTenant(String tenantId) async {
+    await ensureInitialized();
     return await delete<Map<String, dynamic>>(
       ApiEndpoints.deleteTenant(tenantId),
     );
   }
 
-  // =============================================================================
   // TOKEN & SESSION MANAGEMENT
-  // =============================================================================
-
-  /// Clear all tokens and cookies
   Future<void> clearTokens() async {
-    await _fresh.clearToken();
-    await _tokenStorage.delete();
+    if (_fresh != null) {
+      await _fresh!.clearToken();
+    }
+    if (_tokenStorage != null) {
+      await _tokenStorage!.delete();
+    }
     await clearCookies();
     AppLogger.d('Tokens and cookies cleared');
   }
 
-  /// Clear all cookies
   Future<void> clearCookies() async {
     try {
-      await _cookieJar.deleteAll();
-      AppLogger.d('All cookies cleared');
+      if (!kIsWeb && _cookieJar != null) {
+        await _cookieJar!.deleteAll();
+        AppLogger.d('All cookies cleared');
+      } else if (kIsWeb) {
+        AppLogger.d('Running on web - cookies handled by browser');
+      }
     } catch (e) {
       AppLogger.e('Error clearing cookies', e);
     }
   }
 
-  /// Get cookies for a specific URI
   Future<List<Cookie>> getCookies(String url) async {
     try {
+      if (kIsWeb) {
+        // On web, we can't directly access cookies this way
+        AppLogger.d('Running on web - cookies managed by browser');
+        return [];
+      }
+      if (_cookieJar == null) return [];
       final uri = Uri.parse(url);
-      final cookies = await _cookieJar.loadForRequest(uri);
+      final cookies = await _cookieJar!.loadForRequest(uri);
       return cookies;
     } catch (e) {
       AppLogger.e('Error getting cookies', e);
@@ -1027,32 +1125,34 @@ class ApiService extends getx.GetxService {
     }
   }
 
-  /// Set access token manually (for backward compatibility)
   Future<void> setAccessToken(String token) async {
-    await _fresh.setToken(OAuth2Token(
-      accessToken: token,
-      refreshToken: null,
-    ));
-    AppLogger.d('Access token set manually');
+    await ensureInitialized();
+    if (_fresh != null) {
+      await _fresh!.setToken(OAuth2Token(
+        accessToken: token,
+        refreshToken: null,
+      ));
+      AppLogger.d('Access token set manually');
+    }
   }
 
-  /// Set refresh token manually (for backward compatibility)
   Future<void> setRefreshToken(String token) async {
-    final currentToken = await _tokenStorage.read();
-    await _fresh.setToken(OAuth2Token(
-      accessToken: currentToken?.accessToken ?? '',
-      refreshToken: token,
-    ));
-    AppLogger.d('Refresh token set manually');
+    await ensureInitialized();
+    if (_tokenStorage != null) {
+      final currentToken = await _tokenStorage!.read();
+      if (_fresh != null) {
+        await _fresh!.setToken(OAuth2Token(
+          accessToken: currentToken?.accessToken ?? '',
+          refreshToken: token,
+        ));
+        AppLogger.d('Refresh token set manually');
+      }
+    }
   }
 
-  // =============================================================================
   // UTILITY METHODS & GETTERS
-  // =============================================================================
-
-  /// Check if user is authenticated (synchronous but may be stale)
   bool get isAuthenticated {
-    final cachedToken = _tokenStorage.getCachedToken();
+    final cachedToken = _tokenStorage?.getCachedToken();
     if (cachedToken == null) return false;
 
     try {
@@ -1062,31 +1162,61 @@ class ApiService extends getx.GetxService {
     }
   }
 
-  /// Check if user is authenticated (async, always accurate)
   Future<bool> isAuthenticatedAsync() async {
-    final token = await _tokenStorage.read();
-    if (token == null) return false;
-
     try {
-      return !JwtDecoder.isExpired(token.accessToken);
+      await ensureInitialized();
+
+      if (_tokenStorage == null) return false;
+
+      final token = await _tokenStorage!.read().timeout(const Duration(seconds: 3));
+
+      if (token == null) {
+        AppLogger.d('No token found in storage');
+        return false;
+      }
+
+      try {
+        final isExpired = JwtDecoder.isExpired(token.accessToken);
+        if (!isExpired) {
+          AppLogger.d('Access token is valid');
+          return true;
+        }
+        AppLogger.d('Access token is expired');
+      } catch (e) {
+        AppLogger.w('Failed to decode access token', e);
+        return false;
+      }
+
+      if (token.refreshToken != null) {
+        try {
+          final refreshExpired = JwtDecoder.isExpired(token.refreshToken!);
+          if (!refreshExpired) {
+            AppLogger.d('Refresh token is valid, user is authenticated');
+            return true;
+          }
+          AppLogger.d('Refresh token is also expired');
+        } catch (e) {
+          AppLogger.w('Failed to decode refresh token', e);
+        }
+      }
+
+      return false;
     } catch (e) {
+      AppLogger.e('Error checking authentication status', e);
       return false;
     }
   }
 
-  /// Get current access token (synchronous, may be stale)
   String? get accessToken {
-    return _tokenStorage.getCachedToken()?.accessToken;
+    return _tokenStorage?.getCachedToken()?.accessToken;
   }
 
-  /// Get current refresh token (synchronous, may be stale)
   String? get refreshTokenValue {
-    return _tokenStorage.getCachedToken()?.refreshToken;
+    return _tokenStorage?.getCachedToken()?.refreshToken;
   }
 
-  /// Get headers for authenticated requests
   Map<String, String> get authHeaders {
-    final token = _tokenStorage.getCachedToken()?.accessToken;
+    final token = _tokenStorage?.getCachedToken()?.accessToken;
     return {
       if (token != null) 'Authorization': 'Bearer $token',
       'Content-Type': 'application/json',
@@ -1094,44 +1224,42 @@ class ApiService extends getx.GetxService {
     };
   }
 
-  /// Get API base URL
-  String get baseUrl => _dio.options.baseUrl;
+  String get baseUrl => _dio?.options.baseUrl ?? Env.apiBaseUrl;
 
-  // =============================================================================
   // DEBUG METHODS
-  // =============================================================================
-
-  /// Debug current API state
   Future<void> debugApiState() async {
     AppLogger.d('=== API SERVICE STATE DEBUG ===');
+    AppLogger.d('Platform: ${kIsWeb ? "Web" : "Native"}');
+    AppLogger.d('Is initialized: $_isInitialized');
     AppLogger.d('Base URL: $baseUrl');
 
-    final token = await _tokenStorage.read();
-    AppLogger.d('Has access token: ${token?.accessToken != null}');
+    if (_tokenStorage != null) {
+      final token = await _tokenStorage!.read();
+      AppLogger.d('Has access token: ${token?.accessToken != null}');
 
-    if (token?.accessToken != null) {
-      AppLogger.d('Access token length: ${token!.accessToken.length}');
-      AppLogger.d('Access token preview: ${token.accessToken.substring(0, token.accessToken.length.clamp(0, 30))}...');
+      if (token?.accessToken != null) {
+        AppLogger.d('Access token length: ${token!.accessToken.length}');
+        AppLogger.d('Access token preview: ${token.accessToken.substring(0, token.accessToken.length.clamp(0, 30))}...');
 
-      try {
-        final isExpired = JwtDecoder.isExpired(token.accessToken);
-        final expDate = JwtDecoder.getExpirationDate(token.accessToken);
-        final remainingTime = expDate.difference(DateTime.now());
+        try {
+          final isExpired = JwtDecoder.isExpired(token.accessToken);
+          final expDate = JwtDecoder.getExpirationDate(token.accessToken);
+          final remainingTime = expDate.difference(DateTime.now());
 
-        AppLogger.d('Token expired: $isExpired');
-        AppLogger.d('Token expires: $expDate');
-        AppLogger.d('Time remaining: ${remainingTime.inMinutes} minutes');
+          AppLogger.d('Token expired: $isExpired');
+          AppLogger.d('Token expires: $expDate');
+          AppLogger.d('Time remaining: ${remainingTime.inMinutes} minutes');
 
-        final decoded = JwtDecoder.decode(token.accessToken);
-        AppLogger.d('Token claims: ${decoded.keys}');
-      } catch (e) {
-        AppLogger.w('Could not decode JWT', e);
+          final decoded = JwtDecoder.decode(token.accessToken);
+          AppLogger.d('Token claims: ${decoded.keys}');
+        } catch (e) {
+          AppLogger.w('Could not decode JWT', e);
+        }
       }
+
+      AppLogger.d('Has refresh token: ${token?.refreshToken != null}');
     }
 
-    AppLogger.d('Has refresh token: ${token?.refreshToken != null}');
-
-    // Check stored tokens
     try {
       final storedAccess = await StorageService.to.getString('access_token');
       final storedRefresh = await StorageService.to.getString('refresh_token');
@@ -1141,19 +1269,21 @@ class ApiService extends getx.GetxService {
       AppLogger.e('Error checking stored tokens: $e');
     }
 
-    // Check cookies
     await debugCookieStatus();
 
     AppLogger.d('================================');
   }
 
-  /// Debug cookie status
   Future<void> debugCookieStatus() async {
     try {
       AppLogger.d('=== COOKIE DEBUG INFO ===');
 
-      final cookies = await getCookies(Env.apiBaseUrl);
-      AppLogger.d('Cookies for ${Env.apiBaseUrl}: ${cookies.map((c) => '${c.name}=${c.value.substring(0, c.value.length.clamp(0, 20))}...').toList()}');
+      if (kIsWeb) {
+        AppLogger.d('Running on web - cookies managed by browser');
+      } else if (_cookieJar != null) {
+        final cookies = await getCookies(Env.apiBaseUrl);
+        AppLogger.d('Cookies for ${Env.apiBaseUrl}: ${cookies.map((c) => '${c.name}=${c.value.substring(0, c.value.length.clamp(0, 20))}...').toList()}');
+      }
 
       AppLogger.d('========================');
     } catch (e) {
@@ -1161,16 +1291,13 @@ class ApiService extends getx.GetxService {
     }
   }
 
-  /// Test API authentication
   Future<void> testAuthentication() async {
     AppLogger.d('=== AUTHENTICATION TEST ===');
 
-    // Check if authenticated
     final isAuth = await isAuthenticatedAsync();
     AppLogger.d('Is authenticated: $isAuth');
 
     if (isAuth) {
-      // Try to make a test request
       try {
         AppLogger.d('Making test request to /api/auth/me...');
         final response = await get<Map<String, dynamic>>('/auth/me');
