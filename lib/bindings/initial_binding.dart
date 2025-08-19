@@ -1,5 +1,5 @@
 // lib/bindings/initial_binding.dart
-import 'global_binding.dart';
+import 'global_bindings.dart';
 
 
 /// Initial binding that extends GlobalBindings

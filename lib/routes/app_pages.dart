@@ -1,7 +1,7 @@
 // lib/routes/app_pages.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../bindings/global_binding.dart';
+import '../bindings/global_bindings.dart';
 import '../features/admin_platform/home/bindings/admin_home_binding.dart';
 import '../features/auth/bindings/auth_binding.dart';
 import '../features/auth/controllers/auth_controller.dart';

@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'bindings/global_binding.dart';
+import 'bindings/global_bindings.dart';
 import 'routes/app_pages.dart';
 import 'routes/app_routes.dart';
 import 'utils/app_logger.dart';
@@ -13,8 +13,14 @@ void main() async {
   // Initialize app logger
   AppLogger.i('Starting Creche Cloud application...');
 
-  // Initialize global bindings
-  GlobalBindings().dependencies();
+  // CRITICAL: Initialize services BEFORE running the app
+  try {
+    await GlobalBindings.initializeAsync();
+    AppLogger.i('✅ All services initialized successfully');
+  } catch (e) {
+    AppLogger.e('❌ Failed to initialize services', e);
+    // You might want to show an error screen here
+  }
 
   runApp(const MyApp());
 }
@@ -28,8 +34,8 @@ class MyApp extends StatelessWidget {
       title: 'Creche Cloud',
       debugShowCheckedModeBanner: false,
 
-      // Use GlobalBindings as initial binding
-      initialBinding: GlobalBindings(),
+      // Don't use initial binding since we already initialized in main()
+      // initialBinding: GlobalBindings(), // Remove this
 
       // Routes
       initialRoute: AppRoutes.initial,
@@ -52,7 +58,10 @@ class MyApp extends StatelessWidget {
         // Ensure dependencies are always available
         if (!DependencyManager.checkDependencies()) {
           AppLogger.w('Dependencies missing, ensuring they exist...');
-          DependencyManager.ensureCoreServices();
+          // Use Future.microtask to avoid blocking the UI
+          Future.microtask(() async {
+            await DependencyManager.ensureCoreServices();
+          });
         }
 
         return widget ?? const SizedBox.shrink();

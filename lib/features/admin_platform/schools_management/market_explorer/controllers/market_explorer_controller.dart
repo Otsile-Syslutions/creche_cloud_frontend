@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../../../core/services/api_service.dart';
 import '../../../../../core/services/storage_service.dart';
 import '../../../../../utils/app_logger.dart';
-import '../models/zaecdcenters_model.dart'; // MarketAnalytics is now imported from here
+import '../models/zaecdcenters_model.dart';
 import '../../../../auth/controllers/auth_controller.dart';
 import '../../../../../routes/app_routes.dart';
 
@@ -73,10 +73,12 @@ class MarketExplorerController extends GetxController {
   @override
   void onReady() {
     super.onReady();
-    // Load data after view is ready
-    if (!isInitialized.value) {
-      _loadInitialData();
-    }
+    // Small delay to ensure everything is ready
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (!isInitialized.value) {
+        _loadInitialData();
+      }
+    });
   }
 
   Future<void> _loadInitialData() async {
@@ -86,30 +88,34 @@ class MarketExplorerController extends GetxController {
       AppLogger.d('Loading initial Market Explorer data...');
       isInitialized.value = true;
 
-      // CRITICAL FIX: Ensure authentication is properly set before making API calls
+      // Ensure authentication is set up
       await _ensureAuthentication();
-
-      // Small delay to ensure view is ready
-      await Future.delayed(const Duration(milliseconds: 300));
 
       // Load data
       await fetchCenters();
 
-      // Load analytics in background (don't await)
-      fetchAnalytics();
+      // Load analytics in background (don't await, and ignore errors)
+      fetchAnalytics().catchError((e) {
+        AppLogger.w('Analytics fetch failed (non-critical): $e');
+        // Don't show error to user as analytics is not critical
+      });
 
     } catch (e) {
       AppLogger.e('Error loading initial data', e);
-      errorMessage.value = 'Failed to load data. Please try refreshing.';
 
-      // If authentication failed, don't mark as initialized
+      // Only show error if it's not authentication related (already handled)
+      if (!e.toString().contains('Authentication')) {
+        errorMessage.value = 'Failed to load data. Please try refreshing.';
+      }
+
+      // Mark as not initialized so we can retry
       if (e.toString().contains('Authentication')) {
         isInitialized.value = false;
       }
     }
   }
 
-  /// CRITICAL FIX: Ensure authentication token is properly set in ApiService
+  /// Ensure authentication token is properly set in ApiService
   Future<void> _ensureAuthentication() async {
     try {
       // Skip if already verified in this session
@@ -118,28 +124,34 @@ class MarketExplorerController extends GetxController {
         return;
       }
 
-      // Check if AuthController is available
+      // Ensure AuthController exists
       if (_authController == null) {
-        AppLogger.w('AuthController not available, initializing...');
+        AppLogger.d('AuthController not found, creating...');
         if (!Get.isRegistered<AuthController>()) {
           Get.put(AuthController());
         }
       }
 
+      // Wait a bit for AuthController to initialize
+      await Future.delayed(const Duration(milliseconds: 100));
+
       // Check if user is authenticated
-      if (_authController?.isAuthenticated.value != true) {
-        AppLogger.w('User not authenticated, redirecting to login');
-        Get.offAllNamed(AppRoutes.login);
-        throw Exception('Authentication required');
-      }
+      final isAuthenticated = _authController?.isAuthenticated.value ?? false;
 
-      // Ensure the token is loaded in the API service
-      final storedToken = await _storageService.getString('access_token');
+      if (!isAuthenticated) {
+        AppLogger.w('User not authenticated, checking for stored token...');
 
-      if (storedToken == null || storedToken.isEmpty) {
-        AppLogger.w('No access token found in storage');
+        // Check for stored token
+        final storedToken = await _storageService.getString('access_token');
 
-        // Try to refresh token if refresh token exists
+        if (storedToken != null && storedToken.isNotEmpty) {
+          AppLogger.d('Found stored token, setting in API service');
+          await _apiService.setAccessToken(storedToken);
+          isAuthVerified.value = true;
+          return;
+        }
+
+        // Try to refresh token
         final refreshToken = await _storageService.getString('refresh_token');
         if (refreshToken != null && refreshToken.isNotEmpty) {
           AppLogger.d('Attempting to refresh access token...');
@@ -147,39 +159,43 @@ class MarketExplorerController extends GetxController {
           try {
             final response = await _apiService.refreshTokenRequest();
             if (response.success && response.data != null) {
-              // Token refreshed successfully, it should be stored automatically
               AppLogger.d('Token refreshed successfully');
               isAuthVerified.value = true;
-            } else {
-              throw Exception('Token refresh failed');
+              return;
             }
           } catch (e) {
             AppLogger.e('Failed to refresh token', e);
-            _authController?.sessionExpired.value = true;
-            await _authController?.clearSession();
-            Get.offAllNamed(AppRoutes.login);
-            throw Exception('Session expired');
           }
-        } else {
-          // No refresh token either, redirect to login
-          AppLogger.w('No refresh token available, redirecting to login');
-          await _authController?.clearSession();
-          Get.offAllNamed(AppRoutes.login);
-          throw Exception('No valid session');
         }
-      } else {
-        // Ensure the token is set in the API service
+
+        // If we get here, authentication failed
+        AppLogger.w('No valid authentication found, redirecting to login');
+        await _authController?.clearSession();
+        Get.offAllNamed(AppRoutes.login);
+        throw Exception('Authentication required');
+      }
+
+      // Ensure the token is loaded in the API service
+      final storedToken = await _storageService.getString('access_token');
+
+      if (storedToken != null && storedToken.isNotEmpty) {
         if (_apiService.accessToken != storedToken) {
           AppLogger.d('Setting access token in API service');
           await _apiService.setAccessToken(storedToken);
         }
         isAuthVerified.value = true;
-      }
-
-      // Verify the token is valid by checking user data
-      if (_authController?.currentUser.value == null) {
-        AppLogger.d('Loading current user data...');
-        await _authController?.getCurrentUser();
+      } else {
+        AppLogger.w('No access token found despite being authenticated');
+        // Try to get token from AuthController
+        final authToken = _authController?.accessToken;
+        if (authToken != null && authToken.isNotEmpty) {
+          AppLogger.d('Using token from AuthController');
+          await _apiService.setAccessToken(authToken);
+          await _storageService.setString('access_token', authToken);
+          isAuthVerified.value = true;
+        } else {
+          throw Exception('No valid access token available');
+        }
       }
 
       AppLogger.d('Authentication verified successfully');
@@ -188,11 +204,7 @@ class MarketExplorerController extends GetxController {
       AppLogger.e('Authentication verification failed', e);
       errorMessage.value = 'Authentication error. Please log in again.';
       isAuthVerified.value = false;
-
-      // Clear session and redirect to login
-      await _authController?.clearSession();
-      Get.offAllNamed(AppRoutes.login);
-      throw e;
+      rethrow;
     }
   }
 
@@ -233,13 +245,6 @@ class MarketExplorerController extends GetxController {
   Future<void> fetchCenters({bool loadMore = false}) async {
     // Prevent multiple simultaneous loads
     if (isLoading.value || isLoadingMore.value) return;
-
-    // Ensure authentication before making API calls
-    if (_authController?.isAuthenticated.value != true) {
-      AppLogger.w('User not authenticated, cannot fetch centers');
-      errorMessage.value = 'Please log in to view Market Explorer data';
-      return;
-    }
 
     if (loadMore) {
       isLoadingMore.value = true;
@@ -365,11 +370,14 @@ class MarketExplorerController extends GetxController {
     }
   }
 
-  // Fetch analytics
+  // Fetch analytics - with better error handling
   Future<void> fetchAnalytics() async {
     try {
-      // Ensure authentication before making API call
-      await _ensureAuthentication();
+      // Don't ensure authentication if it's already failing
+      if (!isAuthVerified.value) {
+        AppLogger.w('Skipping analytics fetch - not authenticated');
+        return;
+      }
 
       AppLogger.d('Fetching market analytics...');
 
@@ -387,8 +395,8 @@ class MarketExplorerController extends GetxController {
         AppLogger.w('Failed to fetch analytics: ${response.message}');
       }
     } catch (e) {
-      AppLogger.e('Error fetching analytics', e);
       // Don't show error for analytics, it's not critical
+      AppLogger.w('Error fetching analytics (non-critical): $e');
     }
   }
 
@@ -404,7 +412,7 @@ class MarketExplorerController extends GetxController {
 
       if (response.success && response.data != null) {
         final data = response.data!['data'] ?? response.data!;
-        return ZAECDCenters.fromJson(data['center']);
+        return ZAECDCenters.fromJson(data['center'] ?? data);
       }
     } catch (e) {
       AppLogger.e('Error fetching center details', e);
@@ -434,7 +442,7 @@ class MarketExplorerController extends GetxController {
         final index = centers.indexWhere((c) => c.id == centerId);
         if (index != -1 && response.data != null) {
           final data = response.data!['data'] ?? response.data!;
-          centers[index] = ZAECDCenters.fromJson(data['center']);
+          centers[index] = ZAECDCenters.fromJson(data['center'] ?? data);
         }
 
         Get.snackbar(
@@ -485,7 +493,7 @@ class MarketExplorerController extends GetxController {
         final index = centers.indexWhere((c) => c.id == centerId);
         if (index != -1 && response.data != null) {
           final data = response.data!['data'] ?? response.data!;
-          centers[index] = ZAECDCenters.fromJson(data['center']);
+          centers[index] = ZAECDCenters.fromJson(data['center'] ?? data);
         }
 
         Get.snackbar(
@@ -539,7 +547,7 @@ class MarketExplorerController extends GetxController {
         final index = centers.indexWhere((c) => c.id == centerId);
         if (index != -1 && response.data != null) {
           final responseData = response.data!['data'] ?? response.data!;
-          centers[index] = ZAECDCenters.fromJson(responseData['center']);
+          centers[index] = ZAECDCenters.fromJson(responseData['center'] ?? responseData);
         }
 
         Get.snackbar(
@@ -716,13 +724,12 @@ class MarketExplorerController extends GetxController {
   // Manual refresh
   Future<void> refreshData() async {
     errorMessage.value = '';
-    isAuthVerified.value = false; // Force re-verification
     await fetchCenters();
-    fetchAnalytics(); // Don't await
+    // Try to fetch analytics but don't await
+    fetchAnalytics().catchError((e) {
+      AppLogger.w('Analytics refresh failed (non-critical): $e');
+    });
   }
-
-  // Helper methods continue as in original...
-  // (All the existing helper methods remain the same)
 
   Map<String, dynamic> _buildQueryParams() {
     final params = <String, dynamic>{
@@ -792,11 +799,13 @@ class MarketExplorerController extends GetxController {
     centersWithEmail.value = stats['withEmail'] ?? 0;
   }
 
-  // All existing UI helper methods remain the same...
+  // UI helper methods
   void toggleView(String view) {
     selectedView.value = view;
     if (view == 'analytics' && analytics.value == null) {
-      fetchAnalytics();
+      fetchAnalytics().catchError((e) {
+        AppLogger.w('Analytics fetch failed: $e');
+      });
     }
   }
 

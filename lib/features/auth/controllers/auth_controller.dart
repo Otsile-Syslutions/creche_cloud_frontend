@@ -82,7 +82,7 @@ class AuthController extends GetxController {
   }
 
   // =============================================================================
-  // INITIALIZATION
+  // INITIALIZATION - UPDATED FOR FRESH_DIO
   // =============================================================================
 
   Future<void> _initializeAuth() async {
@@ -95,14 +95,12 @@ class AuthController extends GetxController {
         currentTenantId.value = storedTenantId;
       }
 
-      // Check if user is already authenticated
-      final token = await _storageService.getString('access_token');
-      if (token != null && token.isNotEmpty) {
-        try {
-          // Set token in API service
-          await _apiService.setAccessToken(token);
+      // Check if user is already authenticated using fresh_dio
+      final isAuth = await _apiService.isAuthenticatedAsync();
 
-          // Verify token and get current user
+      if (isAuth) {
+        try {
+          // Token is already loaded by ApiService, just get current user
           await getCurrentUser();
 
           // Load current tenant if user is authenticated
@@ -115,7 +113,7 @@ class AuthController extends GetxController {
 
           AppLogger.i('User session restored successfully');
         } catch (e) {
-          AppLogger.w('Stored token is invalid, clearing session', e);
+          AppLogger.w('Failed to restore session', e);
           await clearSession();
         }
       }
@@ -129,10 +127,10 @@ class AuthController extends GetxController {
   }
 
   // =============================================================================
-  // AUTHENTICATION METHODS
+  // AUTHENTICATION METHODS - UPDATED FOR FRESH_DIO
   // =============================================================================
 
-  /// Login user
+  /// Login user - SIMPLIFIED WITH FRESH_DIO
   Future<void> login() async {
     final formController = loginFormController;
     if (formController == null || !formController.validateForm()) {
@@ -149,11 +147,14 @@ class AuthController extends GetxController {
 
       AppLogger.i('Attempting login for user: $email');
 
-      // Call API service with correct method signature
-      final response = await _apiService.login(email: email, password: password);
+      // Call API service - tokens are handled automatically by fresh_dio
+      final response = await _apiService.login(
+        email: email,
+        password: password,
+        rememberMe: formController.rememberMe.value,
+      );
 
       AppLogger.d('Login API response: success=${response.success}, message=${response.message}');
-      AppLogger.d('Login response data: ${response.data}');
 
       if (response.success && response.data != null) {
         await _handleSuccessfulLogin(response.data!, formController);
@@ -169,77 +170,31 @@ class AuthController extends GetxController {
     }
   }
 
-  /// Handle successful login - ENHANCED with comprehensive debugging
+  /// Handle successful login - SIMPLIFIED WITH FRESH_DIO
   Future<void> _handleSuccessfulLogin(Map<String, dynamic> data, LoginFormController formController) async {
     try {
-      AppLogger.d('Processing login response data: $data');
+      AppLogger.d('Processing login response data');
 
-      final userData = data['user'];
-
-      // Handle both field name variations for compatibility with safe type checking
-      String? accessToken;
-      String? refreshToken;
-
-      final accessTokenRaw = data['access_token'] ?? data['accessToken'];
-      final refreshTokenRaw = data['refresh_token'] ?? data['refreshToken'];
-
-      if (accessTokenRaw != null) {
-        if (accessTokenRaw is String) {
-          accessToken = accessTokenRaw;
-        } else {
-          accessToken = accessTokenRaw.toString();
-        }
-      }
-
-      if (refreshTokenRaw != null) {
-        if (refreshTokenRaw is String) {
-          refreshToken = refreshTokenRaw;
-        } else {
-          refreshToken = refreshTokenRaw.toString();
-        }
-      }
+      // Tokens are already stored by ApiService via fresh_dio
+      // Just process user data
+      final userData = data['user'] ?? data;
 
       if (userData == null) {
         throw Exception('User data not found in response');
       }
 
-      if (accessToken == null || accessToken.isEmpty) {
-        throw Exception('Access token not found in response');
-      }
-
-      // ENHANCED: Comprehensive debug logging for login response
-      AppLogger.d('=== LOGIN RESPONSE DEBUG ===');
-      AppLogger.d('User data from backend: $userData');
-      AppLogger.d('User roles in response: ${userData['roles']}');
-      AppLogger.d('User roleNames in response: ${userData['roleNames']}');
-      AppLogger.d('User isPlatformAdmin: ${userData['isPlatformAdmin']}');
-      AppLogger.d('User platformType: ${userData['platformType']}');
-      AppLogger.d('Access token field: ${data['access_token'] != null ? 'access_token' : 'accessToken'}');
-      AppLogger.d('Refresh token field: ${data['refresh_token'] != null ? 'refresh_token' : 'refreshToken'}');
-      AppLogger.d('Access token value: ${accessToken.substring(0, 10)}...');
-      AppLogger.d('===========================');
-
-      // Store authentication data
-      await _storageService.setString('access_token', accessToken);
+      // Store user data locally
       await _storageService.setString('user_data', jsonEncode(userData));
 
-      if (refreshToken != null && refreshToken.isNotEmpty) {
-        await _storageService.setString('refresh_token', refreshToken);
-      }
-
-      // Create user model with enhanced role processing
+      // Create user model
       final user = UserModel.fromJson(userData);
       currentUser.value = user;
       isAuthenticated.value = true;
 
-      // ENHANCED: Comprehensive debug logging for user model
       AppLogger.d('=== USER MODEL DEBUG ===');
       AppLogger.d('Created user model with roles: ${user.roleNames}');
       AppLogger.d('User platform type: ${user.platformType}');
       AppLogger.d('User is platform admin: ${user.isPlatformAdmin}');
-      AppLogger.d('User primary role: ${user.primaryRole}');
-      AppLogger.d('User full name: ${user.fullName}');
-      AppLogger.d('User permissions count: ${user.permissions.length}');
       AppLogger.d('========================');
 
       // Update tenant ID and load tenant data
@@ -266,7 +221,7 @@ class AuthController extends GetxController {
 
       Get.offAllNamed(homeRoute);
 
-      // Log the successful login with enhanced data
+      // Log the successful login
       _logAuthEvent('login_success', {
         'user_id': user.id,
         'tenant_id': currentTenantId.value,
@@ -275,143 +230,9 @@ class AuthController extends GetxController {
         'is_platform_admin': user.isPlatformAdmin,
       });
 
-      // ENHANCED: Debug admin menu generation in background
-      await _debugAdminMenuGeneration();
-
     } catch (e) {
       AppLogger.e('Error processing successful login response', e);
       throw Exception('Login processing failed: ${e.toString()}');
-    }
-  }
-
-  /// Debug admin menu generation - ENHANCED METHOD
-  Future<void> _debugAdminMenuGeneration() async {
-    try {
-      final user = currentUser.value;
-      if (user == null) return;
-
-      AppLogger.d('=== ADMIN MENU GENERATION DEBUG ===');
-      AppLogger.d('User roles for menu: ${user.roleNames}');
-      AppLogger.d('Is platform admin: ${user.isPlatformAdmin}');
-      AppLogger.d('Platform type: ${user.platformType}');
-
-      // Test role checking patterns
-      final isPlatformAdminCheck1 = user.roleNames.any((role) =>
-      role == 'platform_admin' ||
-          role == 'platform_administrator' ||
-          role.toLowerCase() == 'platform_admin' ||
-          (role.toLowerCase().contains('platform') && role.toLowerCase().contains('admin'))
-      );
-
-      AppLogger.d('Platform admin check (pattern matching): $isPlatformAdminCheck1');
-
-      // Test if this would generate admin menu items
-      if (user.platformType == 'admin') {
-        AppLogger.d('✅ User should see admin platform');
-        AppLogger.d('Expected menu items: Dashboard, Tenants, Users, Reports, Analytics, Settings');
-      } else {
-        AppLogger.d('❌ User should see ${user.platformType} platform instead of admin');
-      }
-
-      // Test individual role variations
-      for (final role in user.roleNames) {
-        final normalizedRole = role.toLowerCase();
-        final isPlatformAdmin = normalizedRole == 'platform_admin' ||
-            normalizedRole == 'super_admin' ||
-            normalizedRole == 'platform_administrator' ||
-            (normalizedRole.contains('platform') && normalizedRole.contains('admin'));
-        AppLogger.d('Role: "$role" -> Platform Admin: $isPlatformAdmin');
-      }
-
-      AppLogger.d('==================================');
-
-    } catch (e) {
-      AppLogger.w('Error during admin menu debug', e);
-    }
-  }
-
-  /// Comprehensive debug user data method - ENHANCED
-  Future<void> debugUserData() async {
-    try {
-      final user = currentUser.value;
-      if (user == null) {
-        AppLogger.e('No current user for debug');
-        return;
-      }
-
-      AppLogger.d('=== COMPREHENSIVE USER DEBUG INFO ===');
-      AppLogger.d('User ID: ${user.id}');
-      AppLogger.d('Email: ${user.email}');
-      AppLogger.d('Full Name: ${user.fullName}');
-      AppLogger.d('First Name: ${user.firstName}');
-      AppLogger.d('Last Name: ${user.lastName}');
-      AppLogger.d('Profile Image: ${user.profileImage}');
-      AppLogger.d('Phone: ${user.metadata?.phoneNumber}');
-      AppLogger.d('Is Active: ${user.isActive}');
-      AppLogger.d('Email Verified: ${user.isEmailVerified}');
-      AppLogger.d('Last Login: ${user.lastLoginAt}');
-      AppLogger.d('Created At: ${user.createdAt}');
-      AppLogger.d('Updated At: ${user.updatedAt}');
-      AppLogger.d('Tenant ID: ${user.tenantId}');
-      AppLogger.d('Children: ${user.children}');
-      AppLogger.d('--- ROLES & PERMISSIONS ---');
-      AppLogger.d('Roles Object: ${user.roles}');
-      AppLogger.d('Role Names Array: ${user.roleNames}');
-      AppLogger.d('Primary Role: ${user.primaryRole}');
-      AppLogger.d('Is Platform Admin: ${user.isPlatformAdmin}');
-      AppLogger.d('Platform Type: ${user.platformType}');
-      AppLogger.d('Is Admin: ${user.isAdmin}');
-      AppLogger.d('Is Teacher: ${user.isTeacher}');
-      AppLogger.d('Is Parent: ${user.isParent}');
-      AppLogger.d('Is Staff: ${user.isStaff}');
-      AppLogger.d('Is Tenant Admin: ${user.isTenantAdmin}');
-      AppLogger.d('Permissions: ${user.permissions}');
-      AppLogger.d('Permissions Count: ${user.permissions.length}');
-
-      // Test specific permission checks
-      AppLogger.d('--- PERMISSION TESTS ---');
-      AppLogger.d('Has role "platform_admin": ${user.hasRole("platform_admin")}');
-      AppLogger.d('Has role "super_admin": ${user.hasRole("super_admin")}');
-      AppLogger.d('Has role "school_admin": ${user.hasRole("school_admin")}');
-      AppLogger.d('Has permission "user:read": ${user.hasPermission("user:read")}');
-      AppLogger.d('Has any admin role: ${user.hasAnyRole(["platform_admin", "super_admin", "school_admin"])}');
-
-      AppLogger.d('=====================================');
-
-      // Call backend debug API endpoint
-      try {
-        AppLogger.d('Calling backend debug endpoint...');
-        final response = await _apiService.debugUser();
-        if (response.success) {
-          AppLogger.d('=== BACKEND DEBUG RESPONSE ===');
-          final debugData = response.data?['debug'];
-          if (debugData != null) {
-            AppLogger.d('Backend user ID: ${debugData['userId']}');
-            AppLogger.d('Backend email: ${debugData['email']}');
-            AppLogger.d('Backend full name: ${debugData['fullName']}');
-            AppLogger.d('Backend raw roles: ${debugData['rawRoles']}');
-            AppLogger.d('Backend role names: ${debugData['roleNames']}');
-            AppLogger.d('Backend isPlatformAdmin: ${debugData['isPlatformAdmin']}');
-            AppLogger.d('Backend platformType: ${debugData['platformType']}');
-            AppLogger.d('Backend roles populated: ${debugData['rolesPopulated']}');
-            AppLogger.d('Backend permissions count: ${debugData['permissionsCount']}');
-            AppLogger.d('Backend has role test: ${debugData['hasRoleTest']}');
-
-            // Compare frontend vs backend
-            AppLogger.d('--- FRONTEND vs BACKEND COMPARISON ---');
-            AppLogger.d('Role names match: ${user.roleNames.toString() == debugData['roleNames'].toString()}');
-            AppLogger.d('Platform admin match: ${user.isPlatformAdmin == debugData['isPlatformAdmin']}');
-            AppLogger.d('Platform type match: ${user.platformType == debugData['platformType']}');
-          }
-          AppLogger.d('==============================');
-        } else {
-          AppLogger.w('Debug endpoint returned error: ${response.message}');
-        }
-      } catch (e) {
-        AppLogger.d('Debug endpoint not available or failed: $e');
-      }
-    } catch (e) {
-      AppLogger.e('Debug failed', e);
     }
   }
 
@@ -548,7 +369,7 @@ class AuthController extends GetxController {
   // LOGOUT WITH IMPROVED BACKGROUND REINITIALIZATION
   // =============================================================================
 
-  /// Primary logout method using splash screen approach - IMPROVED
+  /// Primary logout method using splash screen approach
   Future<void> logout({bool showMessage = true}) async {
     try {
       // Set loading state briefly
@@ -605,7 +426,7 @@ class AuthController extends GetxController {
     });
   }
 
-  /// Perform thorough background reinitialization - IMPROVED
+  /// Perform thorough background reinitialization
   Future<void> _performBackgroundReinitialization() async {
     try {
       isBackgroundReinitializing.value = true;
@@ -666,7 +487,7 @@ class AuthController extends GetxController {
     }
   }
 
-  /// Thorough controller cleanup - IMPROVED with better timing
+  /// Thorough controller cleanup
   Future<void> _thoroughControllerCleanup() async {
     try {
       AppLogger.d('Starting thorough controller cleanup...');
@@ -781,7 +602,7 @@ class AuthController extends GetxController {
     }
   }
 
-  /// Prepare fresh login environment - IMPROVED with better timing and error handling
+  /// Prepare fresh login environment
   Future<void> _prepareLoginEnvironment() async {
     try {
       AppLogger.d('Preparing fresh login environment...');
@@ -1142,20 +963,18 @@ class AuthController extends GetxController {
   // SESSION AND USER MANAGEMENT
   // =============================================================================
 
-  /// Clear all session data
+  /// Clear all session data - UPDATED FOR FRESH_DIO
   Future<void> clearSession() async {
     try {
       // Cancel timers
       _sessionTimer?.cancel();
       _tokenRefreshTimer?.cancel();
 
-      // Clear stored data
-      await _storageService.remove('access_token');
-      await _storageService.remove('refresh_token');
+      // Clear stored data (user data, tenant, etc.)
       await _storageService.remove('user_data');
       await _storageService.remove('tenant_data');
 
-      // Clear API service token
+      // Clear tokens via API service (fresh_dio handles this)
       await _apiService.clearTokens();
 
       // Reset state
@@ -1171,7 +990,7 @@ class AuthController extends GetxController {
     }
   }
 
-  /// Get current user profile - ENHANCED with role debugging
+  /// Get current user profile
   Future<void> getCurrentUser() async {
     try {
       final response = await _apiService.getCurrentUser();
@@ -1179,10 +998,7 @@ class AuthController extends GetxController {
       if (response.success && response.data != null) {
         final userData = response.data!['user'] ?? response.data!;
 
-        // ENHANCED: Debug current user API response
-        AppLogger.d('Current user API response: $userData');
-        AppLogger.d('User roles in getCurrentUser: ${userData['roles']}');
-        AppLogger.d('User roleNames in getCurrentUser: ${userData['roleNames']}');
+        AppLogger.d('Current user API response received');
 
         final user = UserModel.fromJson(userData);
         currentUser.value = user;
@@ -1375,113 +1191,39 @@ class AuthController extends GetxController {
     });
   }
 
-  /// Refresh token silently in background
+  /// Refresh token silently in background - UPDATED FOR FRESH_DIO
   Future<void> _refreshTokenSilently() async {
     try {
-      final refreshTokenValue = await _storageService.getString('refresh_token');
-      if (refreshTokenValue == null) return;
-
+      // Fresh_dio handles token refresh automatically
+      // We can manually trigger it if needed
       final response = await _apiService.refreshTokenRequest();
 
-      if (response.success && response.data != null) {
-        final data = response.data!;
-
-        // Handle both field name variations for compatibility with safe type checking
-        String? accessToken;
-        String? refreshToken;
-
-        final accessTokenRaw = data['access_token'] ?? data['accessToken'];
-        final refreshTokenRaw = data['refresh_token'] ?? data['refreshToken'];
-
-        if (accessTokenRaw != null) {
-          if (accessTokenRaw is String) {
-            accessToken = accessTokenRaw;
-          } else {
-            accessToken = accessTokenRaw.toString();
-          }
-        }
-
-        if (refreshTokenRaw != null) {
-          if (refreshTokenRaw is String) {
-            refreshToken = refreshTokenRaw;
-          } else {
-            refreshToken = refreshTokenRaw.toString();
-          }
-        }
-
-        // Update stored tokens
-        if (accessToken != null && accessToken.isNotEmpty) {
-          await _storageService.setString('access_token', accessToken);
-          await _apiService.setAccessToken(accessToken);
-        }
-
-        if (refreshToken != null && refreshToken.isNotEmpty) {
-          await _storageService.setString('refresh_token', refreshToken);
-        }
+      if (response.success) {
+        AppLogger.d('Token refreshed successfully');
 
         // Update user data if provided
-        if (data['user'] != null) {
-          final user = UserModel.fromJson(data['user']);
+        if (response.data?['user'] != null) {
+          final user = UserModel.fromJson(response.data!['user']);
           currentUser.value = user;
-          await _storageService.setString('user_data', jsonEncode(data['user']));
+          await _storageService.setString('user_data', jsonEncode(response.data!['user']));
         }
-
-        AppLogger.d('Token refreshed successfully');
       }
     } catch (e) {
       AppLogger.w('Silent token refresh failed', e);
     }
   }
 
-  /// Public method for refreshing token silently (used by middleware and other services)
+  /// Public method for refreshing token silently - UPDATED FOR FRESH_DIO
   Future<bool> refreshTokenSilently() async {
     try {
-      final refreshTokenValue = await _storageService.getString('refresh_token');
-      if (refreshTokenValue == null) return false;
-
       final response = await _apiService.refreshTokenRequest();
 
-      if (response.success && response.data != null) {
-        final data = response.data!;
-
-        // Handle both field name variations for compatibility with safe type checking
-        String? accessToken;
-        String? refreshToken;
-
-        final accessTokenRaw = data['access_token'] ?? data['accessToken'];
-        final refreshTokenRaw = data['refresh_token'] ?? data['refreshToken'];
-
-        if (accessTokenRaw != null) {
-          if (accessTokenRaw is String) {
-            accessToken = accessTokenRaw;
-          } else {
-            accessToken = accessTokenRaw.toString();
-          }
-        }
-
-        if (refreshTokenRaw != null) {
-          if (refreshTokenRaw is String) {
-            refreshToken = refreshTokenRaw;
-          } else {
-            refreshToken = refreshTokenRaw.toString();
-          }
-        }
-
-        // Update stored tokens
-        if (accessToken != null && accessToken.isNotEmpty) {
-          await _storageService.setString('access_token', accessToken);
-          await _apiService.setAccessToken(accessToken);
-        }
-
-        if (refreshToken != null && refreshToken.isNotEmpty) {
-          await _storageService.setString('refresh_token', refreshToken);
-        }
-
+      if (response.success) {
         // Update user data if provided
-        if (data['user'] != null) {
-          final user = UserModel.fromJson(data['user']);
+        if (response.data?['user'] != null) {
+          final user = UserModel.fromJson(response.data!['user']);
           currentUser.value = user;
-          await _storageService.setString('user_data', jsonEncode(data['user']));
+          await _storageService.setString('user_data', jsonEncode(response.data!['user']));
         }
 
         AppLogger.d('Token refreshed successfully');
@@ -1614,6 +1356,10 @@ class AuthController extends GetxController {
   // USER PROPERTY GETTERS AND PERMISSION METHODS
   // =============================================================================
 
+  // Authentication token getter - UPDATED FOR FRESH_DIO
+  String? get accessToken => _apiService.accessToken;
+  String? get refreshToken => _apiService.refreshTokenValue;
+
   // User role helpers
   bool get isPlatformAdmin => currentUser.value?.isPlatformAdmin ?? false;
   bool get isAdmin => currentUser.value?.isAdmin ?? false;
@@ -1675,6 +1421,37 @@ class AuthController extends GetxController {
       AppLogger.e('Email verification failed', e);
       _showErrorSnackbar('Verification Failed', 'Invalid or expired verification link');
       return false;
+    }
+  }
+
+  /// Debug user data - UPDATED
+  Future<void> debugUserData() async {
+    try {
+      final user = currentUser.value;
+      if (user == null) {
+        AppLogger.e('No current user for debug');
+        return;
+      }
+
+      AppLogger.d('=== COMPREHENSIVE USER DEBUG INFO ===');
+      AppLogger.d('User ID: ${user.id}');
+      AppLogger.d('Email: ${user.email}');
+      AppLogger.d('Full Name: ${user.fullName}');
+      AppLogger.d('Roles: ${user.roleNames}');
+      AppLogger.d('Platform Type: ${user.platformType}');
+      AppLogger.d('Is Platform Admin: ${user.isPlatformAdmin}');
+
+      // Check token status with fresh_dio
+      final hasToken = await _apiService.isAuthenticatedAsync();
+      AppLogger.d('Has Valid Token: $hasToken');
+
+      // Debug API state
+      await _apiService.debugApiState();
+
+      AppLogger.d('=====================================');
+
+    } catch (e) {
+      AppLogger.e('Debug failed', e);
     }
   }
 

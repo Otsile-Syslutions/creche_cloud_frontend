@@ -108,7 +108,7 @@ class AuthMiddleware extends GetMiddleware {
     return page;
   }
 
-  /// Ensure authentication token is loaded in API service
+  /// Ensure authentication token is loaded - UPDATED FOR FRESH_DIO
   Future<void> _ensureTokenLoaded() async {
     try {
       // Ensure AuthController exists
@@ -118,38 +118,41 @@ class AuthMiddleware extends GetMiddleware {
       }
 
       final apiService = Get.find<ApiService>();
-      final storageService = Get.find<StorageService>();
+      final authController = Get.find<AuthController>();
 
-      // Check if token is already set in API service
-      if (apiService.accessToken != null && apiService.accessToken!.isNotEmpty) {
-        AppLogger.d('AuthMiddleware: Token already set in API service');
+      // Check if user is authenticated using fresh_dio's async method
+      final isAuthenticated = await apiService.isAuthenticatedAsync();
+
+      if (isAuthenticated) {
+        AppLogger.d('AuthMiddleware: Token is valid and loaded');
+
+        // Ensure user data is loaded if not already
+        if (authController.currentUser.value == null) {
+          try {
+            await authController.getCurrentUser();
+            AppLogger.d('AuthMiddleware: User data loaded successfully');
+          } catch (e) {
+            AppLogger.w('AuthMiddleware: Failed to load user data', e);
+          }
+        }
+
         return;
       }
 
-      // Load token from storage
-      final storedToken = await storageService.getString('access_token');
-      if (storedToken != null && storedToken.isNotEmpty) {
-        AppLogger.d('AuthMiddleware: Loading token from storage');
-        await apiService.setAccessToken(storedToken);
-      } else {
-        AppLogger.w('AuthMiddleware: No token found in storage, attempting refresh...');
+      AppLogger.w('AuthMiddleware: No valid token found, attempting refresh...');
 
-        // Try to refresh token if refresh token exists
-        final refreshToken = await storageService.getString('refresh_token');
-        if (refreshToken != null && refreshToken.isNotEmpty) {
-          try {
-            final authController = Get.find<AuthController>();
-            final refreshed = await authController.refreshTokenSilently();
-            if (refreshed) {
-              AppLogger.d('AuthMiddleware: Token refreshed successfully');
-            } else {
-              AppLogger.e('AuthMiddleware: Token refresh failed');
-            }
-          } catch (e) {
-            AppLogger.e('AuthMiddleware: Token refresh failed', e);
-          }
+      // Try to refresh token using AuthController's method
+      try {
+        final refreshed = await authController.refreshTokenSilently();
+        if (refreshed) {
+          AppLogger.d('AuthMiddleware: Token refreshed successfully');
+        } else {
+          AppLogger.e('AuthMiddleware: Token refresh failed');
         }
+      } catch (e) {
+        AppLogger.e('AuthMiddleware: Token refresh failed', e);
       }
+
     } catch (e) {
       AppLogger.e('AuthMiddleware: Error ensuring token loaded', e);
     }
@@ -187,5 +190,3 @@ class AuthMiddlewareFactory {
     );
   }
 }
-
-
