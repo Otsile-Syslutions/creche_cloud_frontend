@@ -21,6 +21,12 @@ class AuthMiddleware extends GetMiddleware {
 
   @override
   RouteSettings? redirect(String? route) {
+    // Ensure AuthController exists
+    if (!Get.isRegistered<AuthController>()) {
+      AppLogger.w('AuthMiddleware: AuthController not found, initializing...');
+      Get.put(AuthController());
+    }
+
     final authController = Get.find<AuthController>();
 
     // First check: Is user authenticated?
@@ -105,6 +111,12 @@ class AuthMiddleware extends GetMiddleware {
   /// Ensure authentication token is loaded in API service
   Future<void> _ensureTokenLoaded() async {
     try {
+      // Ensure AuthController exists
+      if (!Get.isRegistered<AuthController>()) {
+        AppLogger.w('AuthMiddleware: AuthController not found in _ensureTokenLoaded, creating...');
+        Get.put(AuthController());
+      }
+
       final apiService = Get.find<ApiService>();
       final storageService = Get.find<StorageService>();
 
@@ -175,4 +187,5 @@ class AuthMiddlewareFactory {
     );
   }
 }
+
 

@@ -18,14 +18,15 @@ class AdminHomeBinding extends Bindings {
       Get.put<ApiService>(ApiService(), permanent: true);
     }
 
-    // Ensure AuthController is available
+    // CRITICAL: Ensure AuthController is available and kept alive
     if (!Get.isRegistered<AuthController>()) {
-      Get.put<AuthController>(AuthController(), permanent: false);
+      Get.put<AuthController>(AuthController(), permanent: true); // Make it permanent
     }
 
     // Put AdminHomeController
     Get.lazyPut<AdminHomeController>(
           () => AdminHomeController(),
+      fenix: true, // Keep controller alive
     );
   }
 }

@@ -18,14 +18,16 @@ class MarketExplorerBinding extends Bindings {
       Get.put<ApiService>(ApiService(), permanent: true);
     }
 
-    // Ensure AuthController is available
+    // Ensure AuthController is available (critical for authentication)
     if (!Get.isRegistered<AuthController>()) {
+      // Create AuthController if it doesn't exist
       Get.put<AuthController>(AuthController(), permanent: false);
     }
 
     // Put MarketExplorerController with dependencies ensured
     Get.lazyPut<MarketExplorerController>(
           () => MarketExplorerController(),
+      fenix: true, // Keep controller alive even after route disposal
     );
   }
 }

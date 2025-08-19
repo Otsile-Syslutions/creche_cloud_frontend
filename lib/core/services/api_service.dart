@@ -1,7 +1,10 @@
 // lib/core/services/api_service.dart
 import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:dio_cookie_manager/dio_cookie_manager.dart';
+import 'package:cookie_jar/cookie_jar.dart';
 import 'package:get/get.dart' as getx;
+import 'package:path_provider/path_provider.dart';
 import '../config/env.dart';
 import '../config/api_endpoints.dart';
 import 'storage_service.dart';
@@ -29,7 +32,7 @@ class ApiResponse<T> {
   factory ApiResponse.fromResponse(Response response) {
     final data = response.data;
 
-    // Debug logging for response structure (safe version)
+    // Debug logging for response structure
     try {
       AppLogger.d('=== API RESPONSE DEBUG ===');
       AppLogger.d('Response status: ${response.statusCode}');
@@ -138,19 +141,21 @@ class ApiException implements Exception {
 }
 
 // =============================================================================
-// API SERVICE
+// API SERVICE WITH COOKIE SUPPORT
 // =============================================================================
 
 class ApiService extends getx.GetxService {
   static ApiService get to => getx.Get.find();
 
   late Dio _dio;
+  late CookieJar _cookieJar;
   String? _accessToken;
   String? _refreshToken;
 
   @override
   Future<void> onInit() async {
     super.onInit();
+    await _initializeCookieJar();
     await _initializeDio();
     await _loadStoredTokens();
   }
@@ -161,7 +166,28 @@ class ApiService extends getx.GetxService {
     super.onClose();
   }
 
-  /// Initialize Dio HTTP client with configuration
+  /// Initialize cookie jar for persistent cookies
+  Future<void> _initializeCookieJar() async {
+    try {
+      // Get application documents directory for storing cookies
+      final Directory appDocDir = await getApplicationDocumentsDirectory();
+      final String cookiePath = '${appDocDir.path}/.cookies/';
+
+      // Create persistent cookie jar
+      _cookieJar = PersistCookieJar(
+        ignoreExpires: false,
+        storage: FileStorage(cookiePath),
+      );
+
+      AppLogger.d('Cookie jar initialized at: $cookiePath');
+    } catch (e) {
+      AppLogger.w('Failed to initialize persistent cookie jar, using default', e);
+      // Fallback to in-memory cookie jar if persistent storage fails
+      _cookieJar = CookieJar();
+    }
+  }
+
+  /// Initialize Dio HTTP client with configuration and cookie support
   Future<void> _initializeDio() async {
     _dio = Dio(BaseOptions(
       baseUrl: Env.apiBaseUrl,
@@ -173,7 +199,14 @@ class ApiService extends getx.GetxService {
         'Accept': 'application/json',
       },
       responseType: ResponseType.json,
+      // IMPORTANT: Ensure cookies are sent with requests
+      validateStatus: (status) {
+        return status! < 500; // Don't throw for 4xx errors
+      },
     ));
+
+    // Add cookie manager interceptor FIRST (before other interceptors)
+    _dio.interceptors.add(CookieManager(_cookieJar));
 
     // Add request interceptor
     _dio.interceptors.add(
@@ -190,11 +223,13 @@ class ApiService extends getx.GetxService {
         requestBody: true,
         responseBody: true,
         requestHeader: true,
-        responseHeader: false,
+        responseHeader: true, // Enable to see cookie headers
         error: true,
         logPrint: (obj) => AppLogger.d('API: $obj'),
       ));
     }
+
+    AppLogger.d('Dio initialized with cookie support');
   }
 
   /// Load stored access and refresh tokens
@@ -210,6 +245,8 @@ class ApiService extends getx.GetxService {
       if (refreshToken != null && refreshToken.isNotEmpty) {
         _refreshToken = refreshToken;
       }
+
+      AppLogger.d('Loaded stored tokens - Access: ${_accessToken != null}, Refresh: ${_refreshToken != null}');
     } catch (e) {
       AppLogger.e('Error loading stored tokens', e);
     }
@@ -226,12 +263,21 @@ class ApiService extends getx.GetxService {
     // This could be set from user's current tenant
     // options.headers['X-Tenant-ID'] = currentTenantId;
 
+    // Log cookies being sent (for debugging)
+    if (Env.isDevelopment) {
+      AppLogger.d('Request to ${options.path} with cookies enabled');
+    }
+
     handler.next(options);
   }
 
   /// Response interceptor
   void _onResponse(Response response, ResponseInterceptorHandler handler) {
-    // Handle successful responses
+    // Log cookies received (for debugging)
+    if (Env.isDevelopment && response.headers['set-cookie'] != null) {
+      AppLogger.d('Received cookies from server: ${response.headers['set-cookie']}');
+    }
+
     handler.next(response);
   }
 
@@ -261,13 +307,38 @@ class ApiService extends getx.GetxService {
   /// Handle token expiration by refreshing
   Future<bool> _handleTokenExpiration() async {
     try {
-      if (_refreshToken == null) return false;
+      if (_refreshToken == null) {
+        AppLogger.w('No refresh token available for automatic refresh');
+        return false;
+      }
 
       final response = await refreshTokenRequest();
       return response.success;
     } catch (e) {
       AppLogger.e('Token refresh failed', e);
       return false;
+    }
+  }
+
+  /// Clear all cookies
+  Future<void> clearCookies() async {
+    try {
+      await _cookieJar.deleteAll();
+      AppLogger.d('All cookies cleared');
+    } catch (e) {
+      AppLogger.e('Error clearing cookies', e);
+    }
+  }
+
+  /// Get cookies for a specific URI
+  Future<List<Cookie>> getCookies(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      final cookies = await _cookieJar.loadForRequest(uri);
+      return cookies;
+    } catch (e) {
+      AppLogger.e('Error getting cookies', e);
+      return [];
     }
   }
 
@@ -298,7 +369,7 @@ class ApiService extends getx.GetxService {
     }
 
     // Convert to string as last resort, but only if it's not an empty object
-    if (value is! Map || (value as Map).isNotEmpty) {
+    if (value is! Map || (value).isNotEmpty) {
       final stringValue = value.toString();
       return stringValue.isNotEmpty && stringValue != 'null' ? stringValue : null;
     }
@@ -307,17 +378,12 @@ class ApiService extends getx.GetxService {
   }
 
   /// Helper method to safely extract tokens from response data
-  /// Handles the actual backend response structure: { success, message, data: { access_token, refresh_token, ... } }
   Map<String, String?> _extractTokens(Map<String, dynamic> responseData) {
     AppLogger.d('=== TOKEN EXTRACTION DEBUG ===');
     AppLogger.d('Response data keys: ${responseData.keys.toList()}');
-    AppLogger.d('Response data structure: ${responseData.runtimeType}');
 
     String? accessToken;
     String? refreshToken;
-
-    // The backend returns tokens in the responseData directly (which is the 'data' field from the API)
-    // Try both field name variations that the backend provides
 
     // Extract access token - backend provides both access_token and accessToken
     final accessTokenRaw = responseData['access_token'] ?? responseData['accessToken'];
@@ -327,8 +393,6 @@ class ApiService extends getx.GetxService {
     final refreshTokenRaw = responseData['refresh_token'] ?? responseData['refreshToken'];
     refreshToken = _extractStringValue(refreshTokenRaw);
 
-    AppLogger.d('Raw access token type: ${accessTokenRaw?.runtimeType}');
-    AppLogger.d('Raw refresh token type: ${refreshTokenRaw?.runtimeType}');
     AppLogger.d('Extracted access token: ${accessToken != null ? '[PRESENT]' : '[MISSING]'}');
     AppLogger.d('Extracted refresh token: ${refreshToken != null ? '[PRESENT]' : '[MISSING]'}');
     AppLogger.d('==============================');
@@ -347,20 +411,24 @@ class ApiService extends getx.GetxService {
   Future<void> setAccessToken(String token) async {
     _accessToken = token;
     await StorageService.to.setString('access_token', token);
+    AppLogger.d('Access token updated');
   }
 
   /// Set refresh token
   Future<void> setRefreshToken(String token) async {
     _refreshToken = token;
     await StorageService.to.setString('refresh_token', token);
+    AppLogger.d('Refresh token updated');
   }
 
-  /// Clear all tokens
+  /// Clear all tokens and cookies
   Future<void> clearTokens() async {
     _accessToken = null;
     _refreshToken = null;
     await StorageService.to.remove('access_token');
     await StorageService.to.remove('refresh_token');
+    await clearCookies(); // Also clear cookies
+    AppLogger.d('Tokens and cookies cleared');
   }
 
   /// Get current access token
@@ -519,7 +587,7 @@ class ApiService extends getx.GetxService {
   // AUTHENTICATION METHODS (matching backend API)
   // =============================================================================
 
-  /// Login user - UPDATED with improved token extraction
+  /// Login user - Updated with cookie support
   Future<ApiResponse<Map<String, dynamic>>> login({
     required String email,
     required String password,
@@ -535,6 +603,8 @@ class ApiService extends getx.GetxService {
     if (tenantId != null && tenantId.isNotEmpty) {
       data['tenantId'] = tenantId;
     }
+
+    AppLogger.d('Attempting login for: $email');
 
     final response = await post<Map<String, dynamic>>(
       ApiEndpoints.login,
@@ -557,15 +627,22 @@ class ApiService extends getx.GetxService {
           AppLogger.d('Access token stored successfully');
         } else {
           AppLogger.e('No valid access token found in response');
-          AppLogger.e('Full response data: ${responseData.toString()}');
         }
 
+        // Store refresh token if available (may also be in cookies)
         if (refreshTokenValue != null && refreshTokenValue.isNotEmpty) {
           await setRefreshToken(refreshTokenValue);
           AppLogger.d('Refresh token stored successfully');
         } else {
-          AppLogger.w('No refresh token found in response');
+          AppLogger.d('No refresh token in response body (may be in cookies)');
         }
+
+        // Log cookies received
+        final cookies = await getCookies(Env.apiBaseUrl);
+        if (cookies.isNotEmpty) {
+          AppLogger.d('Cookies received: ${cookies.map((c) => c.name).toList()}');
+        }
+
       } catch (e) {
         AppLogger.e('Error during token extraction: $e');
         // Don't throw here - login might still be successful even if token storage fails
@@ -600,15 +677,25 @@ class ApiService extends getx.GetxService {
     );
   }
 
-  /// Refresh access token - UPDATED with improved token extraction
+  /// Refresh access token - Updated to handle cookies
   Future<ApiResponse<Map<String, dynamic>>> refreshTokenRequest() async {
-    if (_refreshToken == null) {
-      throw ApiException(message: 'No refresh token available', statusCode: 401);
+    // The refresh token might be in cookies (handled automatically by CookieManager)
+    // or we need to send it in the body
+
+    AppLogger.d('Attempting token refresh');
+
+    // Check if we have a refresh token to send in body
+    Map<String, dynamic>? data;
+    if (_refreshToken != null) {
+      data = {'refreshToken': _refreshToken};
+      AppLogger.d('Sending refresh token in request body');
+    } else {
+      AppLogger.d('No refresh token in memory, relying on cookies');
     }
 
     final response = await post<Map<String, dynamic>>(
       ApiEndpoints.refreshToken,
-      data: {'refreshToken': _refreshToken},
+      data: data ?? {},
     );
 
     // Update stored tokens if refresh successful
@@ -627,7 +714,6 @@ class ApiService extends getx.GetxService {
           AppLogger.d('Access token refreshed and stored successfully');
         } else {
           AppLogger.e('No valid access token found in refresh response');
-          AppLogger.e('Full response data: ${responseData.toString()}');
         }
 
         if (refreshTokenValue != null && refreshTokenValue.isNotEmpty) {
@@ -636,20 +722,19 @@ class ApiService extends getx.GetxService {
         }
       } catch (e) {
         AppLogger.e('Error during token refresh extraction: $e');
-        // Don't throw here - the refresh might still be successful
       }
     }
 
     return response;
   }
 
-  /// Logout user
+  /// Logout user - Updated to clear cookies
   Future<ApiResponse<Map<String, dynamic>>> logout() async {
     final response = await post<Map<String, dynamic>>(
       ApiEndpoints.logout,
     );
 
-    // Clear tokens regardless of response
+    // Clear tokens and cookies regardless of response
     await clearTokens();
 
     return response;
@@ -757,7 +842,6 @@ class ApiService extends getx.GetxService {
     String? phoneNumber,
     Map<String, dynamic>? address,
   }) async {
-    // FIXED: Explicitly declare as Map<String, dynamic>
     final Map<String, dynamic> data = {
       'firstName': firstName,
       'lastName': lastName,
@@ -794,7 +878,7 @@ class ApiService extends getx.GetxService {
   }
 
   // =============================================================================
-  // TENANT MANAGEMENT METHODS (matching backend)
+  // TENANT MANAGEMENT METHODS
   // =============================================================================
 
   /// Get tenants (platform admin only)
@@ -826,7 +910,6 @@ class ApiService extends getx.GetxService {
     String? description,
     Map<String, dynamic>? settings,
   }) async {
-    // FIXED: Explicitly declare as Map<String, dynamic>
     final Map<String, dynamic> data = {
       'name': name,
       'slug': slug,
@@ -864,41 +947,22 @@ class ApiService extends getx.GetxService {
   // DEBUG METHODS
   // =============================================================================
 
-  /// Debug login response structure
-  Future<void> debugLoginResponse() async {
+  /// Debug cookie status
+  Future<void> debugCookieStatus() async {
     try {
-      final response = await post<Map<String, dynamic>>(
-        ApiEndpoints.login,
-        data: {
-          'email': 'test@example.com',
-          'password': 'testpassword'
-        },
-      );
+      AppLogger.d('=== COOKIE DEBUG INFO ===');
 
-      AppLogger.d('=== FULL LOGIN RESPONSE DEBUG ===');
-      AppLogger.d('Success: ${response.success}');
-      AppLogger.d('Status Code: ${response.statusCode}');
-      AppLogger.d('Message: ${response.message}');
-      AppLogger.d('Data Type: ${response.data.runtimeType}');
-      AppLogger.d('Full Data: ${response.data}');
+      // Check cookies for API base URL
+      final cookies = await getCookies(Env.apiBaseUrl);
+      AppLogger.d('Cookies for ${Env.apiBaseUrl}: ${cookies.map((c) => '${c.name}=${c.value}').toList()}');
 
-      if (response.data != null) {
-        response.data!.forEach((key, value) {
-          AppLogger.d('Key: $key, Type: ${value.runtimeType}, Value: $value');
-        });
-      }
+      // Check stored tokens
+      AppLogger.d('Access token in memory: ${_accessToken != null}');
+      AppLogger.d('Refresh token in memory: ${_refreshToken != null}');
+
+      AppLogger.d('========================');
     } catch (e) {
-      AppLogger.e('Debug login error: $e');
-    }
-  }
-
-  /// Debug user endpoint
-  Future<void> debugUserEndpoint() async {
-    try {
-      final response = await get<Map<String, dynamic>>(ApiEndpoints.debugUser);
-      AppLogger.d('Debug user response: ${response.data}');
-    } catch (e) {
-      AppLogger.e('Debug user error: $e');
+      AppLogger.e('Cookie debug error: $e');
     }
   }
 

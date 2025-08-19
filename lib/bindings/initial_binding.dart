@@ -1,14 +1,15 @@
 // lib/bindings/initial_binding.dart
-import 'package:get/get.dart';
-import '../core/services/storage_service.dart';
-import '../core/services/api_service.dart';
+import 'global_binding.dart';
 
-class InitialBinding extends Bindings {
+
+/// Initial binding that extends GlobalBindings
+/// This ensures all core dependencies are available at app startup
+class InitialBinding extends GlobalBindings {
   @override
   void dependencies() {
-    // Only load core services at app startup
-    // AuthController and form controllers will be loaded by AuthBinding when needed
-    Get.put<StorageService>(StorageService(), permanent: true);
-    Get.put<ApiService>(ApiService(), permanent: true);
+    // Call parent to initialize global dependencies
+    super.dependencies();
+
+    // Add any additional app-specific initialization here if needed
   }
 }

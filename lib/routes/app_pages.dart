@@ -1,6 +1,7 @@
 // lib/routes/app_pages.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../bindings/global_binding.dart';
 import '../features/admin_platform/home/bindings/admin_home_binding.dart';
 import '../features/auth/bindings/auth_binding.dart';
 import '../features/auth/controllers/auth_controller.dart';
@@ -485,8 +486,11 @@ class InitialRedirectView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Ensure AuthController exists
+    DependencyManager.ensureAuthController();
+
     return GetBuilder<AuthController>(
-      init: AuthController(),
+      init: Get.find<AuthController>(), // Use Get.find since we ensured it exists
       builder: (authController) {
         // Wait for auth initialization
         if (!authController.isInitialized.value) {
@@ -537,6 +541,9 @@ class DashboardRedirectView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Ensure AuthController exists
+    DependencyManager.ensureAuthController();
+
     // Get auth controller and redirect based on user roles
     final authController = Get.find<AuthController>();
     final user = authController.currentUser.value;
