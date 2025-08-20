@@ -31,7 +31,9 @@ class MarketExplorerController extends GetxController {
   // Data
   final RxList<ZAECDCenters> centers = <ZAECDCenters>[].obs;
   final RxList<ZAECDCenters> selectedCenters = <ZAECDCenters>[].obs;
+  final Rx<ZAECDCenters?> selectedProspectForDetail = Rx<ZAECDCenters?>(null);
   final Rx<MarketAnalytics?> analytics = Rx<MarketAnalytics?>(null);
+
 
   // Filters
   final RxString searchQuery = ''.obs;

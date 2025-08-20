@@ -34,265 +34,85 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
 
   Widget _buildMainContent() {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: const Color(0xFFFAFAFA),
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Custom header bar (replaces AppBar)
-          _buildHeaderBar(),
+          // Header section with title and divider
+          _buildHeader(),
 
-          // Main content
+          // Metrics cards
+          _buildMetricsSection(),
+
+          // Main content panel
           Expanded(
-            child: Obx(() => Column(
-              children: [
-                _buildToolbar(),
-                if (controller.showFilters.value) _buildFiltersPanel(),
-                _buildMetricsRow(),
-                Expanded(
-                  child: _buildContentArea(),
-                ),
-              ],
-            )),
-          ),
-        ],
-      ),
-      floatingActionButton: _buildFloatingActions(),
-    );
-  }
-
-  Widget _buildHeaderBar() {
-    return Container(
-      height: 60,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Title section
-          const Icon(Icons.explore, size: 24),
-          const SizedBox(width: 8),
-          const Text(
-            'Market Explorer',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              child: _buildContentPanel(),
             ),
-          ),
-          const SizedBox(width: 16),
-          Obx(() => Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.blue.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              '${controller.totalCenters.value} ECD Centers',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: Colors.blue[700],
-              ),
-            ),
-          )),
-
-          const Spacer(),
-
-          // Action buttons
-          _buildViewToggle(),
-          const SizedBox(width: 16),
-          Obx(() => IconButton(
-            icon: Icon(controller.showFilters.value ? Icons.filter_list_off : Icons.filter_list),
-            onPressed: controller.toggleFilters,
-            tooltip: 'Toggle Filters',
-          )),
-          IconButton(
-            icon: const Icon(Icons.download),
-            onPressed: _showExportDialog,
-            tooltip: 'Export Data',
-          ),
-          PopupMenuButton<String>(
-            onSelected: _handleMenuAction,
-            itemBuilder: (context) => [
-              const PopupMenuItem(value: 'bulk_enrich', child: Text('Bulk Enrich Contacts')),
-              const PopupMenuItem(value: 'create_campaign', child: Text('Create Campaign')),
-              const PopupMenuItem(value: 'territory_management', child: Text('Manage Territories')),
-              const PopupMenuItem(value: 'import_data', child: Text('Import Additional Data')),
-            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildViewToggle() {
-    return Obx(() => SegmentedButton<String>(
-      segments: const [
-        ButtonSegment(
-          value: 'list',
-          icon: Icon(Icons.list, size: 16),
-          label: Text('List'),
-        ),
-        ButtonSegment(
-          value: 'map',
-          icon: Icon(Icons.map, size: 16),
-          label: Text('Map'),
-        ),
-        ButtonSegment(
-          value: 'analytics',
-          icon: Icon(Icons.analytics, size: 16),
-          label: Text('Analytics'),
-        ),
-      ],
-      selected: {controller.selectedView.value},
-      onSelectionChanged: (Set<String> selection) {
-        controller.toggleView(selection.first);
-      },
-    ));
-  }
-
-  Widget _buildToolbar() {
+  Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.all(16),
-      color: Colors.white,
-      child: Row(
-        children: [
-          // Search bar
-          Expanded(
-            flex: 3,
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search by name, city, contact person...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: controller.searchQuery.value.isNotEmpty
-                    ? IconButton(
-                  icon: const Icon(Icons.clear),
-                  onPressed: () => controller.searchQuery.value = '',
-                )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                isDense: true,
-              ),
-              onChanged: (value) => controller.searchQuery.value = value,
-            ),
-          ),
-          const SizedBox(width: 16),
-
-          // Quick filters
-          Expanded(
-            flex: 2,
-            child: _buildQuickFilters(),
-          ),
-
-          const SizedBox(width: 16),
-
-          // Bulk actions
-          Obx(() {
-            if (controller.selectedCenters.isNotEmpty) {
-              return _buildBulkActions();
-            }
-            return const SizedBox.shrink();
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickFilters() {
-    return Obx(() => Wrap(
-      spacing: 8,
-      children: [
-        FilterChip(
-          label: const Text('Gauteng'),
-          selected: controller.selectedProvinces.contains('GT'),
-          onSelected: (selected) => controller.toggleProvinceFilter('GT'),
-        ),
-        FilterChip(
-          label: const Text('Fully Registered'),
-          selected: controller.selectedRegistrationStatus.contains('Fully registered'),
-          onSelected: (selected) => controller.toggleRegistrationFilter('Fully registered'),
-        ),
-        FilterChip(
-          label: const Text('50+ Children'),
-          selected: controller.minChildren.value >= 50,
-          onSelected: (selected) => controller.minChildren.value = selected ? 50 : 0,
-        ),
-        FilterChip(
-          label: const Text('Has Phone'),
-          selected: controller.hasPhone.value,
-          onSelected: (selected) => controller.hasPhone.value = selected,
-        ),
-        FilterChip(
-          label: const Text('Hot Prospects'),
-          selected: controller.minLeadScore.value >= 80,
-          onSelected: (selected) => controller.minLeadScore.value = selected ? 80 : 0,
-        ),
-      ],
-    ));
-  }
-
-  Widget _buildFiltersPanel() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        border: Border(bottom: BorderSide(color: Colors.grey[300]!)),
-      ),
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Advanced Filters',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          const SizedBox(height: 16),
-
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Geographic filters
-              Expanded(
-                child: _buildGeographicFilters(),
+              // Title
+              const Text(
+                'Market Explorer',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Roboto',
+                  color: Color(0xFF1F2937),
+                ),
               ),
-              const SizedBox(width: 24),
 
-              // Business profile filters
-              Expanded(
-                child: _buildBusinessFilters(),
-              ),
-              const SizedBox(width: 24),
-
-              // CRM status filters
-              Expanded(
-                child: _buildCRMFilters(),
+              // Add Prospect button
+              ElevatedButton.icon(
+                onPressed: _showAddProspectDialog,
+                icon: const Icon(Icons.add, size: 20),
+                label: const Text('Add Prospect'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF875DEC),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: const BorderSide(color: Color(0xFF875DEC)),
+                  ),
+                ),
               ),
             ],
           ),
-
           const SizedBox(height: 16),
-          Row(
+
+          // Divider with purple underline
+          Stack(
             children: [
-              ElevatedButton(
-                onPressed: controller.fetchCenters,
-                child: const Text('Apply Filters'),
+              Container(
+                height: 1,
+                color: Colors.grey[300],
               ),
-              const SizedBox(width: 8),
-              TextButton(
-                onPressed: controller.clearFilters,
-                child: const Text('Clear All'),
+              Container(
+                height: 3,
+                width: 140, // Width to cover "Market E"
+                decoration: const BoxDecoration(
+                  color: Color(0xFF875DEC),
+                  borderRadius: BorderRadius.only(
+                    topRight: Radius.circular(2),
+                    bottomRight: Radius.circular(2),
+                  ),
+                ),
               ),
-              const Spacer(),
-              Obx(() => Text(
-                '${controller.centers.length} of ${controller.totalCenters.value} prospects match filters',
-                style: TextStyle(color: Colors.grey[600]),
-              )),
             ],
           ),
         ],
@@ -300,196 +120,61 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
     );
   }
 
-  Widget _buildGeographicFilters() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Geographic', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-
-            // Province selection
-            Text('Province:', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-            Obx(() => Wrap(
-              spacing: 4,
-              children: ['GT', 'KZN', 'WC', 'EC', 'LIM', 'MP', 'NW', 'FS', 'NC']
-                  .map((province) => FilterChip(
-                label: Text(province, style: const TextStyle(fontSize: 11)),
-                selected: controller.selectedProvinces.contains(province),
-                onSelected: (selected) => controller.toggleProvinceFilter(province),
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ))
-                  .toList(),
-            )),
-          ],
-        ),
-      ),
+  // Helper function to format numbers with thousand separators
+  String _formatNumber(int number) {
+    return number.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]},',
     );
   }
 
-  Widget _buildBusinessFilters() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Business Profile', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-
-            // Children count range
-            Text('Children Count:', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    decoration: const InputDecoration(
-                      hintText: 'Min',
-                      isDense: true,
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: TextInputType.number,
-                    onChanged: (value) => controller.minChildren.value = int.tryParse(value) ?? 0,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    decoration: const InputDecoration(
-                      hintText: 'Max',
-                      isDense: true,
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: TextInputType.number,
-                    onChanged: (value) => controller.maxChildren.value = int.tryParse(value) ?? 999,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 8),
-
-            // Registration status
-            Text('Registration Status:', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-            Obx(() => Column(
-              children: [
-                'Fully registered',
-                'Conditionally registered',
-                'In process',
-                'Not registered'
-              ].map((status) => CheckboxListTile(
-                title: Text(status, style: const TextStyle(fontSize: 12)),
-                value: controller.selectedRegistrationStatus.contains(status),
-                onChanged: (selected) => controller.toggleRegistrationFilter(status),
-                dense: true,
-                controlAffinity: ListTileControlAffinity.leading,
-              )).toList(),
-            )),
-          ],
-        ),
-      ),
+  // Helper function to format currency with thousand separators
+  String _formatCurrency(double amount) {
+    final formatted = amount.toStringAsFixed(2);
+    final parts = formatted.split('.');
+    final wholePart = parts[0].replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]},',
     );
+    return '$wholePart.${parts[1]}';
   }
 
-  Widget _buildCRMFilters() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('CRM Status', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-
-            // Lead score range
-            Text('Lead Score:', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-            Obx(() => RangeSlider(
-              values: RangeValues(
-                controller.minLeadScore.value.toDouble(),
-                controller.maxLeadScore.value.toDouble(),
-              ),
-              min: 0,
-              max: 100,
-              divisions: 10,
-              labels: RangeLabels(
-                controller.minLeadScore.value.toString(),
-                controller.maxLeadScore.value.toString(),
-              ),
-              onChanged: (values) {
-                controller.minLeadScore.value = values.start.round();
-                controller.maxLeadScore.value = values.end.round();
-              },
-            )),
-
-            // Contact data quality
-            Obx(() => CheckboxListTile(
-              title: const Text('Has Phone Number', style: TextStyle(fontSize: 12)),
-              value: controller.hasPhone.value,
-              onChanged: (value) => controller.hasPhone.value = value ?? false,
-              dense: true,
-            )),
-            Obx(() => CheckboxListTile(
-              title: const Text('Has Email Address', style: TextStyle(fontSize: 12)),
-              value: controller.hasEmail.value,
-              onChanged: (value) => controller.hasEmail.value = value ?? false,
-              dense: true,
-            )),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMetricsRow() {
+  Widget _buildMetricsSection() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.blue[50],
-        border: Border(bottom: BorderSide(color: Colors.grey[300]!)),
-      ),
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
       child: Obx(() => Row(
         children: [
-          _buildMetricCard(
-            'Total Prospects',
-            '${controller.centers.length}',
-            Icons.business,
-          ),
-          const SizedBox(width: 16),
-          _buildMetricCard(
-            'Total Children',
-            '${controller.totalChildren.value}',
-            Icons.child_care,
-          ),
-          const SizedBox(width: 16),
-          _buildMetricCard(
-            'Potential MRR',
-            'R${controller.totalPotentialMRR.value.toStringAsFixed(0)}',
-            Icons.attach_money,
-          ),
-          const SizedBox(width: 16),
-          _buildMetricCard(
-            'Avg Score',
-            controller.avgLeadScore.value.toStringAsFixed(1),
-            Icons.score,
-          ),
-          const Spacer(),
-          if (controller.selectedCenters.isNotEmpty)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.orange[100],
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Text(
-                '${controller.selectedCenters.length} selected',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.orange[700],
-                ),
-              ),
+          Expanded(
+            child: _buildMetricCard(
+              'Total Prospects',
+              _formatNumber(controller.centers.length),
+              Icons.business_outlined,
             ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: _buildMetricCard(
+              'Total Children',
+              _formatNumber(controller.totalChildren.value),
+              Icons.child_care_outlined,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: _buildMetricCard(
+              'Potential MRR',
+              'R${_formatCurrency(controller.totalPotentialMRR.value)}',
+              Icons.payments_outlined,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: _buildMetricCard(
+              'Avg. Score',
+              controller.avgLeadScore.value.toStringAsFixed(1),
+              Icons.analytics_outlined,
+            ),
+          ),
         ],
       )),
     );
@@ -497,33 +182,824 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
 
   Widget _buildMetricCard(String label, String value, IconData icon) {
     return Container(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[300]!),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: Colors.blue[600]),
-          const SizedBox(width: 4),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF875DEC).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              icon,
+              size: 24,
+              color: const Color(0xFF875DEC),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContentPanel() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Tabs header
+          _buildTabsHeader(),
+
+          // Content area
+          Expanded(
+            child: Obx(() {
+              switch (controller.selectedView.value) {
+                case 'map':
+                  return MarketExplorerMapView(
+                    prospects: controller.centers,
+                    onProspectSelected: (prospect) {
+                      controller.selectedProspectForDetail.value = prospect;
+                    },
+                  );
+                case 'analytics':
+                  return MarketExplorerAnalyticsView(
+                    prospects: controller.centers,
+                    analytics: controller.analytics.value,
+                    onRefresh: controller.fetchAnalytics,
+                  );
+                case 'list':
+                default:
+                  return _buildListContent();
+              }
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabsHeader() {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+          child: Row(
             children: [
-              Text(
-                value,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
+              // Tabs
+              Obx(() => Row(
+                children: [
+                  _buildTab('List', 'list', controller.selectedView.value == 'list'),
+                  const SizedBox(width: 24),
+                  _buildTab('Map', 'map', controller.selectedView.value == 'map'),
+                  const SizedBox(width: 24),
+                  _buildTab('Analytics', 'analytics', controller.selectedView.value == 'analytics'),
+                ],
+              )),
+
+              const Spacer(),
+
+              // Action buttons
+              Obx(() {
+                if (controller.selectedCenters.isNotEmpty && controller.selectedView.value == 'list') {
+                  return Row(
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: _showAssignRepDialog,
+                        icon: const Icon(Icons.person_add_outlined, size: 18),
+                        label: const Text('Assign Rep'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF875DEC),
+                          side: const BorderSide(color: Color(0xFF875DEC)),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      OutlinedButton.icon(
+                        onPressed: _showBulkUpdateDialog,
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        label: const Text('Bulk Update'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF875DEC),
+                          side: const BorderSide(color: Color(0xFF875DEC)),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
+                  );
+                }
+                return const SizedBox.shrink();
+              }),
+
+              // More menu
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_horiz, color: Color(0xFF6B7280)),
+                onSelected: _handleMenuAction,
+                itemBuilder: (context) => [
+                  const PopupMenuItem(value: 'export', child: Text('Export Data')),
+                  const PopupMenuItem(value: 'import', child: Text('Import Data')),
+                  const PopupMenuItem(value: 'bulk_enrich', child: Text('Bulk Enrich Contacts')),
+                  const PopupMenuItem(value: 'create_campaign', child: Text('Create Campaign')),
+                  const PopupMenuItem(value: 'territory_management', child: Text('Manage Territories')),
+                ],
+              ),
+            ],
+          ),
+        ),
+        // Divider positioned to align with active tab indicator
+        Stack(
+          children: [
+            Container(
+              height: 1,
+              margin: EdgeInsets.only(
+                left: controller.selectedView.value == 'list'
+                    ? 79  // Start 5px before "List" tab indicator end (84-5)
+                    : controller.selectedView.value == 'map'
+                    ? 163 // Start 5px before "Map" tab indicator end (168-5)
+                    : 263, // Start 5px before "Analytics" tab indicator end (268-5)
+                right: 5, // Stop 5px from right edge
+              ),
+              color: Colors.grey[200],
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTab(String label, String value, bool isSelected) {
+    return GestureDetector(
+      onTap: () => controller.toggleView(value),
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+              color: isSelected ? const Color(0xFF875DEC) : Colors.grey[600],
+              fontFamily: 'Roboto',
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            height: 3,
+            width: 60,
+            decoration: BoxDecoration(
+              color: isSelected ? const Color(0xFF875DEC) : Colors.transparent,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildListContent() {
+    // Check if we're in detail view
+    if (controller.selectedProspectForDetail.value != null) {
+      return Builder(
+        builder: (context) => _buildSplitView(context),
+      );
+    }
+
+    return Column(
+      children: [
+        // Search and filter bar
+        Container(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              // Search field
+              Expanded(
+                child: TextField(
+                  decoration: InputDecoration(
+                    hintText: 'Search by name, city, contact person...',
+                    hintStyle: const TextStyle(fontFamily: 'Roboto'),
+                    prefixIcon: const Icon(Icons.search, color: Color(0xFF6B7280)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Color(0xFF875DEC)),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                  onChanged: (value) => controller.searchQuery.value = value,
                 ),
               ),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 10,
-                  color: Colors.grey[600],
+              const SizedBox(width: 16),
+
+              // Filter button
+              OutlinedButton.icon(
+                onPressed: () => controller.toggleFilters(),
+                icon: Icon(
+                  controller.showFilters.value ? Icons.filter_list_off : Icons.filter_list,
+                  size: 20,
                 ),
+                label: const Text('Filter'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF875DEC),
+                  side: const BorderSide(color: Color(0xFF875DEC)),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Filters panel if shown
+        if (controller.showFilters.value) _buildFiltersPanel(),
+
+        // Data table
+        Expanded(
+          child: _buildDataTable(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSplitView(BuildContext context) {
+    final prospect = controller.selectedProspectForDetail.value!;
+
+    return Row(
+      children: [
+        // Left panel - Compressed list
+        Container(
+          width: 400,
+          decoration: BoxDecoration(
+            border: Border(
+              right: BorderSide(color: Colors.grey[200]!),
+            ),
+          ),
+          child: Column(
+            children: [
+              // Search and filter bar (compressed)
+              Container(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    // Search field
+                    Expanded(
+                      child: TextField(
+                        decoration: InputDecoration(
+                          hintText: 'Search schools...',
+                          hintStyle: const TextStyle(fontFamily: 'Roboto', fontSize: 14),
+                          prefixIcon: const Icon(Icons.search, color: Color(0xFF6B7280), size: 20),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Color(0xFF875DEC)),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          isDense: true,
+                        ),
+                        onChanged: (value) => controller.searchQuery.value = value,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Filter button
+                    IconButton(
+                      icon: Icon(
+                        controller.showFilters.value ? Icons.filter_list_off : Icons.filter_list,
+                        size: 20,
+                      ),
+                      onPressed: () => controller.toggleFilters(),
+                      tooltip: 'Filter',
+                      color: const Color(0xFF875DEC),
+                    ),
+                    // Close button
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () {
+                        controller.selectedProspectForDetail.value = null;
+                      },
+                      tooltip: 'Close details',
+                      color: Colors.grey[600],
+                    ),
+                  ],
+                ),
+              ),
+
+              // School list with custom scrollbar
+              Expanded(
+                child: Theme(
+                  data: Theme.of(context).copyWith(
+                    scrollbarTheme: ScrollbarThemeData(
+                      thumbVisibility: MaterialStateProperty.all(true),
+                      trackVisibility: MaterialStateProperty.all(true),
+                      thickness: MaterialStateProperty.all(3),
+                      thumbColor: MaterialStateProperty.all(const Color(0xFF875DEC)),
+                      trackColor: MaterialStateProperty.all(Colors.grey[200]),
+                      trackBorderColor: MaterialStateProperty.all(Colors.grey[200]),
+                      radius: const Radius.circular(2),
+                    ),
+                  ),
+                  child: Scrollbar(
+                    child: ListView.builder(
+                      itemCount: controller.centers.length,
+                      itemBuilder: (context, index) {
+                        final school = controller.centers[index];
+                        final isSelected = school.id == prospect.id;
+
+                        return InkWell(
+                          onTap: () {
+                            controller.selectedProspectForDetail.value = school;
+                          },
+                          onHover: (hovering) {
+                            // Handle hover state if needed
+                          },
+                          child: Container(
+                            height: 65,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: isSelected ? const Color(0xFF875DEC).withOpacity(0.05) : Colors.transparent,
+                              border: Border(
+                                bottom: BorderSide(color: Colors.grey[200]!),
+                                left: BorderSide(
+                                  color: isSelected ? const Color(0xFF875DEC) : Colors.transparent,
+                                  width: 3,
+                                ),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  _toCamelCase(school.ecdName),
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: isSelected ? const Color(0xFF875DEC) : Colors.black,
+                                    fontFamily: 'Roboto',
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                                const SizedBox(height: 2),
+                                if (school.contactPerson != null && school.contactPerson!.isNotEmpty)
+                                  Text(
+                                    _toCamelCase(school.contactPerson!),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                      fontFamily: 'Roboto',
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+
+              // Pagination at bottom
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(color: Colors.grey[200]!)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.first_page, size: 20),
+                      onPressed: controller.currentPage.value > 1
+                          ? () => controller.currentPage.value = 1
+                          : null,
+                      color: const Color(0xFF875DEC),
+                      padding: const EdgeInsets.all(4),
+                      constraints: const BoxConstraints(),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left, size: 20),
+                      onPressed: controller.currentPage.value > 1
+                          ? () => controller.currentPage.value--
+                          : null,
+                      color: const Color(0xFF875DEC),
+                      padding: const EdgeInsets.all(4),
+                      constraints: const BoxConstraints(),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      child: Text(
+                        'Page ${controller.currentPage.value} of ${controller.totalPages.value}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right, size: 20),
+                      onPressed: controller.hasMorePages
+                          ? () => controller.loadNextPage()
+                          : null,
+                      color: const Color(0xFF875DEC),
+                      padding: const EdgeInsets.all(4),
+                      constraints: const BoxConstraints(),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.last_page, size: 20),
+                      onPressed: controller.hasMorePages
+                          ? () => controller.currentPage.value = controller.totalPages.value
+                          : null,
+                      color: const Color(0xFF875DEC),
+                      padding: const EdgeInsets.all(4),
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Right panel - School details
+        Expanded(
+          child: _buildDetailPanel(prospect),
+        ),
+      ],
+    );
+  }
+
+  String _toCamelCase(String text) {
+    if (text.isEmpty) return text;
+    return text.split(' ').map((word) {
+      if (word.isEmpty) return word;
+      return word[0].toUpperCase() + word.substring(1).toLowerCase();
+    }).join(' ');
+  }
+
+  Widget _buildMiniStatusChip(String status) {
+    Color bgColor;
+    Color textColor;
+
+    switch (status) {
+      case 'Fully registered':
+        bgColor = Colors.green[50]!;
+        textColor = Colors.green[700]!;
+        break;
+      case 'Conditionally registered':
+        bgColor = Colors.orange[50]!;
+        textColor = Colors.orange[700]!;
+        break;
+      case 'In process':
+        bgColor = Colors.blue[50]!;
+        textColor = Colors.blue[700]!;
+        break;
+      default:
+        bgColor = Colors.grey[100]!;
+        textColor = Colors.grey[700]!;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        status.split(' ').first,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w500,
+          color: textColor,
+          fontFamily: 'Roboto',
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailPanel(ZAECDCenters prospect) {
+    return Container(
+      color: const Color(0xFFFAFAFA),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // School header
+            Container(
+              padding: const EdgeInsets.all(24),
+              color: Colors.white,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _toCamelCase(prospect.ecdName),
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'Roboto',
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                _buildStatusChip(prospect.registrationStatus),
+                                const SizedBox(width: 12),
+                                Text(
+                                  'Score: ${prospect.leadScore}',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: _getScoreColor(prospect.leadScore),
+                                    fontFamily: 'Roboto',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Schedule Demo button
+                      ElevatedButton.icon(
+                        onPressed: () => _scheduleDemo(prospect),
+                        icon: const Icon(Icons.calendar_today_outlined, size: 18),
+                        label: const Text('Schedule Demo'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF875DEC),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // CRM Actions bar
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              color: Colors.white,
+              child: Row(
+                children: [
+                  _buildCRMActionButton(Icons.email_outlined, 'Email', () => _emailProspect(prospect)),
+                  const SizedBox(width: 16),
+                  _buildCRMActionButton(Icons.phone_outlined, 'Call', () => _callProspect(prospect)),
+                  const SizedBox(width: 16),
+                  _buildCRMActionButton(Icons.note_add_outlined, 'Note', () => _addNote(prospect)),
+                  const SizedBox(width: 16),
+                  _buildCRMActionButton(Icons.task_outlined, 'Task', () => _createTask(prospect)),
+                  const SizedBox(width: 16),
+                  _buildCRMActionButton(Icons.event_outlined, 'Meeting', () => _scheduleMeeting(prospect)),
+                  const SizedBox(width: 16),
+                  // More menu for additional actions
+                  PopupMenuButton<String>(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey[300]!),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.more_horiz, size: 18, color: Color(0xFF6B7280)),
+                          const SizedBox(width: 6),
+                          const Text(
+                            'More',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF6B7280),
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    onSelected: (value) => _handleCRMAction(prospect, value),
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(value: 'log_sms', child: Text('Log SMS')),
+                      const PopupMenuItem(value: 'log_whatsapp', child: Text('Log WhatsApp')),
+                      const PopupMenuItem(value: 'log_linkedin', child: Text('Log LinkedIn Message')),
+                      const PopupMenuItem(value: 'log_activity', child: Text('Log Activity')),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Content sections
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Left column - Activities
+                  Expanded(
+                    flex: 2,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildSectionHeader('Recent Activities'),
+                        _buildActivityTimeline(prospect),
+                        const SizedBox(height: 24),
+                        _buildSectionHeader('Upcoming Tasks'),
+                        _buildUpcomingTasks(prospect),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 24),
+                  // Right column - School info
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildSectionHeader('About this School'),
+                        _buildSchoolInfo(prospect),
+                        const SizedBox(height: 24),
+                        _buildSectionHeader('Contacts'),
+                        _buildContactsSection(prospect),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFiltersPanel() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        border: Border(
+          top: BorderSide(color: Colors.grey[200]!),
+          bottom: BorderSide(color: Colors.grey[200]!),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Province filters
+          Text(
+            'Province',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[700],
+              fontFamily: 'Roboto',
+            ),
+          ),
+          const SizedBox(height: 8),
+          Obx(() => Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: ['GT', 'KZN', 'WC', 'EC', 'LIM', 'MP', 'NW', 'FS', 'NC']
+                .map((province) => FilterChip(
+              label: Text(province),
+              selected: controller.selectedProvinces.contains(province),
+              onSelected: (selected) => controller.toggleProvinceFilter(province),
+              selectedColor: const Color(0xFF875DEC).withOpacity(0.2),
+              checkmarkColor: const Color(0xFF875DEC),
+              labelStyle: TextStyle(
+                color: controller.selectedProvinces.contains(province)
+                    ? const Color(0xFF875DEC)
+                    : Colors.grey[700],
+                fontFamily: 'Roboto',
+              ),
+            ))
+                .toList(),
+          )),
+
+          const SizedBox(height: 16),
+
+          // Registration status filters
+          Text(
+            'Registration Status',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[700],
+              fontFamily: 'Roboto',
+            ),
+          ),
+          const SizedBox(height: 8),
+          Obx(() => Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              'Fully registered',
+              'Conditionally registered',
+              'In process',
+              'Not registered'
+            ].map((status) => FilterChip(
+              label: Text(status),
+              selected: controller.selectedRegistrationStatus.contains(status),
+              onSelected: (selected) => controller.toggleRegistrationFilter(status),
+              selectedColor: const Color(0xFF875DEC).withOpacity(0.2),
+              checkmarkColor: const Color(0xFF875DEC),
+              labelStyle: TextStyle(
+                color: controller.selectedRegistrationStatus.contains(status)
+                    ? const Color(0xFF875DEC)
+                    : Colors.grey[700],
+                fontFamily: 'Roboto',
+              ),
+            )).toList(),
+          )),
+
+          const SizedBox(height: 16),
+
+          // Action buttons
+          Row(
+            children: [
+              ElevatedButton(
+                onPressed: controller.fetchCenters,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF875DEC),
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Apply Filters'),
+              ),
+              const SizedBox(width: 12),
+              TextButton(
+                onPressed: controller.clearFilters,
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.grey[600],
+                ),
+                child: const Text('Clear All'),
               ),
             ],
           ),
@@ -532,31 +1008,12 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
     );
   }
 
-  Widget _buildContentArea() {
-    return Obx(() {
-      switch (controller.selectedView.value) {
-        case 'map':
-          return MarketExplorerMapView(
-            prospects: controller.centers,
-            onProspectSelected: _viewProspectDetails,
-          );
-        case 'analytics':
-          return MarketExplorerAnalyticsView(
-            prospects: controller.centers,
-            analytics: controller.analytics.value,
-            onRefresh: controller.fetchAnalytics,
-          );
-        case 'list':
-        default:
-          return _buildListView();
-      }
-    });
-  }
-
-  Widget _buildListView() {
+  Widget _buildDataTable() {
     return Obx(() {
       if (controller.isLoading.value && controller.centers.isEmpty) {
-        return const Center(child: CircularProgressIndicator());
+        return const Center(child: CircularProgressIndicator(
+          color: Color(0xFF875DEC),
+        ));
       }
 
       if (controller.centers.isEmpty) {
@@ -568,86 +1025,94 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
               const SizedBox(height: 16),
               Text(
                 'No ECD Centers found',
-                style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                style: TextStyle(
+                  fontSize: 18,
+                  color: Colors.grey[600],
+                  fontFamily: 'Roboto',
+                ),
               ),
               const SizedBox(height: 8),
               Text(
                 'Try adjusting your filters',
-                style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[500],
+                  fontFamily: 'Roboto',
+                ),
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
                 onPressed: controller.clearFilters,
                 icon: const Icon(Icons.clear),
                 label: const Text('Clear Filters'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF875DEC),
+                  foregroundColor: Colors.white,
+                ),
               ),
             ],
           ),
         );
       }
 
-      return Container(
-        color: Colors.white,
-        child: Column(
-          children: [
-            // Table with DataTable2 for better performance
-            Expanded(
-              child: DataTable2(
-                columnSpacing: 12,
-                horizontalMargin: 12,
-                minWidth: 1200,
-                showCheckboxColumn: true,
-                onSelectAll: (selected) {
-                  if (selected ?? false) {
-                    controller.selectAllCenters();
-                  } else {
-                    controller.clearSelection();
-                  }
-                },
-                columns: [
-                  DataColumn2(
-                    label: const Text('ECD Name'),
-                    size: ColumnSize.L,
-                    onSort: (columnIndex, ascending) =>
-                        controller.setSorting('ecdName'),
-                  ),
-                  const DataColumn2(
-                    label: Text('Province'),
-                    size: ColumnSize.S,
-                  ),
-                  const DataColumn2(
-                    label: Text('City'),
-                    size: ColumnSize.M,
-                  ),
-                  const DataColumn2(
-                    label: Text('Children'),
-                    size: ColumnSize.S,
-                    numeric: true,
-                  ),
-                  const DataColumn2(
-                    label: Text('Score'),
-                    size: ColumnSize.S,
-                    numeric: true,
-                  ),
-                  const DataColumn2(
-                    label: Text('Status'),
-                    size: ColumnSize.M,
-                  ),
-                  const DataColumn2(
-                    label: Text('Actions'),
-                    size: ColumnSize.M,
-                  ),
-                ],
-                rows: controller.centers.map((center) =>
-                    _buildProspectRow(center)
-                ).toList(),
-              ),
+      return Column(
+        children: [
+          Expanded(
+            child: DataTable2(
+              columnSpacing: 12,
+              horizontalMargin: 24,
+              minWidth: 1200,
+              showCheckboxColumn: true,
+              onSelectAll: (selected) {
+                if (selected ?? false) {
+                  controller.selectAllCenters();
+                } else {
+                  controller.clearSelection();
+                }
+              },
+              columns: [
+                DataColumn2(
+                  label: const Text('School Name', style: TextStyle(fontFamily: 'Roboto')),
+                  size: ColumnSize.L,
+                  onSort: (columnIndex, ascending) =>
+                      controller.setSorting('ecdName'),
+                ),
+                const DataColumn2(
+                  label: Text('Province', style: TextStyle(fontFamily: 'Roboto')),
+                  size: ColumnSize.S,
+                ),
+                const DataColumn2(
+                  label: Text('City', style: TextStyle(fontFamily: 'Roboto')),
+                  size: ColumnSize.M,
+                ),
+                const DataColumn2(
+                  label: Text('Children', style: TextStyle(fontFamily: 'Roboto')),
+                  size: ColumnSize.S,
+                  numeric: true,
+                ),
+                const DataColumn2(
+                  label: Text('Score', style: TextStyle(fontFamily: 'Roboto')),
+                  size: ColumnSize.S,
+                  numeric: true,
+                ),
+                const DataColumn2(
+                  label: Text('Status', style: TextStyle(fontFamily: 'Roboto')),
+                  size: ColumnSize.M,
+                ),
+                const DataColumn2(
+                  label: Text('Actions', style: TextStyle(fontFamily: 'Roboto')),
+                  size: ColumnSize.M,
+                ),
+              ],
+              rows: controller.centers.map((center) =>
+                  _buildProspectRow(center)
+              ).toList(),
             ),
+          ),
 
-            // Pagination
-            _buildPagination(),
-          ],
-        ),
+          // Pagination
+          _buildPagination(),
+        ],
       );
     });
   }
@@ -658,81 +1123,579 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
       onSelectChanged: (selected) => controller.toggleCenterSelection(prospect),
       cells: [
         DataCell(
-          Row(
-            children: [
-              _buildLeadScoreIndicator(prospect.leadScore),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      prospect.ecdName,
-                      style: const TextStyle(fontWeight: FontWeight.w500),
-                      overflow: TextOverflow.ellipsis,
+          InkWell(
+            onTap: () {
+              controller.selectedProspectForDetail.value = prospect;
+            },
+            onHover: (hovering) {
+              // Handle hover state for color change
+            },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: Text(
+                    _toCamelCase(prospect.ecdName),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                      fontFamily: 'Roboto',
                     ),
-                    if (prospect.contactPerson != null && prospect.contactPerson!.isNotEmpty)
-                      Text(
-                        prospect.contactPerson!,
-                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                  ],
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
-            ],
+                if (prospect.contactPerson != null && prospect.contactPerson!.isNotEmpty)
+                  const SizedBox(height: 2),
+                if (prospect.contactPerson != null && prospect.contactPerson!.isNotEmpty)
+                  Text(
+                    _toCamelCase(prospect.contactPerson!),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey[600],
+                      fontFamily: 'Roboto',
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
+            ),
           ),
         ),
-        DataCell(Text(prospect.province)),
-        DataCell(Text(prospect.townCity ?? '')),
-        DataCell(Text(prospect.numberOfChildren.toString())),
+        DataCell(Text(prospect.province, style: const TextStyle(fontFamily: 'Roboto'))),
+        DataCell(Text(_toCamelCase(prospect.townCity ?? ''), style: const TextStyle(fontFamily: 'Roboto'))),
+        DataCell(Text(_formatNumber(prospect.numberOfChildren), style: const TextStyle(fontFamily: 'Roboto'))),
         DataCell(Text(
           prospect.leadScore.toString(),
           style: TextStyle(
             fontWeight: FontWeight.bold,
             color: _getScoreColor(prospect.leadScore),
+            fontFamily: 'Roboto',
           ),
         )),
-        DataCell(Row(
-          children: [
-            _buildRegistrationStatusIndicator(prospect.registrationStatus),
-            const SizedBox(width: 4),
-            Expanded(
-              child: Text(
-                prospect.leadStatus,
-                style: const TextStyle(fontSize: 12),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        )),
+        DataCell(_buildStatusChip(prospect.registrationStatus)),
         DataCell(Row(
           children: [
             IconButton(
-              icon: const Icon(Icons.visibility, size: 16),
-              onPressed: () => _viewProspectDetails(prospect),
+              icon: const Icon(Icons.visibility_outlined, size: 18),
+              onPressed: () => controller.selectedProspectForDetail.value = prospect,
               tooltip: 'View Details',
+              color: const Color(0xFF6B7280),
             ),
             if (prospect.telephone != null && prospect.telephone!.isNotEmpty)
               IconButton(
-                icon: const Icon(Icons.phone, size: 16),
+                icon: const Icon(Icons.phone_outlined, size: 18),
                 onPressed: () => _callProspect(prospect),
                 tooltip: 'Call',
+                color: const Color(0xFF6B7280),
               ),
             PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, size: 16),
+              icon: const Icon(Icons.more_vert, size: 18, color: Color(0xFF6B7280)),
               onSelected: (action) => _handleProspectAction(prospect, action),
               itemBuilder: (context) => [
                 const PopupMenuItem(value: 'add_to_campaign', child: Text('Add to Campaign')),
                 const PopupMenuItem(value: 'schedule_demo', child: Text('Schedule Demo')),
                 const PopupMenuItem(value: 'mark_contacted', child: Text('Mark as Contacted')),
-                const PopupMenuItem(value: 'add_note', child: Text('Add Note')),
               ],
             ),
           ],
         )),
       ],
+    );
+  }
+
+  Widget _buildStatusChip(String status) {
+    Color bgColor;
+    Color textColor;
+
+    switch (status) {
+      case 'Fully registered':
+        bgColor = Colors.green[50]!;
+        textColor = Colors.green[700]!;
+        break;
+      case 'Conditionally registered':
+        bgColor = Colors.orange[50]!;
+        textColor = Colors.orange[700]!;
+        break;
+      case 'In process':
+        bgColor = Colors.blue[50]!;
+        textColor = Colors.blue[700]!;
+        break;
+      default:
+        bgColor = Colors.grey[100]!;
+        textColor = Colors.grey[700]!;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        status,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+          color: textColor,
+          fontFamily: 'Roboto',
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMasterDetailView() {
+    final prospect = controller.selectedProspectForDetail.value!;
+
+    return Row(
+      children: [
+        // Left panel - School list (compressed)
+        Container(
+          width: 350,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(
+              right: BorderSide(color: Colors.grey[200]!),
+            ),
+          ),
+          child: Column(
+            children: [
+              // Header with back button
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: Colors.grey[200]!),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      onPressed: () {
+                        controller.selectedProspectForDetail.value = null;
+                      },
+                      color: const Color(0xFF875DEC),
+                    ),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Schools',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Scrollable list of schools
+              Expanded(
+                child: ListView.builder(
+                  itemCount: controller.centers.length,
+                  itemBuilder: (context, index) {
+                    final school = controller.centers[index];
+                    final isSelected = school.id == prospect.id;
+
+                    return InkWell(
+                      onTap: () {
+                        controller.selectedProspectForDetail.value = school;
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isSelected ? const Color(0xFF875DEC).withOpacity(0.1) : Colors.white,
+                          border: Border(
+                            bottom: BorderSide(color: Colors.grey[200]!),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              school.ecdName,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                color: isSelected ? const Color(0xFF875DEC) : Colors.black87,
+                                fontFamily: 'Roboto',
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${school.townCity ?? ''} • ${school.numberOfChildren} children',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                                fontFamily: 'Roboto',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Right panel - School details (HubSpot-style)
+        Expanded(
+          child: Container(
+            color: const Color(0xFFFAFAFA),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // School header
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    color: Colors.white,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    prospect.ecdName,
+                                    style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'Roboto',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      _buildStatusChip(prospect.registrationStatus),
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        'Score: ${prospect.leadScore}',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: _getScoreColor(prospect.leadScore),
+                                          fontFamily: 'Roboto',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Action buttons
+                            Row(
+                              children: [
+                                ElevatedButton.icon(
+                                  onPressed: () => _scheduleDemo(prospect),
+                                  icon: const Icon(Icons.calendar_today_outlined, size: 18),
+                                  label: const Text('Schedule Demo'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF875DEC),
+                                    foregroundColor: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                OutlinedButton.icon(
+                                  onPressed: () => _addNote(prospect),
+                                  icon: const Icon(Icons.note_add_outlined, size: 18),
+                                  label: const Text('Add Note'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFF875DEC),
+                                    side: const BorderSide(color: Color(0xFF875DEC)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // CRM Actions bar
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    color: Colors.white,
+                    child: Row(
+                      children: [
+                        _buildCRMActionButton(Icons.email_outlined, 'Email', () => _emailProspect(prospect)),
+                        const SizedBox(width: 16),
+                        _buildCRMActionButton(Icons.phone_outlined, 'Call', () => _callProspect(prospect)),
+                        const SizedBox(width: 16),
+                        _buildCRMActionButton(Icons.task_outlined, 'Task', () => _createTask(prospect)),
+                        const SizedBox(width: 16),
+                        _buildCRMActionButton(Icons.event_outlined, 'Meeting', () => _scheduleMeeting(prospect)),
+                        const SizedBox(width: 16),
+                        // More menu for additional actions
+                        PopupMenuButton<String>(
+                          child: Row(
+                            children: [
+                              const Icon(Icons.more_horiz, size: 20, color: Color(0xFF6B7280)),
+                              const SizedBox(width: 4),
+                              const Text('More', style: TextStyle(color: Color(0xFF6B7280))),
+                            ],
+                          ),
+                          onSelected: (value) => _handleCRMAction(prospect, value),
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(value: 'log_sms', child: Text('Log SMS')),
+                            const PopupMenuItem(value: 'log_whatsapp', child: Text('Log WhatsApp')),
+                            const PopupMenuItem(value: 'log_linkedin', child: Text('Log LinkedIn Message')),
+                            const PopupMenuItem(value: 'log_activity', child: Text('Log Activity')),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Content sections
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Left column - Activities
+                        Expanded(
+                          flex: 2,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildSectionHeader('Recent Activities'),
+                              _buildActivityTimeline(prospect),
+                              const SizedBox(height: 24),
+                              _buildSectionHeader('Upcoming Tasks'),
+                              _buildUpcomingTasks(prospect),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 24),
+                        // Right column - School info
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildSectionHeader('About this School'),
+                              _buildSchoolInfo(prospect),
+                              const SizedBox(height: 24),
+                              _buildSectionHeader('Contacts'),
+                              _buildContactsSection(prospect),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCRMActionButton(IconData icon, String label, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey[300]!),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: const Color(0xFF6B7280)),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF6B7280),
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Container(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          fontFamily: 'Roboto',
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActivityTimeline(ZAECDCenters prospect) {
+    // This would be populated with actual activity data
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: const Text(
+        'No recent activities',
+        style: TextStyle(
+          color: Colors.grey,
+          fontFamily: 'Roboto',
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUpcomingTasks(ZAECDCenters prospect) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: const Text(
+        'No upcoming tasks',
+        style: TextStyle(
+          color: Colors.grey,
+          fontFamily: 'Roboto',
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSchoolInfo(ZAECDCenters prospect) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildInfoRow('Province', prospect.province),
+          _buildInfoRow('City', prospect.townCity ?? 'N/A'),
+          _buildInfoRow('Children', prospect.numberOfChildren.toString()),
+          _buildInfoRow('Registration', prospect.registrationStatus),
+          _buildInfoRow('Lead Status', prospect.leadStatus),
+          if (prospect.streetAddress != null)
+            _buildInfoRow('Address', prospect.streetAddress!),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContactsSection(ZAECDCenters prospect) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (prospect.contactPerson != null && prospect.contactPerson!.isNotEmpty)
+            _buildContactCard(prospect.contactPerson!, prospect.telephone, prospect.email),
+          if (prospect.contactPerson == null || prospect.contactPerson!.isEmpty)
+            const Text(
+              'No contacts available',
+              style: TextStyle(
+                color: Colors.grey,
+                fontFamily: 'Roboto',
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContactCard(String name, String? phone, String? email) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          name,
+          style: const TextStyle(
+            fontWeight: FontWeight.w500,
+            fontFamily: 'Roboto',
+          ),
+        ),
+        const SizedBox(height: 4),
+        if (phone != null && phone.isNotEmpty)
+          Text(
+            phone,
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey[600],
+              fontFamily: 'Roboto',
+            ),
+          ),
+        if (email != null && email.isNotEmpty)
+          Text(
+            email,
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey[600],
+              fontFamily: 'Roboto',
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey[600],
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -749,47 +1712,20 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
     }
 
     return Container(
-      width: 8,
+      width: 4,
       height: 32,
       decoration: BoxDecoration(
         color: color,
-        borderRadius: BorderRadius.circular(4),
-      ),
-    );
-  }
-
-  Widget _buildRegistrationStatusIndicator(String status) {
-    Color color;
-    switch (status) {
-      case 'Fully registered':
-        color = Colors.green;
-        break;
-      case 'Conditionally registered':
-        color = Colors.orange;
-        break;
-      case 'In process':
-        color = Colors.blue;
-        break;
-      default:
-        color = Colors.grey;
-    }
-
-    return Container(
-      width: 8,
-      height: 8,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
+        borderRadius: BorderRadius.circular(2),
       ),
     );
   }
 
   Widget _buildPagination() {
-    return Obx(() => Container(
+    return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey[300]!)),
+        border: Border(top: BorderSide(color: Colors.grey[200]!)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -799,22 +1735,27 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
             onPressed: controller.currentPage.value > 1
                 ? () => controller.currentPage.value = 1
                 : null,
+            color: const Color(0xFF875DEC),
           ),
           IconButton(
             icon: const Icon(Icons.chevron_left),
             onPressed: controller.currentPage.value > 1
                 ? () => controller.currentPage.value--
                 : null,
+            color: const Color(0xFF875DEC),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey[300]!),
+              border: Border.all(color: const Color(0xFF875DEC).withOpacity(0.3)),
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
               'Page ${controller.currentPage.value} of ${controller.totalPages.value}',
-              style: const TextStyle(fontWeight: FontWeight.w500),
+              style: const TextStyle(
+                fontWeight: FontWeight.w500,
+                fontFamily: 'Roboto',
+              ),
             ),
           ),
           IconButton(
@@ -822,47 +1763,18 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
             onPressed: controller.hasMorePages
                 ? () => controller.loadNextPage()
                 : null,
+            color: const Color(0xFF875DEC),
           ),
           IconButton(
             icon: const Icon(Icons.last_page),
             onPressed: controller.hasMorePages
                 ? () => controller.currentPage.value = controller.totalPages.value
                 : null,
+            color: const Color(0xFF875DEC),
           ),
         ],
       ),
-    ));
-  }
-
-  Widget _buildBulkActions() {
-    return Row(
-      children: [
-        ElevatedButton.icon(
-          icon: const Icon(Icons.person_add, size: 16),
-          label: const Text('Assign Rep'),
-          onPressed: _showAssignRepDialog,
-        ),
-        const SizedBox(width: 8),
-        ElevatedButton.icon(
-          icon: const Icon(Icons.update, size: 16),
-          label: const Text('Bulk Update'),
-          onPressed: _showBulkUpdateDialog,
-        ),
-      ],
     );
-  }
-
-  Widget? _buildFloatingActions() {
-    return Obx(() {
-      if (controller.selectedView.value == 'list') {
-        return FloatingActionButton.extended(
-          onPressed: _showAddProspectDialog,
-          icon: const Icon(Icons.add),
-          label: const Text('Add Prospect'),
-        );
-      }
-      return const SizedBox.shrink();
-    });
   }
 
   Color _getScoreColor(int score) {
@@ -872,21 +1784,74 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
     return Colors.grey;
   }
 
-  // ... [Rest of the helper methods remain the same] ...
-
-  void _viewProspectDetails(ZAECDCenters prospect) {
-    Get.toNamed(
-      AppRoutes.adminMarketExplorerDetail.replaceAll(':id', prospect.id),
-      parameters: {'id': prospect.id},
-    );
-  }
-
+  // Helper methods for actions
   void _callProspect(ZAECDCenters prospect) {
     Get.snackbar(
       'Call',
       'Calling ${prospect.contactPerson ?? prospect.ecdName} at ${prospect.telephone}',
       snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: const Color(0xFF875DEC),
+      colorText: Colors.white,
     );
+  }
+
+  void _emailProspect(ZAECDCenters prospect) {
+    Get.snackbar(
+      'Email',
+      'Opening email composer for ${prospect.ecdName}',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: const Color(0xFF875DEC),
+      colorText: Colors.white,
+    );
+  }
+
+  void _createTask(ZAECDCenters prospect) {
+    _showTaskDialog(prospect);
+  }
+
+  void _scheduleMeeting(ZAECDCenters prospect) {
+    _showMeetingDialog(prospect);
+  }
+
+  void _scheduleDemo(ZAECDCenters prospect) {
+    _showScheduleDemoDialog(prospect);
+  }
+
+  void _addNote(ZAECDCenters prospect) {
+    _showAddNoteDialog(prospect);
+  }
+
+  void _handleCRMAction(ZAECDCenters prospect, String action) {
+    switch (action) {
+      case 'log_sms':
+        _showLogActivityDialog(prospect, 'SMS');
+        break;
+      case 'log_whatsapp':
+        _showLogActivityDialog(prospect, 'WhatsApp');
+        break;
+      case 'log_linkedin':
+        _showLogActivityDialog(prospect, 'LinkedIn');
+        break;
+      case 'log_activity':
+        _showLogActivityDialog(prospect, 'Activity');
+        break;
+    }
+  }
+
+  void _showQuickActionsMenu(BuildContext context, ZAECDCenters prospect) {
+    showMenu(
+      context: context,
+      position: RelativeRect.fill,
+      items: [
+        const PopupMenuItem(value: 'add_to_campaign', child: Text('Add to Campaign')),
+        const PopupMenuItem(value: 'schedule_demo', child: Text('Schedule Demo')),
+        const PopupMenuItem(value: 'mark_contacted', child: Text('Mark as Contacted')),
+      ],
+    ).then((value) {
+      if (value != null) {
+        _handleProspectAction(prospect, value);
+      }
+    });
   }
 
   void _handleProspectAction(ZAECDCenters prospect, String action) async {
@@ -904,14 +1869,17 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
           prospect.pipelineStage,
         );
         break;
-      case 'add_note':
-        _showAddNoteDialog(prospect);
-        break;
     }
   }
 
   void _handleMenuAction(String action) {
     switch (action) {
+      case 'export':
+        _showExportDialog();
+        break;
+      case 'import':
+        _showImportDialog();
+        break;
       case 'bulk_enrich':
         _showBulkEnrichDialog();
         break;
@@ -921,13 +1889,67 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
       case 'territory_management':
         Get.toNamed('/territories');
         break;
-      case 'import_data':
-        _showImportDialog();
-        break;
     }
   }
 
-  // ... [All dialog methods remain the same] ...
+  // Dialog methods remain the same but with updated styling
+  void _showAddProspectDialog() {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Add New ECD Prospect'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              TextField(
+                decoration: InputDecoration(
+                  labelText: 'ECD Name',
+                  hintText: 'Enter ECD center name',
+                ),
+              ),
+              SizedBox(height: 16),
+              TextField(
+                decoration: InputDecoration(
+                  labelText: 'Contact Person',
+                  hintText: 'Enter contact person name',
+                ),
+              ),
+              SizedBox(height: 16),
+              TextField(
+                decoration: InputDecoration(
+                  labelText: 'Phone Number',
+                  hintText: 'Enter phone number',
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: Get.back,
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Get.back();
+              Get.snackbar(
+                'Success',
+                'New prospect added successfully',
+                snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: const Color(0xFF875DEC),
+                colorText: Colors.white,
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF875DEC),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
 
   void _showExportDialog() {
     Get.dialog(
@@ -975,8 +1997,8 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
             const SizedBox(height: 16),
             const TextField(
               decoration: InputDecoration(
-                labelText: 'Sales Rep ID',
-                hintText: 'Enter sales rep ID',
+                labelText: 'Sales Rep',
+                hintText: 'Select sales representative',
               ),
             ),
           ],
@@ -993,8 +2015,14 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
                 'Success',
                 'Sales rep assigned to ${controller.selectedCenters.length} centers',
                 snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: const Color(0xFF875DEC),
+                colorText: Colors.white,
               );
             },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF875DEC),
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Assign'),
           ),
         ],
@@ -1031,8 +2059,14 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
                 'Success',
                 'Updated ${controller.selectedCenters.length} centers',
                 snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: const Color(0xFF875DEC),
+                colorText: Colors.white,
               );
             },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF875DEC),
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Update'),
           ),
         ],
@@ -1040,36 +2074,21 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
     );
   }
 
-  void _showAddProspectDialog() {
+  void _showImportDialog() {
     Get.dialog(
       AlertDialog(
-        title: const Text('Add New ECD Prospect'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: const [
-              TextField(
-                decoration: InputDecoration(
-                  labelText: 'ECD Name',
-                  hintText: 'Enter ECD center name',
-                ),
-              ),
-              SizedBox(height: 16),
-              TextField(
-                decoration: InputDecoration(
-                  labelText: 'Contact Person',
-                  hintText: 'Enter contact person name',
-                ),
-              ),
-              SizedBox(height: 16),
-              TextField(
-                decoration: InputDecoration(
-                  labelText: 'Phone Number',
-                  hintText: 'Enter phone number',
-                ),
-              ),
-            ],
-          ),
+        title: const Text('Import ECD Center Data'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Select a CSV file to import additional ECD center data.'),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: null,
+              icon: const Icon(Icons.upload_file),
+              label: const Text('Choose File'),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -1080,12 +2099,50 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
             onPressed: () {
               Get.back();
               Get.snackbar(
-                'Success',
-                'New prospect added successfully',
+                'Processing',
+                'Importing ECD center data...',
                 snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: const Color(0xFF875DEC),
+                colorText: Colors.white,
               );
             },
-            child: const Text('Add'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF875DEC),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Import'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showBulkEnrichDialog() {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Bulk Enrich Contact Data'),
+        content: const Text('This feature will enrich contact information for selected centers.'),
+        actions: [
+          TextButton(
+            onPressed: Get.back,
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Get.back();
+              Get.snackbar(
+                'Processing',
+                'Enriching contact data for selected centers...',
+                snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: const Color(0xFF875DEC),
+                colorText: Colors.white,
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF875DEC),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Start Enrichment'),
           ),
         ],
       ),
@@ -1119,8 +2176,14 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
                 'Success',
                 '${prospect.ecdName} added to campaign',
                 snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: const Color(0xFF875DEC),
+                colorText: Colors.white,
               );
             },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF875DEC),
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Add'),
           ),
         ],
@@ -1134,15 +2197,15 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
         title: Text('Schedule Demo for ${prospect.ecdName}'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          children: [
-            const TextField(
+          children: const [
+            TextField(
               decoration: InputDecoration(
                 labelText: 'Date',
                 hintText: 'Select date',
               ),
             ),
-            const SizedBox(height: 16),
-            const TextField(
+            SizedBox(height: 16),
+            TextField(
               decoration: InputDecoration(
                 labelText: 'Time',
                 hintText: 'Select time',
@@ -1162,8 +2225,14 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
                 'Success',
                 'Demo scheduled for ${prospect.ecdName}',
                 snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: const Color(0xFF875DEC),
+                colorText: Colors.white,
               );
             },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF875DEC),
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Schedule'),
           ),
         ],
@@ -1195,8 +2264,19 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
               if (noteController.text.isNotEmpty) {
                 controller.addNote(prospect.id, noteController.text, 'general');
                 Get.back();
+                Get.snackbar(
+                  'Success',
+                  'Note added successfully',
+                  snackPosition: SnackPosition.BOTTOM,
+                  backgroundColor: const Color(0xFF875DEC),
+                  colorText: Colors.white,
+                );
               }
             },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF875DEC),
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Add Note'),
           ),
         ],
@@ -1204,45 +2284,34 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
     );
   }
 
-  void _showBulkEnrichDialog() {
+  void _showTaskDialog(ZAECDCenters prospect) {
     Get.dialog(
       AlertDialog(
-        title: const Text('Bulk Enrich Contact Data'),
-        content: const Text('This feature will enrich contact information for selected centers.'),
-        actions: [
-          TextButton(
-            onPressed: Get.back,
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Get.back();
-              Get.snackbar(
-                'Processing',
-                'Enriching contact data for selected centers...',
-                snackPosition: SnackPosition.BOTTOM,
-              );
-            },
-            child: const Text('Start Enrichment'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showImportDialog() {
-    Get.dialog(
-      AlertDialog(
-        title: const Text('Import ECD Center Data'),
+        title: Text('Create Task for ${prospect.ecdName}'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Select a CSV file to import additional ECD center data.'),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: null, // TODO: Implement file picker
-              icon: const Icon(Icons.upload_file),
-              label: const Text('Choose File'),
+          children: const [
+            TextField(
+              decoration: InputDecoration(
+                labelText: 'Task Title',
+                hintText: 'Enter task title',
+              ),
+            ),
+            SizedBox(height: 16),
+            TextField(
+              decoration: InputDecoration(
+                labelText: 'Due Date',
+                hintText: 'Select due date',
+              ),
+            ),
+            SizedBox(height: 16),
+            TextField(
+              maxLines: 3,
+              decoration: InputDecoration(
+                labelText: 'Description',
+                hintText: 'Enter task description',
+                border: OutlineInputBorder(),
+              ),
             ),
           ],
         ),
@@ -1255,12 +2324,124 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
             onPressed: () {
               Get.back();
               Get.snackbar(
-                'Processing',
-                'Importing ECD center data...',
+                'Success',
+                'Task created successfully',
                 snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: const Color(0xFF875DEC),
+                colorText: Colors.white,
               );
             },
-            child: const Text('Import'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF875DEC),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Create Task'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showMeetingDialog(ZAECDCenters prospect) {
+    Get.dialog(
+      AlertDialog(
+        title: Text('Schedule Meeting with ${prospect.ecdName}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            TextField(
+              decoration: InputDecoration(
+                labelText: 'Meeting Title',
+                hintText: 'Enter meeting title',
+              ),
+            ),
+            SizedBox(height: 16),
+            TextField(
+              decoration: InputDecoration(
+                labelText: 'Date & Time',
+                hintText: 'Select date and time',
+              ),
+            ),
+            SizedBox(height: 16),
+            TextField(
+              decoration: InputDecoration(
+                labelText: 'Location/Link',
+                hintText: 'Enter location or meeting link',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: Get.back,
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Get.back();
+              Get.snackbar(
+                'Success',
+                'Meeting scheduled successfully',
+                snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: const Color(0xFF875DEC),
+                colorText: Colors.white,
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF875DEC),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Schedule'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLogActivityDialog(ZAECDCenters prospect, String activityType) {
+    Get.dialog(
+      AlertDialog(
+        title: Text('Log $activityType for ${prospect.ecdName}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              decoration: InputDecoration(
+                labelText: '$activityType Details',
+                hintText: 'Enter details about the $activityType',
+              ),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 16),
+            const TextField(
+              decoration: InputDecoration(
+                labelText: 'Date & Time',
+                hintText: 'When did this occur?',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: Get.back,
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Get.back();
+              Get.snackbar(
+                'Success',
+                '$activityType logged successfully',
+                snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: const Color(0xFF875DEC),
+                colorText: Colors.white,
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF875DEC),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Log Activity'),
           ),
         ],
       ),
