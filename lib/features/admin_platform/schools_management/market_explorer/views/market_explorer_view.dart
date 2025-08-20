@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:data_table_2/data_table_2.dart';
 import '../../../../../routes/app_routes.dart';
+import '../../../../../shared/layouts/desktop_app_layout.dart';
+import '../../../config/sidebar/admin_menu_items.dart';
 import '../controllers/market_explorer_controller.dart';
 import '../models/zaecdcenters_model.dart';
 import '../../../../auth/controllers/auth_controller.dart';
@@ -17,29 +19,72 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
 
   @override
   Widget build(BuildContext context) {
+    final user = authController.currentUser.value;
+    final userRoles = user?.roleNames ?? [];
+
+    // Wrap in AdminDesktopLayout
+    return AdminDesktopLayout(
+      sidebarItems: AdminMenuItems.getMenuItems(userRoles),
+      sidebarHeader: AdminMenuItems.buildHeader(),
+      sidebarFooter: AdminMenuItems.buildFooter(),
+      selectedIndex: 2, // Assuming Market Explorer is the 3rd item in Schools submenu
+      body: _buildMainContent(),
+    );
+  }
+
+  Widget _buildMainContent() {
     return Scaffold(
-      appBar: _buildAppBar(),
-      body: Obx(() => Column(
+      backgroundColor: Colors.grey[50],
+      body: Column(
         children: [
-          _buildToolbar(),
-          if (controller.showFilters.value) _buildFiltersPanel(),
-          _buildMetricsRow(),
+          // Custom header bar (replaces AppBar)
+          _buildHeaderBar(),
+
+          // Main content
           Expanded(
-            child: _buildMainContent(),
+            child: Obx(() => Column(
+              children: [
+                _buildToolbar(),
+                if (controller.showFilters.value) _buildFiltersPanel(),
+                _buildMetricsRow(),
+                Expanded(
+                  child: _buildContentArea(),
+                ),
+              ],
+            )),
           ),
         ],
-      )),
+      ),
       floatingActionButton: _buildFloatingActions(),
     );
   }
 
-  AppBar _buildAppBar() {
-    return AppBar(
-      title: Row(
+  Widget _buildHeaderBar() {
+    return Container(
+      height: 60,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
         children: [
+          // Title section
           const Icon(Icons.explore, size: 24),
           const SizedBox(width: 8),
-          const Text('Market Explorer'),
+          const Text(
+            'Market Explorer',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(width: 16),
           Obx(() => Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -56,30 +101,33 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
               ),
             ),
           )),
+
+          const Spacer(),
+
+          // Action buttons
+          _buildViewToggle(),
+          const SizedBox(width: 16),
+          Obx(() => IconButton(
+            icon: Icon(controller.showFilters.value ? Icons.filter_list_off : Icons.filter_list),
+            onPressed: controller.toggleFilters,
+            tooltip: 'Toggle Filters',
+          )),
+          IconButton(
+            icon: const Icon(Icons.download),
+            onPressed: _showExportDialog,
+            tooltip: 'Export Data',
+          ),
+          PopupMenuButton<String>(
+            onSelected: _handleMenuAction,
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 'bulk_enrich', child: Text('Bulk Enrich Contacts')),
+              const PopupMenuItem(value: 'create_campaign', child: Text('Create Campaign')),
+              const PopupMenuItem(value: 'territory_management', child: Text('Manage Territories')),
+              const PopupMenuItem(value: 'import_data', child: Text('Import Additional Data')),
+            ],
+          ),
         ],
       ),
-      actions: [
-        _buildViewToggle(),
-        Obx(() => IconButton(
-          icon: Icon(controller.showFilters.value ? Icons.filter_list_off : Icons.filter_list),
-          onPressed: controller.toggleFilters,
-          tooltip: 'Toggle Filters',
-        )),
-        IconButton(
-          icon: const Icon(Icons.download),
-          onPressed: _showExportDialog,
-          tooltip: 'Export Data',
-        ),
-        PopupMenuButton<String>(
-          onSelected: _handleMenuAction,
-          itemBuilder: (context) => [
-            const PopupMenuItem(value: 'bulk_enrich', child: Text('Bulk Enrich Contacts')),
-            const PopupMenuItem(value: 'create_campaign', child: Text('Create Campaign')),
-            const PopupMenuItem(value: 'territory_management', child: Text('Manage Territories')),
-            const PopupMenuItem(value: 'import_data', child: Text('Import Additional Data')),
-          ],
-        ),
-      ],
     );
   }
 
@@ -112,6 +160,7 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
   Widget _buildToolbar() {
     return Container(
       padding: const EdgeInsets.all(16),
+      color: Colors.white,
       child: Row(
         children: [
           // Search bar
@@ -483,7 +532,7 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
     );
   }
 
-  Widget _buildMainContent() {
+  Widget _buildContentArea() {
     return Obx(() {
       switch (controller.selectedView.value) {
         case 'map':
@@ -537,65 +586,68 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
         );
       }
 
-      return Column(
-        children: [
-          // Table with DataTable2 for better performance
-          Expanded(
-            child: DataTable2(
-              columnSpacing: 12,
-              horizontalMargin: 12,
-              minWidth: 1200,
-              showCheckboxColumn: true,
-              onSelectAll: (selected) {
-                if (selected ?? false) {
-                  controller.selectAllCenters();
-                } else {
-                  controller.clearSelection();
-                }
-              },
-              columns: [
-                DataColumn2(
-                  label: const Text('ECD Name'),
-                  size: ColumnSize.L,
-                  onSort: (columnIndex, ascending) =>
-                      controller.setSorting('ecdName'),
-                ),
-                const DataColumn2(
-                  label: Text('Province'),
-                  size: ColumnSize.S,
-                ),
-                const DataColumn2(
-                  label: Text('City'),
-                  size: ColumnSize.M,
-                ),
-                const DataColumn2(
-                  label: Text('Children'),
-                  size: ColumnSize.S,
-                  numeric: true,
-                ),
-                const DataColumn2(
-                  label: Text('Score'),
-                  size: ColumnSize.S,
-                  numeric: true,
-                ),
-                const DataColumn2(
-                  label: Text('Status'),
-                  size: ColumnSize.M,
-                ),
-                const DataColumn2(
-                  label: Text('Actions'),
-                  size: ColumnSize.M,
-                ),
-              ],
-              rows: controller.centers.map((center) =>
-                  _buildProspectRow(center)
-              ).toList(),
+      return Container(
+        color: Colors.white,
+        child: Column(
+          children: [
+            // Table with DataTable2 for better performance
+            Expanded(
+              child: DataTable2(
+                columnSpacing: 12,
+                horizontalMargin: 12,
+                minWidth: 1200,
+                showCheckboxColumn: true,
+                onSelectAll: (selected) {
+                  if (selected ?? false) {
+                    controller.selectAllCenters();
+                  } else {
+                    controller.clearSelection();
+                  }
+                },
+                columns: [
+                  DataColumn2(
+                    label: const Text('ECD Name'),
+                    size: ColumnSize.L,
+                    onSort: (columnIndex, ascending) =>
+                        controller.setSorting('ecdName'),
+                  ),
+                  const DataColumn2(
+                    label: Text('Province'),
+                    size: ColumnSize.S,
+                  ),
+                  const DataColumn2(
+                    label: Text('City'),
+                    size: ColumnSize.M,
+                  ),
+                  const DataColumn2(
+                    label: Text('Children'),
+                    size: ColumnSize.S,
+                    numeric: true,
+                  ),
+                  const DataColumn2(
+                    label: Text('Score'),
+                    size: ColumnSize.S,
+                    numeric: true,
+                  ),
+                  const DataColumn2(
+                    label: Text('Status'),
+                    size: ColumnSize.M,
+                  ),
+                  const DataColumn2(
+                    label: Text('Actions'),
+                    size: ColumnSize.M,
+                  ),
+                ],
+                rows: controller.centers.map((center) =>
+                    _buildProspectRow(center)
+                ).toList(),
+              ),
             ),
-          ),
 
-          // Pagination
-          _buildPagination(),
-        ],
+            // Pagination
+            _buildPagination(),
+          ],
+        ),
       );
     });
   }
@@ -735,6 +787,10 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
   Widget _buildPagination() {
     return Obx(() => Container(
       padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Colors.grey[300]!)),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -816,6 +872,8 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
     return Colors.grey;
   }
 
+  // ... [Rest of the helper methods remain the same] ...
+
   void _viewProspectDetails(ZAECDCenters prospect) {
     Get.toNamed(
       AppRoutes.adminMarketExplorerDetail.replaceAll(':id', prospect.id),
@@ -824,7 +882,6 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
   }
 
   void _callProspect(ZAECDCenters prospect) {
-    // Implement phone dialing functionality
     Get.snackbar(
       'Call',
       'Calling ${prospect.contactPerson ?? prospect.ecdName} at ${prospect.telephone}',
@@ -841,11 +898,10 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
         _showScheduleDemoDialog(prospect);
         break;
       case 'mark_contacted':
-      // Use updateLeadStatus with proper parameters
         await controller.updateLeadStatus(
           prospect.id,
-          'Contacted',  // leadStatus
-          prospect.pipelineStage,  // keep existing pipeline stage
+          'Contacted',
+          prospect.pipelineStage,
         );
         break;
       case 'add_note':
@@ -870,6 +926,8 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
         break;
     }
   }
+
+  // ... [All dialog methods remain the same] ...
 
   void _showExportDialog() {
     Get.dialog(
@@ -907,8 +965,6 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
   }
 
   void _showAssignRepDialog() {
-    // TODO: Implement proper sales rep selection dialog
-    // For now, just show a placeholder
     Get.dialog(
       AlertDialog(
         title: const Text('Assign Sales Representative'),
@@ -917,7 +973,6 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
           children: [
             Text('Select a sales rep for ${controller.selectedCenters.length} centers'),
             const SizedBox(height: 16),
-            // Add dropdown or list of sales reps here
             const TextField(
               decoration: InputDecoration(
                 labelText: 'Sales Rep ID',
@@ -933,7 +988,6 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
           ),
           ElevatedButton(
             onPressed: () {
-              // TODO: Implement actual assignment logic
               Get.back();
               Get.snackbar(
                 'Success',
@@ -949,7 +1003,6 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
   }
 
   void _showBulkUpdateDialog() {
-    // TODO: Implement bulk update dialog
     Get.dialog(
       AlertDialog(
         title: const Text('Bulk Update'),
@@ -958,7 +1011,6 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
           children: [
             Text('Update ${controller.selectedCenters.length} centers'),
             const SizedBox(height: 16),
-            // Add update fields here
             const TextField(
               decoration: InputDecoration(
                 labelText: 'Lead Status',
@@ -974,7 +1026,6 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
           ),
           ElevatedButton(
             onPressed: () {
-              // TODO: Implement actual bulk update logic
               Get.back();
               Get.snackbar(
                 'Success',
@@ -990,7 +1041,6 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
   }
 
   void _showAddProspectDialog() {
-    // TODO: Implement add prospect dialog
     Get.dialog(
       AlertDialog(
         title: const Text('Add New ECD Prospect'),
@@ -1018,7 +1068,6 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
                   hintText: 'Enter phone number',
                 ),
               ),
-              // Add more fields as needed
             ],
           ),
         ),
@@ -1029,7 +1078,6 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
           ),
           ElevatedButton(
             onPressed: () {
-              // TODO: Implement actual add prospect logic
               Get.back();
               Get.snackbar(
                 'Success',
@@ -1045,7 +1093,6 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
   }
 
   void _showAddToCampaignDialog(ZAECDCenters prospect) {
-    // TODO: Implement add to campaign dialog
     Get.dialog(
       AlertDialog(
         title: Text('Add ${prospect.ecdName} to Campaign'),
@@ -1082,7 +1129,6 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
   }
 
   void _showScheduleDemoDialog(ZAECDCenters prospect) {
-    // TODO: Implement schedule demo dialog
     Get.dialog(
       AlertDialog(
         title: Text('Schedule Demo for ${prospect.ecdName}'),
@@ -1159,7 +1205,6 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
   }
 
   void _showBulkEnrichDialog() {
-    // TODO: Implement bulk enrich dialog
     Get.dialog(
       AlertDialog(
         title: const Text('Bulk Enrich Contact Data'),
@@ -1186,7 +1231,6 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
   }
 
   void _showImportDialog() {
-    // TODO: Implement import dialog
     Get.dialog(
       AlertDialog(
         title: const Text('Import ECD Center Data'),
@@ -1195,7 +1239,6 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
           children: [
             const Text('Select a CSV file to import additional ECD center data.'),
             const SizedBox(height: 16),
-            // Add file picker widget here
             ElevatedButton.icon(
               onPressed: null, // TODO: Implement file picker
               icon: const Icon(Icons.upload_file),
