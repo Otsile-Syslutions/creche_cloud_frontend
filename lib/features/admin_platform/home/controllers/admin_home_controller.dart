@@ -290,7 +290,7 @@ class AdminHomeController extends GetxController {
       // Navigate to the route if it's different from current
       final routeMap = {
         'market-explorer': AppRoutes.adminMarketExplorer,
-        'active-schools': AppRoutes.adminActiveSchools,
+        'active-customers': AppRoutes.adminActiveCustomers,
         'sales-pipeline': AppRoutes.adminSalesPipeline,
         'users': AppRoutes.adminUsers,
         'tenants': AppRoutes.adminTenants,

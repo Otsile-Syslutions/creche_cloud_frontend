@@ -1,4 +1,4 @@
-// lib/features/admin_platform/schools_management/market_explorer/views/map_analytics_views.dart
+// lib/features/admin_platform/customer_management/market_explorer/views/map_analytics_views.dart
 
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';

@@ -1,4 +1,4 @@
-// lib/features/admin_platform/schools_management/market_explorer/views/market_explorer_view.dart
+// lib/features/admin_platform/customer_management/market_explorer/views/market_explorer_view.dart
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -16,6 +16,11 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
 
   // Get AuthController for user information
   AuthController get authController => Get.find<AuthController>();
+
+  // Market totals - these would typically come from your backend
+  static const int TOTAL_MARKET_SCHOOLS = 41538;
+  static const int TOTAL_MARKET_CHILDREN = 1561957;
+  static const double TOTAL_MARKET_MRR = 14370004.40;
 
   @override
   Widget build(BuildContext context) {
@@ -142,45 +147,81 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
   Widget _buildMetricsSection() {
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
-      child: Obx(() => Row(
-        children: [
-          Expanded(
-            child: _buildMetricCard(
-              'Total Prospects',
-              _formatNumber(controller.centers.length),
-              Icons.business_outlined,
+      child: Obx(() {
+        // Calculate current onboarded values (assuming 0 for now, but would come from actual data)
+        const int currentOnboardedSchools = 0; // This would come from your actual data
+        const int currentOnboardedChildren = 0; // This would come from your actual data
+        const double currentMRR = 0.0; // This would come from your actual data
+
+        // Calculate market share percentage
+        final double marketSharePercentage = (currentOnboardedSchools / TOTAL_MARKET_SCHOOLS) * 100;
+
+        // Check if there are selected centers
+        final bool hasSelection = controller.selectedCenters.isNotEmpty;
+
+        return Row(
+          children: [
+            Expanded(
+              child: _buildMetricCard(
+                'Total Prospects',
+                hasSelection
+                    ? '${_formatNumber(controller.selectedCenters.length)} selected'
+                    : '${_formatNumber(currentOnboardedSchools)} of ${_formatNumber(TOTAL_MARKET_SCHOOLS)}',
+                Icons.business_outlined,
+                subtitle: hasSelection ? 'Schools selected' : 'Schools onboarded',
+              ),
             ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: _buildMetricCard(
-              'Total Children',
-              _formatNumber(controller.totalChildren.value),
-              Icons.child_care_outlined,
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildMetricCard(
+                'Total Children',
+                hasSelection
+                    ? _formatNumber(controller.totalSelectedChildren)
+                    : '${_formatNumber(currentOnboardedChildren)} of ${_formatNumber(TOTAL_MARKET_CHILDREN)}',
+                Icons.child_care_outlined,
+                subtitle: hasSelection ? 'Children in selection' : 'Children reached',
+              ),
             ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: _buildMetricCard(
-              'Potential MRR',
-              'R${_formatCurrency(controller.totalPotentialMRR.value)}',
-              Icons.payments_outlined,
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildMetricCard(
+                'Potential MRR',
+                hasSelection
+                    ? 'R${_formatCurrency(controller.totalSelectedMRR.toDouble())}'
+                    : 'R${_formatCurrency(currentMRR)} of R${_formatCurrency(TOTAL_MARKET_MRR)}',
+                Icons.payments_outlined,
+                subtitle: hasSelection ? 'Selected value' : 'Current vs potential',
+              ),
             ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: _buildMetricCard(
-              'Avg. Score',
-              controller.avgLeadScore.value.toStringAsFixed(1),
-              Icons.analytics_outlined,
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildMetricCard(
+                hasSelection ? 'Avg. Score' : 'Market Share',
+                hasSelection
+                    ? _calculateAverageScore().toStringAsFixed(1)
+                    : '${marketSharePercentage.toStringAsFixed(2)}%',
+                hasSelection ? Icons.analytics_outlined : Icons.pie_chart_outline_outlined,
+                subtitle: hasSelection ? 'Lead score average' : 'Market penetration',
+                isPercentage: !hasSelection,
+              ),
             ),
-          ),
-        ],
-      )),
+          ],
+        );
+      }),
     );
   }
 
-  Widget _buildMetricCard(String label, String value, IconData icon) {
+  // Helper method to calculate average score of selected prospects
+  double _calculateAverageScore() {
+    if (controller.selectedCenters.isEmpty) return 0.0;
+    final totalScore = controller.selectedCenters.fold(
+        0,
+            (sum, center) => sum + center.leadScore
+    );
+    return totalScore / controller.selectedCenters.length;
+  }
+
+  Widget _buildMetricCard(String label, String value, IconData icon, {String? subtitle, bool isPercentage = false}) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -224,12 +265,24 @@ class MarketExplorerPage extends GetView<MarketExplorerController> {
                 const SizedBox(height: 4),
                 Text(
                   value,
-                  style: const TextStyle(
-                    fontSize: 20,
+                  style: TextStyle(
+                    fontSize: isPercentage ? 18 : 16,
                     fontWeight: FontWeight.bold,
                     fontFamily: 'Roboto',
+                    color: isPercentage ? const Color(0xFF875DEC) : null,
                   ),
                 ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.grey[500],
+                      fontFamily: 'Roboto',
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

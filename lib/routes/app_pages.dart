@@ -22,12 +22,12 @@ import '../features/parent_platform/home/views/parent_home_view.dart';
 import '../features/tenant_platform/home/views/tenant_home_view.dart';
 
 // Schools Management views
-import '../features/admin_platform/schools_management/market_explorer/views/market_explorer_view.dart';
-import '../features/admin_platform/schools_management/market_explorer/bindings/market_explorer_binding.dart';
-// import '../features/admin_platform/schools_management/active_schools/views/active_schools_view.dart';
-// import '../features/admin_platform/schools_management/active_schools/bindings/active_schools_binding.dart';
-// import '../features/admin_platform/schools_management/sales_pipeline/views/sales_pipeline_view.dart';
-// import '../features/admin_platform/schools_management/sales_pipeline/bindings/sales_pipeline_binding.dart';
+import '../features/admin_platform/customer_management/market_explorer/views/market_explorer_view.dart';
+import '../features/admin_platform/customer_management/market_explorer/bindings/market_explorer_binding.dart';
+// import '../features/admin_platform/customer_management/active_customers/views/active_schools_view.dart';
+// import '../features/admin_platform/customer_management/active_customers/bindings/active_schools_binding.dart';
+// import '../features/admin_platform/customer_management/sales_pipeline/views/sales_pipeline_view.dart';
+// import '../features/admin_platform/customer_management/sales_pipeline/bindings/sales_pipeline_binding.dart';
 
 class AppPages {
   static final List<GetPage> pages = [
@@ -97,7 +97,7 @@ class AppPages {
 
     // Active Schools (Admin/Support)
     GetPage(
-      name: AppRoutes.adminActiveSchools,
+      name: AppRoutes.adminActiveCustomers,
       page: () => const ActiveSchoolsPlaceholderView(),
       binding: AuthBinding(), // TODO: Replace with ActiveSchoolsBinding
       middlewares: [AuthMiddlewareFactory.admin()],

@@ -34,12 +34,12 @@ class AdminMenuItems {
             color: selected ? Colors.white : const Color(0xFF6B7280),
             size: 22,
           ),
-          label: 'Schools',
+          label: 'Customers',
           subItems: [
             AppSidebarItem(
               label: 'Active Customers',
               onTap: () {
-                // Get.toNamed(AppRoutes.adminActiveSchools);
+                // Get.toNamed(AppRoutes.adminActiveCustomers);
               },
             ),
             AppSidebarItem(

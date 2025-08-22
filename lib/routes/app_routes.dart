@@ -33,10 +33,10 @@ abstract class AppRoutes {
   static const String adminAnnouncements = '/admin/announcements';
 
   // Schools Management Routes (Under Admin Platform)
-  static const String adminActiveSchools = '/admin/schools/active';
-  static const String adminSalesPipeline = '/admin/schools/pipeline';
-  static const String adminMarketExplorer = '/admin/schools/market-explorer';
-  static const String adminMarketExplorerDetail = '/admin/schools/market-explorer/:id';
+  static const String adminActiveCustomers = '/admin/customers/active';
+  static const String adminSalesPipeline = '/admin/customers/pipeline';
+  static const String adminMarketExplorer = '/admin/customers/market-explorer';
+  static const String adminMarketExplorerDetail = '/admin/customers/market-explorer/:id';
 
   // Parent Platform (Parents)
   static const String parentChildren = '/parent/children';
@@ -157,7 +157,7 @@ abstract class AppRoutes {
       adminAnnouncements: ['platform_admin', 'platform_support'],
 
       // Schools Management routes
-      adminActiveSchools: ['platform_admin', 'platform_support'],
+      adminActiveCustomers: ['platform_admin', 'platform_support'],
       adminSalesPipeline: ['platform_admin', 'platform_support'],
       adminMarketExplorer: ['platform_admin', 'platform_support'],
       adminMarketExplorerDetail: ['platform_admin', 'platform_support'],
@@ -220,7 +220,7 @@ abstract class AppRoutes {
         adminBilling,
         adminSupport,
         adminAnnouncements,
-        adminActiveSchools,
+        adminActiveCustomers,
         adminSalesPipeline,
         adminMarketExplorer,
         adminMarketExplorerDetail,
@@ -258,8 +258,8 @@ abstract class AppRoutes {
       case 'admin':
         return [
           NavigationItem('Dashboard', adminHome, 'dashboard'),
-          NavigationItem('Schools', adminActiveSchools, 'business', [
-            NavigationItem('Active Customers', adminActiveSchools, 'business'),
+          NavigationItem('Customers', adminActiveCustomers, 'business', [
+            NavigationItem('Active Customers', adminActiveCustomers, 'business'),
             NavigationItem('Sales Pipeline', adminSalesPipeline, 'trending_up'),
             NavigationItem('Market Explorer', adminMarketExplorer, 'explore'),
           ]),
@@ -320,7 +320,7 @@ abstract class AppRoutes {
     profile: 'Profile',
     settings: 'Settings',
     notifications: 'Notifications',
-    adminActiveSchools: 'Active Schools',
+    adminActiveCustomers: 'Active Customers',
     adminSalesPipeline: 'Sales Pipeline',
     adminMarketExplorer: 'Market Explorer',
     adminMarketExplorerDetail: 'Market Explorer Detail',

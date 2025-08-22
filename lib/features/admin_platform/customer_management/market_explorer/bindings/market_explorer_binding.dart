@@ -1,4 +1,4 @@
-// lib/features/admin_platform/schools_management/market_explorer/bindings/market_explorer_binding.dart
+// lib/features/admin_platform/customer_management/market_explorer/bindings/market_explorer_binding.dart
 
 import 'package:get/get.dart';
 import '../controllers/market_explorer_controller.dart';
