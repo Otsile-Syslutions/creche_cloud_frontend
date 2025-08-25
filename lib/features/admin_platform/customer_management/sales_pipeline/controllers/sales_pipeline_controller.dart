@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import '../../../../../core/services/api_service.dart';
 import '../../../../../core/services/storage_service.dart';
+import '../../../../../core/config/api_endpoints.dart';
 import '../../../../../utils/app_logger.dart';
 import '../models/deal_model.dart';
 import '../models/pipeline_status_model.dart';
@@ -125,35 +126,100 @@ class SalesPipelineController extends GetxController {
       final filters = _buildFilters();
 
       final response = await _apiService.get<Map<String, dynamic>>(
-        '/sales-pipeline',
+        ApiEndpoints.getSalesPipeline,
         queryParameters: filters,
       );
+
+      AppLogger.d('Pipeline API Response: ${response.data}');
 
       if (response.success && response.data != null) {
         final data = response.data!['data'] ?? response.data!;
 
-        // Parse pipeline stages
-        _parsePipelineData(data['pipeline']);
+        // Parse deals first if they exist in the response
+        if (data['deals'] != null) {
+          AppLogger.d('Parsing deals from response');
+          _parseDealsData(data['deals']);
+        } else if (data['pipeline'] != null) {
+          AppLogger.d('Parsing pipeline data');
+          _parsePipelineData(data['pipeline']);
+        } else {
+          AppLogger.w('No deals or pipeline data found in response');
+          // Initialize empty stages
+          _initializeEmptyStages();
+        }
 
         // Parse statistics
         if (data['stats'] != null) {
           statistics.value = PipelineStatistics.fromJson(data['stats']);
         }
 
-        AppLogger.d('Pipeline loaded successfully');
+        AppLogger.d('Pipeline loaded successfully. Total deals: ${allDeals.length}');
       } else {
         errorMessage.value = response.message ?? 'Failed to load pipeline';
+        AppLogger.e('Failed to load pipeline: ${response.message}');
+        // Initialize empty stages on error
+        _initializeEmptyStages();
       }
 
     } catch (e) {
       AppLogger.e('Error loading pipeline', e);
       errorMessage.value = 'Error loading pipeline data';
+      // Initialize empty stages on error
+      _initializeEmptyStages();
     } finally {
       isLoading.value = false;
     }
   }
 
-  // Parse pipeline data from API response
+  // Parse deals array directly from API response
+  void _parseDealsData(dynamic dealsData) {
+    pipelineStages.clear();
+    allDeals.clear();
+
+    // Initialize all stages
+    for (final stage in stageConfigs) {
+      pipelineStages[stage.name] = PipelineStage(
+        name: stage.name,
+        deals: [],
+        totalValue: 0,
+        weightedValue: 0,
+        count: 0,
+      );
+    }
+
+    // Parse deals and organize by stage
+    if (dealsData is List) {
+      AppLogger.d('Parsing ${dealsData.length} deals');
+
+      for (final dealJson in dealsData) {
+        try {
+          final deal = Deal.fromJson(dealJson);
+          allDeals.add(deal);
+
+          // Add to appropriate stage
+          final stage = pipelineStages[deal.stage];
+          if (stage != null) {
+            stage.deals.add(deal);
+            stage.count++;
+            stage.totalValue += deal.value.annual;
+            stage.weightedValue += deal.value.weighted;
+            AppLogger.d('Added deal ${deal.id} to stage ${deal.stage}');
+          } else {
+            AppLogger.w('Stage ${deal.stage} not found for deal ${deal.id}');
+          }
+        } catch (e) {
+          AppLogger.e('Error parsing deal: $e', e);
+        }
+      }
+    }
+
+    AppLogger.d('Deals organized into stages:');
+    pipelineStages.forEach((stageName, stage) {
+      AppLogger.d('  $stageName: ${stage.count} deals, R${stage.totalValue}');
+    });
+  }
+
+  // Parse pipeline data from API response (if structured by stage)
   void _parsePipelineData(Map<String, dynamic> pipelineData) {
     pipelineStages.clear();
     allDeals.clear();
@@ -161,16 +227,16 @@ class SalesPipelineController extends GetxController {
     for (final stage in stageConfigs) {
       final stageData = pipelineData[stage.name];
       if (stageData != null) {
-        final deals = (stageData['deals'] as List)
+        final deals = (stageData['deals'] as List? ?? [])
             .map((json) => Deal.fromJson(json))
             .toList();
 
         pipelineStages[stage.name] = PipelineStage(
           name: stage.name,
           deals: deals,
-          totalValue: stageData['totalValue']?.toDouble() ?? 0,
-          weightedValue: stageData['weightedValue']?.toDouble() ?? 0,
-          count: stageData['count'] ?? 0,
+          totalValue: (stageData['totalValue'] ?? 0).toDouble(),
+          weightedValue: (stageData['weightedValue'] ?? 0).toDouble(),
+          count: stageData['count'] ?? deals.length,
         );
 
         allDeals.addAll(deals);
@@ -187,6 +253,20 @@ class SalesPipelineController extends GetxController {
     }
   }
 
+  // Initialize empty stages
+  void _initializeEmptyStages() {
+    pipelineStages.clear();
+    for (final stage in stageConfigs) {
+      pipelineStages[stage.name] = PipelineStage(
+        name: stage.name,
+        deals: [],
+        totalValue: 0,
+        weightedValue: 0,
+        count: 0,
+      );
+    }
+  }
+
   // Create deal from ECD Center
   Future<bool> createDeal(ZAECDCenters center, {
     String? initialStage,
@@ -194,8 +274,10 @@ class SalesPipelineController extends GetxController {
     List<String>? tags,
   }) async {
     try {
+      AppLogger.d('Creating deal for center: ${center.id}');
+
       final response = await _apiService.post<Map<String, dynamic>>(
-        '/sales-pipeline/deals',
+        ApiEndpoints.createDeal,
         data: {
           'centerId': center.id,
           'title': '${center.ecdName} - Opportunity',
@@ -203,8 +285,15 @@ class SalesPipelineController extends GetxController {
           'expectedCloseDate': expectedCloseDate?.toIso8601String() ??
               DateTime.now().add(const Duration(days: 60)).toIso8601String(),
           'tags': tags ?? [],
+          'value': {
+            'monthly': center.numberOfChildren * 9.20,
+            'annual': center.numberOfChildren * 9.20 * 12,
+          },
+          'notes': 'Deal created from Market Explorer',
         },
       );
+
+      AppLogger.d('Create deal response: ${response.data}');
 
       if (response.success) {
         await loadPipeline();
@@ -217,6 +306,7 @@ class SalesPipelineController extends GetxController {
         );
         return true;
       } else {
+        AppLogger.e('Failed to create deal: ${response.message}');
         Get.snackbar(
           'Error',
           response.message ?? 'Failed to create deal',
@@ -229,7 +319,7 @@ class SalesPipelineController extends GetxController {
       AppLogger.e('Error creating deal', e);
       Get.snackbar(
         'Error',
-        'Failed to create deal',
+        'Failed to create deal: ${e.toString()}',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red,
         colorText: Colors.white,
@@ -242,7 +332,7 @@ class SalesPipelineController extends GetxController {
   Future<bool> updateDealStage(String dealId, String newStage) async {
     try {
       final response = await _apiService.put<Map<String, dynamic>>(
-        '/sales-pipeline/deals/$dealId/stage',
+        ApiEndpoints.updateDealStage(dealId),
         data: {
           'stage': newStage,
         },
@@ -250,18 +340,33 @@ class SalesPipelineController extends GetxController {
 
       if (response.success) {
         // Update local data immediately for smooth UX
-        final deal = allDeals.firstWhere((d) => d.id == dealId);
-        final oldStage = deal.stage;
+        final dealIndex = allDeals.indexWhere((d) => d.id == dealId);
+        if (dealIndex != -1) {
+          final deal = allDeals[dealIndex];
+          final oldStage = deal.stage;
 
-        // Remove from old stage
-        pipelineStages[oldStage]?.deals.removeWhere((d) => d.id == dealId);
-        pipelineStages[oldStage]?.count--;
+          // Remove from old stage
+          final oldStageData = pipelineStages[oldStage];
+          if (oldStageData != null) {
+            oldStageData.deals.removeWhere((d) => d.id == dealId);
+            oldStageData.count--;
+            oldStageData.totalValue -= deal.value.annual;
+            oldStageData.weightedValue -= deal.value.weighted;
+          }
 
-        // Add to new stage
-        deal.stage = newStage;
-        deal.updateProbability();
-        pipelineStages[newStage]?.deals.add(deal);
-        pipelineStages[newStage]?.count++;
+          // Update deal stage
+          deal.stage = newStage;
+          deal.updateProbability();
+
+          // Add to new stage
+          final newStageData = pipelineStages[newStage];
+          if (newStageData != null) {
+            newStageData.deals.add(deal);
+            newStageData.count++;
+            newStageData.totalValue += deal.value.annual;
+            newStageData.weightedValue += deal.value.weighted;
+          }
+        }
 
         // Refresh to get updated stats
         await loadPipeline();
@@ -285,7 +390,7 @@ class SalesPipelineController extends GetxController {
   Future<bool> updateDeal(String dealId, Map<String, dynamic> updates) async {
     try {
       final response = await _apiService.put<Map<String, dynamic>>(
-        '/sales-pipeline/deals/$dealId',
+        ApiEndpoints.updateDeal(dealId),
         data: updates,
       );
 
@@ -317,7 +422,7 @@ class SalesPipelineController extends GetxController {
   Future<bool> addActivity(String dealId, ActivityData activity) async {
     try {
       final response = await _apiService.post<Map<String, dynamic>>(
-        '/sales-pipeline/deals/$dealId/activities',
+        ApiEndpoints.addDealActivity(dealId),
         data: activity.toJson(),
       );
 
@@ -349,7 +454,7 @@ class SalesPipelineController extends GetxController {
   Future<bool> closeDealWon(String dealId, WonDetails details) async {
     try {
       final response = await _apiService.post<Map<String, dynamic>>(
-        '/sales-pipeline/deals/$dealId/close-won',
+        ApiEndpoints.closeDealWon(dealId),
         data: details.toJson(),
       );
 
@@ -382,7 +487,7 @@ class SalesPipelineController extends GetxController {
   Future<bool> closeDealLost(String dealId, LostReason reason) async {
     try {
       final response = await _apiService.post<Map<String, dynamic>>(
-        '/sales-pipeline/deals/$dealId/close-lost',
+        ApiEndpoints.closeDealLost(dealId),
         data: reason.toJson(),
       );
 
@@ -407,7 +512,7 @@ class SalesPipelineController extends GetxController {
   Future<void> loadSalesVelocity() async {
     try {
       final response = await _apiService.get<Map<String, dynamic>>(
-        '/sales-pipeline/velocity',
+        ApiEndpoints.getSalesVelocity,
       );
 
       if (response.success && response.data != null) {
@@ -422,7 +527,7 @@ class SalesPipelineController extends GetxController {
   Future<void> loadForecast({String period = 'quarter'}) async {
     try {
       final response = await _apiService.get<Map<String, dynamic>>(
-        '/sales-pipeline/forecast',
+        ApiEndpoints.getSalesForecast,
         queryParameters: {'period': period},
       );
 
@@ -438,7 +543,7 @@ class SalesPipelineController extends GetxController {
   Future<Deal?> getDealDetails(String dealId) async {
     try {
       final response = await _apiService.get<Map<String, dynamic>>(
-        '/sales-pipeline/deals/$dealId',
+        ApiEndpoints.getDealDetails(dealId),
       );
 
       if (response.success && response.data != null) {
@@ -547,11 +652,11 @@ class SalesPipelineController extends GetxController {
   }
 
   int get rottingDealsCount {
-    return allDeals.where((deal) => deal.status?.isRotting ?? false).length;
+    return allDeals.where((deal) => deal.isRotting).length;
   }
 
   int get hotDealsCount {
-    return allDeals.where((deal) => deal.status?.isHot ?? false).length;
+    return allDeals.where((deal) => deal.isHot).length;
   }
 
   PipelineStageConfig? getStageConfig(String stageName) {
@@ -563,8 +668,8 @@ class SalesPipelineController extends GetxController {
 class PipelineStage {
   final String name;
   final List<Deal> deals;
-  final double totalValue;
-  final double weightedValue;
+  double totalValue;
+  double weightedValue;
   int count;
 
   PipelineStage({

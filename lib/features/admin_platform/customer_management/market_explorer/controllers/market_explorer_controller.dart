@@ -4,8 +4,9 @@ import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import '../../../../../core/services/api_service.dart';
 import '../../../../../core/services/storage_service.dart';
+import '../../../../../core/config/api_endpoints.dart';
 import '../../../../../utils/app_logger.dart';
-import '../models/zaecdcenters_model.dart';
+import '../models/zaecdcenters_model.dart'; // This includes MarketAnalytics
 import '../../../../auth/controllers/auth_controller.dart';
 import '../../../../../routes/app_routes.dart';
 
@@ -266,11 +267,11 @@ class MarketExplorerController extends GetxController {
         queryParams['page'] = (currentPage.value + 1).toString();
       }
 
-      AppLogger.d('Fetching centers from /market-explorer with params: $queryParams');
+      AppLogger.d('Fetching centers with params: $queryParams');
 
-      // Make API call with direct path
+      // Make API call using the proper endpoint
       final response = await _apiService.get<Map<String, dynamic>>(
-        '/market-explorer',
+        ApiEndpoints.getECDCenters,
         queryParameters: queryParams,
       );
 
@@ -408,7 +409,7 @@ class MarketExplorerController extends GetxController {
       AppLogger.d('Fetching market analytics...');
 
       final response = await _apiService.get<Map<String, dynamic>>(
-        '/market-explorer/analytics',
+        ApiEndpoints.getMarketAnalytics,
       );
 
       if (response.success && response.data != null) {
@@ -440,7 +441,7 @@ class MarketExplorerController extends GetxController {
       await _ensureAuthentication();
 
       final response = await _apiService.get<Map<String, dynamic>>(
-        '/market-explorer/$centerId',
+        ApiEndpoints.getECDCenterById(centerId),
       );
 
       if (response.success && response.data != null) {
@@ -466,7 +467,7 @@ class MarketExplorerController extends GetxController {
       await _ensureAuthentication();
 
       final response = await _apiService.put<Map<String, dynamic>>(
-        '/market-explorer/$centerId',
+        ApiEndpoints.updateECDCenter(centerId),
         data: updates,
       );
 
@@ -514,7 +515,7 @@ class MarketExplorerController extends GetxController {
       await _ensureAuthentication();
 
       final response = await _apiService.post<Map<String, dynamic>>(
-        '/market-explorer/$centerId/notes',
+        ApiEndpoints.addNoteToCenter(centerId),
         data: {
           'content': content,
           'type': type,
@@ -571,7 +572,7 @@ class MarketExplorerController extends GetxController {
       if (reasonLost != null) data['reasonLost'] = reasonLost;
 
       final response = await _apiService.put<Map<String, dynamic>>(
-        '/market-explorer/$centerId/status',
+        ApiEndpoints.updateCenterLeadStatus(centerId),
         data: data,
       );
 
@@ -605,13 +606,53 @@ class MarketExplorerController extends GetxController {
     return false;
   }
 
+  // Update pipeline status for ECD Center
+  Future<bool> updatePipelineStatus(String centerId, String status, String notes) async {
+    try {
+      await _ensureAuthentication();
+
+      final response = await _apiService.put<Map<String, dynamic>>(
+        ApiEndpoints.updateCenterPipelineStatus(centerId),
+        data: {
+          'status': status,
+          'notes': notes,
+        },
+      );
+
+      if (response.success) {
+        // Update local data
+        final index = centers.indexWhere((c) => c.id == centerId);
+        if (index != -1 && response.data != null) {
+          final responseData = response.data!['data'] ?? response.data!;
+          centers[index] = ZAECDCenters.fromJson(responseData['center'] ?? responseData);
+        }
+
+        AppLogger.d('Pipeline status updated successfully');
+        return true;
+      } else {
+        AppLogger.w('Failed to update pipeline status: ${response.message}');
+        return false;
+      }
+    } catch (e) {
+      AppLogger.e('Error updating pipeline status', e);
+      Get.snackbar(
+        'Error',
+        'Failed to update pipeline status',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return false;
+    }
+  }
+
   // Assign sales rep
   Future<bool> assignSalesRep(List<String> centerIds, String salesRepId) async {
     try {
       await _ensureAuthentication();
 
       final response = await _apiService.post<Map<String, dynamic>>(
-        '/market-explorer/assign',
+        ApiEndpoints.assignSalesRep,
         data: {
           'centerIds': centerIds,
           'salesRepId': salesRepId,
@@ -650,7 +691,7 @@ class MarketExplorerController extends GetxController {
       await _ensureAuthentication();
 
       final response = await _apiService.post<Map<String, dynamic>>(
-        '/market-explorer/$centerId/convert',
+        ApiEndpoints.convertCenterToTenant(centerId),
         data: tenantData,
       );
 
@@ -687,7 +728,7 @@ class MarketExplorerController extends GetxController {
       await _ensureAuthentication();
 
       final response = await _apiService.put<Map<String, dynamic>>(
-        '/market-explorer/bulk',
+        ApiEndpoints.bulkUpdateCenters,
         data: {
           'centerIds': centerIds,
           'updates': updates,
@@ -729,7 +770,7 @@ class MarketExplorerController extends GetxController {
       queryParams['format'] = format;
 
       final response = await _apiService.get<dynamic>(
-        '/market-explorer/export',
+        ApiEndpoints.exportECDCenters,
         queryParameters: queryParams,
       );
 
@@ -1211,3 +1252,4 @@ class CompetitorStats {
     };
   }
 }
+

@@ -196,43 +196,51 @@ class PipelineColumn extends StatelessWidget {
                   );
                 }
 
-                return ListView.builder(
-                  padding: const EdgeInsets.all(8),
-                  itemCount: deals.length,
-                  itemBuilder: (context, index) {
-                    final deal = deals[index];
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Draggable<Deal>(
-                        data: deal,
-                        onDragStarted: () => onDragStart(deal),
-                        onDragEnd: (_) => onDragEnd(),
-                        feedback: Material(
-                          elevation: 8,
-                          borderRadius: BorderRadius.circular(8),
-                          child: Container(
-                            width: 260,
+                // Fix for scrollbar issue - use ScrollConfiguration to control scrollbar
+                return ScrollConfiguration(
+                  behavior: ScrollConfiguration.of(context).copyWith(
+                    scrollbars: false, // Disable default scrollbars
+                  ),
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(8),
+                    itemCount: deals.length,
+                    // Add explicit scroll physics
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    itemBuilder: (context, index) {
+                      final deal = deals[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Draggable<Deal>(
+                          data: deal,
+                          onDragStarted: () => onDragStart(deal),
+                          onDragEnd: (_) => onDragEnd(),
+                          feedback: Material(
+                            elevation: 8,
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              width: 260,
+                              child: DealCard(
+                                deal: deal,
+                                isDragging: true,
+                                onTap: () {},
+                              ),
+                            ),
+                          ),
+                          childWhenDragging: Opacity(
+                            opacity: 0.3,
                             child: DealCard(
                               deal: deal,
-                              isDragging: true,
                               onTap: () {},
                             ),
                           ),
-                        ),
-                        childWhenDragging: Opacity(
-                          opacity: 0.3,
                           child: DealCard(
                             deal: deal,
-                            onTap: () {},
+                            onTap: () => onDealTap(deal),
                           ),
                         ),
-                        child: DealCard(
-                          deal: deal,
-                          onTap: () => onDealTap(deal),
-                        ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 );
               },
             ),

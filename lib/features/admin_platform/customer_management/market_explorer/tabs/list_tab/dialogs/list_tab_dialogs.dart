@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../models/zaecdcenters_model.dart';
 import '../../../controllers/market_explorer_controller.dart';
+import '../../../../sales_pipeline/controllers/sales_pipeline_controller.dart';
+import '../../../../../../../utils/app_logger.dart';
 
 class ListTabDialogs {
 
@@ -67,6 +69,331 @@ class ListTabDialogs {
     );
   }
 
+  static void showAddToPipelineDialog(ZAECDCenters prospect) {
+    AppLogger.d('Opening Add to Pipeline dialog for: ${prospect.ecdName}');
+
+    final expectedCloseDateController = TextEditingController();
+    DateTime? selectedDate = DateTime.now().add(const Duration(days: 60));
+    expectedCloseDateController.text = '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}';
+    final RxList<String> selectedTags = <String>[].obs;
+    final availableTags = ['Hot Lead', 'Demo Ready', 'Budget Confirmed', 'Decision Maker', 'Urgent'];
+
+    Get.dialog(
+      AlertDialog(
+        title: Text('Add ${prospect.ecdName} to Pipeline'),
+        content: StatefulBuilder(
+          builder: (context, setState) {
+            return SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'This will create a new deal in the sales pipeline',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Deal value section
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Deal Value',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Monthly:'),
+                            Text(
+                              'R${(prospect.numberOfChildren * 9.20).toStringAsFixed(2)}',
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Annual:'),
+                            Text(
+                              'R${(prospect.numberOfChildren * 9.20 * 12).toStringAsFixed(2)}',
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Expected close date
+                  TextField(
+                    controller: expectedCloseDateController,
+                    readOnly: true,
+                    decoration: InputDecoration(
+                      labelText: 'Expected Close Date',
+                      hintText: 'Select expected close date',
+                      suffixIcon: const Icon(Icons.calendar_today),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onTap: () async {
+                      final DateTime? picked = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate ?? DateTime.now().add(const Duration(days: 60)),
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                        builder: (context, child) {
+                          return Theme(
+                            data: Theme.of(context).copyWith(
+                              colorScheme: const ColorScheme.light(
+                                primary: Color(0xFF875DEC),
+                              ),
+                            ),
+                            child: child!,
+                          );
+                        },
+                      );
+                      if (picked != null) {
+                        setState(() {
+                          selectedDate = picked;
+                          expectedCloseDateController.text =
+                          '${picked.day}/${picked.month}/${picked.year}';
+                        });
+                      }
+                    },
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Tags selection
+                  const Text(
+                    'Tags (optional)',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: availableTags.map((tag) {
+                      return Obx(() => FilterChip(
+                        label: Text(tag),
+                        selected: selectedTags.contains(tag),
+                        onSelected: (selected) {
+                          if (selected) {
+                            selectedTags.add(tag);
+                          } else {
+                            selectedTags.remove(tag);
+                          }
+                        },
+                        selectedColor: const Color(0xFF875DEC).withOpacity(0.2),
+                        checkmarkColor: const Color(0xFF875DEC),
+                        labelStyle: TextStyle(
+                          fontSize: 12,
+                          color: selectedTags.contains(tag)
+                              ? const Color(0xFF875DEC)
+                              : Colors.grey[700],
+                        ),
+                      ));
+                    }).toList(),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Initial stage info
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue[200]!),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, size: 16, color: Colors.blue[700]),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Deal will be created in "Initial Contact" stage',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.blue[700],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              AppLogger.d('User cancelled Add to Pipeline');
+              Get.back();
+            },
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              AppLogger.d('User confirmed Add to Pipeline');
+
+              try {
+                Get.back(); // Close dialog first
+
+                // Initialize controllers with guaranteed non-null values
+                final SalesPipelineController pipelineController;
+                final MarketExplorerController marketController;
+
+                // Ensure SalesPipelineController exists
+                try {
+                  if (Get.isRegistered<SalesPipelineController>()) {
+                    AppLogger.d('SalesPipelineController already registered');
+                    pipelineController = Get.find<SalesPipelineController>();
+                  } else {
+                    AppLogger.d('SalesPipelineController not registered, creating new instance');
+                    pipelineController = Get.put(SalesPipelineController());
+                    // Give it a moment to initialize
+                    await Future.delayed(const Duration(milliseconds: 100));
+                  }
+                } catch (e) {
+                  AppLogger.e('Failed to initialize SalesPipelineController: $e');
+                  throw Exception('Failed to initialize Sales Pipeline controller');
+                }
+
+                // Ensure MarketExplorerController exists
+                try {
+                  if (Get.isRegistered<MarketExplorerController>()) {
+                    AppLogger.d('MarketExplorerController already registered');
+                    marketController = Get.find<MarketExplorerController>();
+                  } else {
+                    AppLogger.w('MarketExplorerController not registered, creating new instance');
+                    marketController = Get.put(MarketExplorerController());
+                    // Give it a moment to initialize
+                    await Future.delayed(const Duration(milliseconds: 100));
+                  }
+                } catch (e) {
+                  AppLogger.e('Failed to initialize MarketExplorerController: $e');
+                  throw Exception('Failed to initialize Market Explorer controller');
+                }
+
+                AppLogger.d('Controllers initialized successfully');
+                AppLogger.d('Creating deal for center: ${prospect.id}');
+                AppLogger.d('Center name: ${prospect.ecdName}');
+                AppLogger.d('Expected close date: ${selectedDate?.toIso8601String()}');
+                AppLogger.d('Tags: ${selectedTags.join(', ')}');
+
+                // Call the pipeline controller to create the deal
+                bool success = false;
+                try {
+                  success = await pipelineController.createDeal(
+                    prospect,
+                    initialStage: 'Initial Contact',
+                    expectedCloseDate: selectedDate,
+                    tags: selectedTags.toList(),
+                  );
+                  AppLogger.d('CreateDeal returned: $success');
+                } catch (e) {
+                  AppLogger.e('Error calling createDeal: $e');
+                  throw Exception('Failed to create deal: $e');
+                }
+
+                if (success) {
+                  AppLogger.d('Deal created successfully');
+
+                  // Only add a note, don't update pipeline status again
+                  // as the deal creation already sets the pipeline status
+                  try {
+                    final noteAdded = await marketController.addNote(
+                      prospect.id,
+                      'Deal created and added to sales pipeline',
+                      'pipeline',
+                    );
+                    AppLogger.d('Note added: $noteAdded');
+                  } catch (e) {
+                    AppLogger.e('Error adding note: $e');
+                    // Don't fail the whole operation if this fails
+                  }
+
+                  // Note: Market Explorer data will refresh when user navigates back
+
+                  // Success notification already shown by createDeal
+                  // Optionally navigate to pipeline view
+                  Get.dialog(
+                    AlertDialog(
+                      title: const Text('Deal Created'),
+                      content: const Text('Would you like to view the deal in the pipeline?'),
+                      actions: [
+                        TextButton(
+                          onPressed: Get.back,
+                          child: const Text('Stay Here'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            Get.back();
+                            Get.toNamed('/admin/customers/sales-pipeline');
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF875DEC),
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text('View Pipeline'),
+                        ),
+                      ],
+                    ),
+                  );
+                } else {
+                  AppLogger.e('Failed to create deal - createDeal returned false');
+                  // Error notification already shown by createDeal
+                }
+              } catch (e, stackTrace) {
+                AppLogger.e('Error in Add to Pipeline: $e', e, stackTrace);
+                Get.snackbar(
+                  'Error',
+                  'An error occurred: ${e.toString()}',
+                  snackPosition: SnackPosition.BOTTOM,
+                  backgroundColor: Colors.red,
+                  colorText: Colors.white,
+                  duration: const Duration(seconds: 5),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF875DEC),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Add to Pipeline'),
+          ),
+        ],
+      ),
+    );
+  }
+
   static void showAddToCampaignDialog(ZAECDCenters prospect) {
     Get.dialog(
       AlertDialog(
@@ -103,55 +430,6 @@ class ListTabDialogs {
               foregroundColor: Colors.white,
             ),
             child: const Text('Add'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  static void showScheduleDemoDialog(ZAECDCenters prospect) {
-    Get.dialog(
-      AlertDialog(
-        title: Text('Schedule Demo for ${prospect.ecdName}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: const [
-            TextField(
-              decoration: InputDecoration(
-                labelText: 'Date',
-                hintText: 'Select date',
-              ),
-            ),
-            SizedBox(height: 16),
-            TextField(
-              decoration: InputDecoration(
-                labelText: 'Time',
-                hintText: 'Select time',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: Get.back,
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Get.back();
-              Get.snackbar(
-                'Success',
-                'Demo scheduled for ${prospect.ecdName}',
-                snackPosition: SnackPosition.BOTTOM,
-                backgroundColor: const Color(0xFF875DEC),
-                colorText: Colors.white,
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF875DEC),
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Schedule'),
           ),
         ],
       ),
@@ -600,8 +878,8 @@ class ListTabDialogs {
       case 'add_to_campaign':
         showAddToCampaignDialog(prospect);
         break;
-      case 'schedule_demo':
-        showScheduleDemoDialog(prospect);
+      case 'add_to_pipeline':
+        showAddToPipelineDialog(prospect);
         break;
       case 'mark_contacted':
         await controller.updateLeadStatus(

@@ -17,6 +17,7 @@ class ApiEndpoints {
   static const String _billing = '/billing';
   static const String _settings = '/settings';
   static const String _marketExplorer = '/market-explorer';
+  static const String _salesPipeline = '/sales-pipeline';
 
   // =============================================================================
   // AUTHENTICATION ENDPOINTS (matching backend)
@@ -163,7 +164,7 @@ class ApiEndpoints {
   static String regenerateApiKey(String tenantId) => '$_tenants/$tenantId/regenerate-api-key';
 
   // =============================================================================
-  // MARKET EXPLORER ENDPOINTS (NEW)
+  // MARKET EXPLORER ENDPOINTS
   // =============================================================================
 
   /// GET /market-explorer - Get all ECD Centers with filtering
@@ -186,6 +187,12 @@ class ApiEndpoints {
 
   /// PUT /market-explorer/:id/status - Update lead status
   static String updateCenterLeadStatus(String centerId) => '$_marketExplorer/$centerId/status';
+
+  /// POST /market-explorer/:id/add-to-pipeline - Add ECD Center to pipeline
+  static String addCenterToPipeline(String centerId) => '$_marketExplorer/$centerId/add-to-pipeline';
+
+  /// PUT /market-explorer/:id/pipeline-status - Update pipeline status
+  static String updateCenterPipelineStatus(String centerId) => '$_marketExplorer/$centerId/pipeline-status';
 
   /// POST /market-explorer/:id/convert - Convert ECD Center to Tenant
   static String convertCenterToTenant(String centerId) => '$_marketExplorer/$centerId/convert';
@@ -219,6 +226,68 @@ class ApiEndpoints {
 
   /// GET /market-explorer/pipeline - Get pipeline funnel data
   static const String getPipelineFunnel = '$_marketExplorer/pipeline';
+
+  /// POST /market-explorer/campaigns - Add centers to campaign
+  static const String addToCampaign = '$_marketExplorer/campaigns';
+
+  /// POST /market-explorer/enrich - Bulk enrich contact data
+  static const String enrichContactData = '$_marketExplorer/enrich';
+
+  /// POST /market-explorer/import - Import data
+  static const String importMarketData = '$_marketExplorer/import';
+
+  /// GET /market-explorer/:id/activities - Get activity history for center
+  static String getCenterActivityHistory(String centerId) => '$_marketExplorer/$centerId/activities';
+
+  // =============================================================================
+  // SALES PIPELINE ENDPOINTS
+  // =============================================================================
+
+  /// GET /sales-pipeline - Get pipeline view with all deals
+  static const String getSalesPipeline = _salesPipeline;
+
+  /// GET /sales-pipeline/statistics - Get pipeline statistics
+  static const String getPipelineStatistics = '$_salesPipeline/statistics';
+
+  /// GET /sales-pipeline/velocity - Get sales velocity metrics
+  static const String getSalesVelocity = '$_salesPipeline/velocity';
+
+  /// GET /sales-pipeline/forecast - Get sales forecast
+  static const String getSalesForecast = '$_salesPipeline/forecast';
+
+  /// POST /sales-pipeline/deals - Create a new deal
+  static const String createDeal = '$_salesPipeline/deals';
+
+  /// POST /sales-pipeline/bulk-create - Bulk create deals from ECD Centers
+  static const String bulkCreateDeals = '$_salesPipeline/bulk-create';
+
+  /// GET /sales-pipeline/deals/:id - Get deal details
+  static String getDealDetails(String dealId) => '$_salesPipeline/deals/$dealId';
+
+  /// PUT /sales-pipeline/deals/:id - Update deal information
+  static String updateDeal(String dealId) => '$_salesPipeline/deals/$dealId';
+
+  /// PUT /sales-pipeline/deals/:id/stage - Update deal stage
+  static String updateDealStage(String dealId) => '$_salesPipeline/deals/$dealId/stage';
+
+  /// POST /sales-pipeline/deals/:id/activities - Add activity to deal
+  static String addDealActivity(String dealId) => '$_salesPipeline/deals/$dealId/activities';
+
+  /// PUT /sales-pipeline/deals/:dealId/activities/:activityId/complete - Complete an activity
+  static String completeDealActivity(String dealId, String activityId) =>
+      '$_salesPipeline/deals/$dealId/activities/$activityId/complete';
+
+  /// POST /sales-pipeline/deals/:id/notes - Add note to deal
+  static String addDealNote(String dealId) => '$_salesPipeline/deals/$dealId/notes';
+
+  /// POST /sales-pipeline/deals/:id/close-won - Close deal as won
+  static String closeDealWon(String dealId) => '$_salesPipeline/deals/$dealId/close-won';
+
+  /// POST /sales-pipeline/deals/:id/close-lost - Close deal as lost
+  static String closeDealLost(String dealId) => '$_salesPipeline/deals/$dealId/close-lost';
+
+  /// DELETE /sales-pipeline/deals/:id - Delete a deal
+  static String deleteDeal(String dealId) => '$_salesPipeline/deals/$dealId';
 
   // =============================================================================
   // FUTURE ENDPOINTS (Placeholders for upcoming features)
@@ -341,6 +410,17 @@ class ApiEndpoints {
     'createSalesTerritory': createSalesTerritory,
     'getTopOpportunities': getTopOpportunities,
     'getPipelineFunnel': getPipelineFunnel,
+    'addToCampaign': addToCampaign,
+    'enrichContactData': enrichContactData,
+    'importMarketData': importMarketData,
+
+    // Sales Pipeline endpoints
+    'getSalesPipeline': getSalesPipeline,
+    'getPipelineStatistics': getPipelineStatistics,
+    'getSalesVelocity': getSalesVelocity,
+    'getSalesForecast': getSalesForecast,
+    'createDeal': createDeal,
+    'bulkCreateDeals': bulkCreateDeals,
 
     // Future endpoints
     'getChildren': getChildren,
