@@ -19,7 +19,7 @@ class SalesPipelineController extends GetxController {
   final RxString errorMessage = ''.obs;
 
   // View state
-  final RxString currentView = 'pipeline'.obs; // pipeline, list, forecast
+  final RxString currentView = 'pipeline'.obs;
   final RxBool showFilters = false.obs;
   final RxString selectedStageFilter = 'all'.obs;
 
@@ -94,6 +94,7 @@ class SalesPipelineController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    _initializeStages();
     _setupListeners();
     AppLogger.d('SalesPipelineController initialized');
   }
@@ -104,12 +105,21 @@ class SalesPipelineController extends GetxController {
     loadPipeline();
   }
 
+  void _initializeStages() {
+    for (final config in stageConfigs) {
+      pipelineStages[config.name] = PipelineStage(
+        name: config.name,
+        deals: [],
+        totalValue: 0,
+        weightedValue: 0,
+        count: 0,
+      );
+    }
+  }
+
   void _setupListeners() {
-    // Debounce search
     debounce(searchQuery, (_) => loadPipeline(),
         time: const Duration(milliseconds: 500));
-
-    // React to filter changes
     ever(ownerFilter, (_) => loadPipeline());
     ever(showHotDeals, (_) => loadPipeline());
     ever(showRottingDeals, (_) => loadPipeline());
@@ -117,14 +127,12 @@ class SalesPipelineController extends GetxController {
     ever(dateRange, (_) => loadPipeline());
   }
 
-  // Load pipeline data
   Future<void> loadPipeline() async {
     try {
       isLoading.value = true;
       errorMessage.value = '';
 
       final filters = _buildFilters();
-
       final response = await _apiService.get<Map<String, dynamic>>(
         ApiEndpoints.getSalesPipeline,
         queryParameters: filters,
@@ -133,141 +141,107 @@ class SalesPipelineController extends GetxController {
       AppLogger.d('Pipeline API Response: ${response.data}');
 
       if (response.success && response.data != null) {
-        final data = response.data!['data'] ?? response.data!;
+        // Clear and reinitialize stages
+        _initializeStages();
+        allDeals.clear();
 
-        // Parse deals first if they exist in the response
+        // The API returns data in response.data.data structure
+        final responseData = response.data!;
+        final data = responseData['data'] ?? responseData;
+
+        // Parse deals - handle both array and object structures
         if (data['deals'] != null) {
-          AppLogger.d('Parsing deals from response');
-          _parseDealsData(data['deals']);
+          if (data['deals'] is List) {
+            _parseDealsArray(data['deals'] as List);
+          } else if (data['deals'] is Map) {
+            // If deals come as a map, convert to list
+            final dealsMap = data['deals'] as Map;
+            final dealsList = dealsMap.values.toList();
+            _parseDealsArray(dealsList);
+          }
         } else if (data['pipeline'] != null) {
-          AppLogger.d('Parsing pipeline data');
-          _parsePipelineData(data['pipeline']);
-        } else {
-          AppLogger.w('No deals or pipeline data found in response');
-          // Initialize empty stages
-          _initializeEmptyStages();
+          _parsePipelineStructure(data['pipeline']);
+        } else if (data is List) {
+          // Sometimes the API might return just an array of deals
+          _parseDealsArray(data);
         }
 
-        // Parse statistics
+        // Parse statistics if available
         if (data['stats'] != null) {
           statistics.value = PipelineStatistics.fromJson(data['stats']);
         }
 
-        AppLogger.d('Pipeline loaded successfully. Total deals: ${allDeals.length}');
+        // Force UI update
+        pipelineStages.refresh();
+        allDeals.refresh();
+
+        AppLogger.d('Pipeline loaded: ${allDeals.length} deals');
+        AppLogger.d('Stages: ${pipelineStages.keys.join(', ')}');
+        pipelineStages.forEach((stageName, stage) {
+          AppLogger.d('Stage $stageName: ${stage.count} deals, value: ${stage.totalValue}');
+        });
       } else {
         errorMessage.value = response.message ?? 'Failed to load pipeline';
-        AppLogger.e('Failed to load pipeline: ${response.message}');
-        // Initialize empty stages on error
-        _initializeEmptyStages();
+        _initializeStages();
       }
-
     } catch (e) {
       AppLogger.e('Error loading pipeline', e);
       errorMessage.value = 'Error loading pipeline data';
-      // Initialize empty stages on error
-      _initializeEmptyStages();
+      _initializeStages();
     } finally {
       isLoading.value = false;
     }
   }
 
-  // Parse deals array directly from API response
-  void _parseDealsData(dynamic dealsData) {
-    pipelineStages.clear();
-    allDeals.clear();
+  void _parseDealsArray(List dealsData) {
+    AppLogger.d('Parsing ${dealsData.length} deals');
 
-    // Initialize all stages
-    for (final stage in stageConfigs) {
-      pipelineStages[stage.name] = PipelineStage(
-        name: stage.name,
-        deals: [],
-        totalValue: 0,
-        weightedValue: 0,
-        count: 0,
-      );
-    }
+    for (final dealJson in dealsData) {
+      try {
+        final deal = Deal.fromJson(dealJson);
+        allDeals.add(deal);
 
-    // Parse deals and organize by stage
-    if (dealsData is List) {
-      AppLogger.d('Parsing ${dealsData.length} deals');
+        // Find the stage and add the deal
+        final stage = pipelineStages[deal.stage];
+        if (stage != null) {
+          stage.deals.add(deal);
+          stage.count++;
+          stage.totalValue += deal.value.annual;
+          stage.weightedValue += deal.value.weighted;
 
-      for (final dealJson in dealsData) {
-        try {
-          final deal = Deal.fromJson(dealJson);
-          allDeals.add(deal);
-
-          // Add to appropriate stage
-          final stage = pipelineStages[deal.stage];
-          if (stage != null) {
-            stage.deals.add(deal);
-            stage.count++;
-            stage.totalValue += deal.value.annual;
-            stage.weightedValue += deal.value.weighted;
-            AppLogger.d('Added deal ${deal.id} to stage ${deal.stage}');
-          } else {
-            AppLogger.w('Stage ${deal.stage} not found for deal ${deal.id}');
-          }
-        } catch (e) {
-          AppLogger.e('Error parsing deal: $e', e);
+          AppLogger.d('Added deal ${deal.id} to stage ${deal.stage}');
+        } else {
+          AppLogger.w('Stage ${deal.stage} not found for deal ${deal.id}');
         }
+      } catch (e) {
+        AppLogger.e('Error parsing deal: $e', e);
       }
     }
-
-    AppLogger.d('Deals organized into stages:');
-    pipelineStages.forEach((stageName, stage) {
-      AppLogger.d('  $stageName: ${stage.count} deals, R${stage.totalValue}');
-    });
   }
 
-  // Parse pipeline data from API response (if structured by stage)
-  void _parsePipelineData(Map<String, dynamic> pipelineData) {
-    pipelineStages.clear();
-    allDeals.clear();
+  void _parsePipelineStructure(Map<String, dynamic> pipelineData) {
+    AppLogger.d('Parsing pipeline structure');
 
-    for (final stage in stageConfigs) {
-      final stageData = pipelineData[stage.name];
-      if (stageData != null) {
-        final deals = (stageData['deals'] as List? ?? [])
+    for (final config in stageConfigs) {
+      final stageData = pipelineData[config.name];
+      if (stageData != null && stageData['deals'] != null) {
+        final deals = (stageData['deals'] as List)
             .map((json) => Deal.fromJson(json))
             .toList();
 
-        pipelineStages[stage.name] = PipelineStage(
-          name: stage.name,
-          deals: deals,
-          totalValue: (stageData['totalValue'] ?? 0).toDouble(),
-          weightedValue: (stageData['weightedValue'] ?? 0).toDouble(),
-          count: stageData['count'] ?? deals.length,
-        );
+        final stage = pipelineStages[config.name]!;
+        stage.deals.addAll(deals);
+        stage.count = deals.length;
+        stage.totalValue = (stageData['totalValue'] ?? 0).toDouble();
+        stage.weightedValue = (stageData['weightedValue'] ?? 0).toDouble();
 
         allDeals.addAll(deals);
-      } else {
-        // Initialize empty stage
-        pipelineStages[stage.name] = PipelineStage(
-          name: stage.name,
-          deals: [],
-          totalValue: 0,
-          weightedValue: 0,
-          count: 0,
-        );
+
+        AppLogger.d('Stage ${config.name}: ${deals.length} deals');
       }
     }
   }
 
-  // Initialize empty stages
-  void _initializeEmptyStages() {
-    pipelineStages.clear();
-    for (final stage in stageConfigs) {
-      pipelineStages[stage.name] = PipelineStage(
-        name: stage.name,
-        deals: [],
-        totalValue: 0,
-        weightedValue: 0,
-        count: 0,
-      );
-    }
-  }
-
-  // Create deal from ECD Center
   Future<bool> createDeal(ZAECDCenters center, {
     String? initialStage,
     DateTime? expectedCloseDate,
@@ -276,37 +250,42 @@ class SalesPipelineController extends GetxController {
     try {
       AppLogger.d('Creating deal for center: ${center.id}');
 
+      final dealData = {
+        'centerId': center.id,
+        'title': '${center.ecdName} - Opportunity',
+        'stage': initialStage ?? 'Initial Contact',
+        'expectedCloseDate': expectedCloseDate?.toIso8601String() ??
+            DateTime.now().add(const Duration(days: 60)).toIso8601String(),
+        'tags': tags ?? [],
+        'value': {
+          'monthly': center.numberOfChildren * 9.20,
+          'annual': center.numberOfChildren * 9.20 * 12,
+        },
+        'notes': 'Deal created from Market Explorer',
+        'probability': 10,
+      };
+
       final response = await _apiService.post<Map<String, dynamic>>(
         ApiEndpoints.createDeal,
-        data: {
-          'centerId': center.id,
-          'title': '${center.ecdName} - Opportunity',
-          'stage': initialStage ?? 'Initial Contact',
-          'expectedCloseDate': expectedCloseDate?.toIso8601String() ??
-              DateTime.now().add(const Duration(days: 60)).toIso8601String(),
-          'tags': tags ?? [],
-          'value': {
-            'monthly': center.numberOfChildren * 9.20,
-            'annual': center.numberOfChildren * 9.20 * 12,
-          },
-          'notes': 'Deal created from Market Explorer',
-        },
+        data: dealData,
       );
 
       AppLogger.d('Create deal response: ${response.data}');
 
       if (response.success) {
+        // Reload the pipeline to show the new deal
         await loadPipeline();
+
         Get.snackbar(
           'Success',
           'Deal created successfully',
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.green,
           colorText: Colors.white,
+          duration: const Duration(seconds: 3),
         );
         return true;
       } else {
-        AppLogger.e('Failed to create deal: ${response.message}');
         Get.snackbar(
           'Error',
           response.message ?? 'Failed to create deal',
@@ -319,7 +298,7 @@ class SalesPipelineController extends GetxController {
       AppLogger.e('Error creating deal', e);
       Get.snackbar(
         'Error',
-        'Failed to create deal: ${e.toString()}',
+        'Failed to create deal',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red,
         colorText: Colors.white,
@@ -328,18 +307,15 @@ class SalesPipelineController extends GetxController {
     return false;
   }
 
-  // Update deal stage (drag and drop)
   Future<bool> updateDealStage(String dealId, String newStage) async {
     try {
       final response = await _apiService.put<Map<String, dynamic>>(
         ApiEndpoints.updateDealStage(dealId),
-        data: {
-          'stage': newStage,
-        },
+        data: {'stage': newStage},
       );
 
       if (response.success) {
-        // Update local data immediately for smooth UX
+        // Update local state immediately for smooth UX
         final dealIndex = allDeals.indexWhere((d) => d.id == dealId);
         if (dealIndex != -1) {
           final deal = allDeals[dealIndex];
@@ -354,7 +330,7 @@ class SalesPipelineController extends GetxController {
             oldStageData.weightedValue -= deal.value.weighted;
           }
 
-          // Update deal stage
+          // Update deal
           deal.stage = newStage;
           deal.updateProbability();
 
@@ -366,11 +342,13 @@ class SalesPipelineController extends GetxController {
             newStageData.totalValue += deal.value.annual;
             newStageData.weightedValue += deal.value.weighted;
           }
+
+          // Force UI update
+          pipelineStages.refresh();
         }
 
-        // Refresh to get updated stats
+        // Refresh from server
         await loadPipeline();
-
         return true;
       }
     } catch (e) {
@@ -386,39 +364,6 @@ class SalesPipelineController extends GetxController {
     return false;
   }
 
-  // Update deal information
-  Future<bool> updateDeal(String dealId, Map<String, dynamic> updates) async {
-    try {
-      final response = await _apiService.put<Map<String, dynamic>>(
-        ApiEndpoints.updateDeal(dealId),
-        data: updates,
-      );
-
-      if (response.success) {
-        await loadPipeline();
-        Get.snackbar(
-          'Success',
-          'Deal updated successfully',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-        );
-        return true;
-      }
-    } catch (e) {
-      AppLogger.e('Error updating deal', e);
-      Get.snackbar(
-        'Error',
-        'Failed to update deal',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-    }
-    return false;
-  }
-
-  // Add activity to deal
   Future<bool> addActivity(String dealId, ActivityData activity) async {
     try {
       final response = await _apiService.post<Map<String, dynamic>>(
@@ -439,18 +384,10 @@ class SalesPipelineController extends GetxController {
       }
     } catch (e) {
       AppLogger.e('Error adding activity', e);
-      Get.snackbar(
-        'Error',
-        'Failed to add activity',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
     }
     return false;
   }
 
-  // Close deal as won
   Future<bool> closeDealWon(String dealId, WonDetails details) async {
     try {
       final response = await _apiService.post<Map<String, dynamic>>(
@@ -472,18 +409,10 @@ class SalesPipelineController extends GetxController {
       }
     } catch (e) {
       AppLogger.e('Error closing deal', e);
-      Get.snackbar(
-        'Error',
-        'Failed to close deal',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
     }
     return false;
   }
 
-  // Close deal as lost
   Future<bool> closeDealLost(String dealId, LostReason reason) async {
     try {
       final response = await _apiService.post<Map<String, dynamic>>(
@@ -497,18 +426,10 @@ class SalesPipelineController extends GetxController {
       }
     } catch (e) {
       AppLogger.e('Error closing deal as lost', e);
-      Get.snackbar(
-        'Error',
-        'Failed to close deal',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
     }
     return false;
   }
 
-  // Load sales velocity metrics
   Future<void> loadSalesVelocity() async {
     try {
       final response = await _apiService.get<Map<String, dynamic>>(
@@ -523,7 +444,6 @@ class SalesPipelineController extends GetxController {
     }
   }
 
-  // Load forecast
   Future<void> loadForecast({String period = 'quarter'}) async {
     try {
       final response = await _apiService.get<Map<String, dynamic>>(
@@ -539,52 +459,25 @@ class SalesPipelineController extends GetxController {
     }
   }
 
-  // Get deal details
-  Future<Deal?> getDealDetails(String dealId) async {
-    try {
-      final response = await _apiService.get<Map<String, dynamic>>(
-        ApiEndpoints.getDealDetails(dealId),
-      );
-
-      if (response.success && response.data != null) {
-        final data = response.data!['data'] ?? response.data!;
-        return Deal.fromJson(data['deal'] ?? data);
-      }
-    } catch (e) {
-      AppLogger.e('Error fetching deal details', e);
-    }
-    return null;
-  }
-
-  // Build filters for API calls
   Map<String, dynamic> _buildFilters() {
     final filters = <String, dynamic>{};
 
     if (ownerFilter.value != 'all') {
       filters['owner'] = ownerFilter.value;
     }
-
-    if (selectedStageFilter.value != 'all') {
-      filters['stage'] = selectedStageFilter.value;
-    }
-
     if (showHotDeals.value) {
       filters['isHot'] = true;
     }
-
     if (showRottingDeals.value) {
       filters['isRotting'] = true;
     }
-
     if (selectedTags.isNotEmpty) {
       filters['tags'] = selectedTags.join(',');
     }
-
     if (dateRange.value != null) {
       filters['startDate'] = dateRange.value!.start.toIso8601String();
       filters['endDate'] = dateRange.value!.end.toIso8601String();
     }
-
     if (searchQuery.value.isNotEmpty) {
       filters['search'] = searchQuery.value;
     }
@@ -657,10 +550,6 @@ class SalesPipelineController extends GetxController {
 
   int get hotDealsCount {
     return allDeals.where((deal) => deal.isHot).length;
-  }
-
-  PipelineStageConfig? getStageConfig(String stageName) {
-    return stageConfigs.firstWhereOrNull((config) => config.name == stageName);
   }
 }
 

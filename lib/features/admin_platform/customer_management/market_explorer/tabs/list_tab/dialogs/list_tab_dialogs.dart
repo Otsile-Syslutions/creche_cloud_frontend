@@ -326,23 +326,10 @@ class ListTabDialogs {
                 if (success) {
                   AppLogger.d('Deal created successfully');
 
-                  // Only add a note, don't update pipeline status again
-                  // as the deal creation already sets the pipeline status
-                  try {
-                    final noteAdded = await marketController.addNote(
-                      prospect.id,
-                      'Deal created and added to sales pipeline',
-                      'pipeline',
-                    );
-                    AppLogger.d('Note added: $noteAdded');
-                  } catch (e) {
-                    AppLogger.e('Error adding note: $e');
-                    // Don't fail the whole operation if this fails
-                  }
+                  // The deal creation already handles the pipeline status update
+                  // We don't need to update it again or add duplicate notes
+                  // Market Explorer data will refresh when user navigates back
 
-                  // Note: Market Explorer data will refresh when user navigates back
-
-                  // Success notification already shown by createDeal
                   // Optionally navigate to pipeline view
                   Get.dialog(
                     AlertDialog(
