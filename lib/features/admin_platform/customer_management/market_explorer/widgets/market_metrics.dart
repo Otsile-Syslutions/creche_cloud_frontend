@@ -1,4 +1,4 @@
-// lib/features/admin_platform/customer_management/market_explorer/widgets/metrics_section.dart
+// lib/features/admin_platform/customer_management/market_explorer/widgets/market_metrics.dart
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';

@@ -9,7 +9,7 @@ import '../../../../auth/controllers/auth_controller.dart';
 import '../tabs/analytics_tab/analytics_tab.dart';
 import '../tabs/list_tab/list_tab.dart';
 import '../tabs/map_tab/map_tab.dart';
-import '../widgets/metrics_section.dart';
+import '../widgets/market_metrics.dart';
 import '../tabs/list_tab/dialogs/list_tab_dialogs.dart';
 
 class MarketExplorerPage extends GetView<MarketExplorerController> {
