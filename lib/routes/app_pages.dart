@@ -24,10 +24,10 @@ import '../features/tenant_platform/home/views/tenant_home_view.dart';
 // Schools Management views
 import '../features/admin_platform/customer_management/market_explorer/views/market_explorer_view.dart';
 import '../features/admin_platform/customer_management/market_explorer/bindings/market_explorer_binding.dart';
+import '../features/admin_platform/customer_management/sales_pipeline/views/sales_pipeline_view.dart';
+import '../features/admin_platform/customer_management/sales_pipeline/bindings/sales_pipeline_binding.dart';
 // import '../features/admin_platform/customer_management/active_customers/views/active_schools_view.dart';
 // import '../features/admin_platform/customer_management/active_customers/bindings/active_schools_binding.dart';
-// import '../features/admin_platform/customer_management/sales_pipeline/views/sales_pipeline_view.dart';
-// import '../features/admin_platform/customer_management/sales_pipeline/bindings/sales_pipeline_binding.dart';
 
 class AppPages {
   static final List<GetPage> pages = [
@@ -99,15 +99,15 @@ class AppPages {
     GetPage(
       name: AppRoutes.adminActiveCustomers,
       page: () => const ActiveSchoolsPlaceholderView(),
-      binding: AuthBinding(), // TODO: Replace with ActiveSchoolsBinding
+      binding: AuthBinding(), // TODO: Replace with ActiveSchoolsBinding when implemented
       middlewares: [AuthMiddlewareFactory.admin()],
     ),
 
-    // Sales Pipeline (Admin/Support)
+    // Sales Pipeline (Admin/Support) - NOW USING ACTUAL VIEW AND BINDING
     GetPage(
       name: AppRoutes.adminSalesPipeline,
-      page: () => const SalesPipelinePlaceholderView(),
-      binding: AuthBinding(), // TODO: Replace with SalesPipelineBinding
+      page: () => const SalesPipelineView(),
+      binding: SalesPipelineBinding(),
       middlewares: [AuthMiddlewareFactory.admin()],
     ),
 
@@ -185,6 +185,209 @@ class AppPages {
       page: () => const AdminPlaceholderView(title: 'Support Tickets'),
       binding: AuthBinding(),
       middlewares: [AuthMiddlewareFactory.support()],
+    ),
+
+    // Announcements (Admin/Support)
+    GetPage(
+      name: AppRoutes.adminAnnouncements,
+      page: () => const AdminPlaceholderView(title: 'Announcements'),
+      binding: AuthBinding(),
+      middlewares: [AuthMiddlewareFactory.support()],
+    ),
+
+    // =========================================================================
+    // PARENT PLATFORM ROUTES
+    // =========================================================================
+
+    // Parent Children
+    GetPage(
+      name: AppRoutes.parentChildren,
+      page: () => const ParentPlaceholderView(title: 'My Children'),
+      binding: AuthBinding(),
+      middlewares: [AuthMiddlewareFactory.withRoles(['parent'])],
+    ),
+
+    // Parent Activities
+    GetPage(
+      name: AppRoutes.parentActivities,
+      page: () => const ParentPlaceholderView(title: 'Activities'),
+      binding: AuthBinding(),
+      middlewares: [AuthMiddlewareFactory.withRoles(['parent'])],
+    ),
+
+    // Parent Reports
+    GetPage(
+      name: AppRoutes.parentReports,
+      page: () => const ParentPlaceholderView(title: 'Reports'),
+      binding: AuthBinding(),
+      middlewares: [AuthMiddlewareFactory.withRoles(['parent'])],
+    ),
+
+    // Parent Messages
+    GetPage(
+      name: AppRoutes.parentMessages,
+      page: () => const ParentPlaceholderView(title: 'Messages'),
+      binding: AuthBinding(),
+      middlewares: [AuthMiddlewareFactory.withRoles(['parent'])],
+    ),
+
+    // Parent Billing
+    GetPage(
+      name: AppRoutes.parentBilling,
+      page: () => const ParentPlaceholderView(title: 'Billing'),
+      binding: AuthBinding(),
+      middlewares: [AuthMiddlewareFactory.withRoles(['parent'])],
+    ),
+
+    // =========================================================================
+    // TENANT PLATFORM ROUTES
+    // =========================================================================
+
+    // Tenant Dashboard
+    GetPage(
+      name: AppRoutes.tenantDashboard,
+      page: () => const TenantPlaceholderView(title: 'Dashboard'),
+      binding: AuthBinding(),
+      middlewares: [
+        AuthMiddlewareFactory.withRoles([
+          'school_admin',
+          'school_manager',
+          'teacher',
+          'assistant',
+          'viewer'
+        ])
+      ],
+    ),
+
+    // Tenant Children
+    GetPage(
+      name: AppRoutes.tenantChildren,
+      page: () => const TenantPlaceholderView(title: 'Children'),
+      binding: AuthBinding(),
+      middlewares: [
+        AuthMiddlewareFactory.withRoles([
+          'school_admin',
+          'school_manager',
+          'teacher',
+          'assistant'
+        ])
+      ],
+    ),
+
+    // Tenant Staff
+    GetPage(
+      name: AppRoutes.tenantStaff,
+      page: () => const TenantPlaceholderView(title: 'Staff'),
+      binding: AuthBinding(),
+      middlewares: [
+        AuthMiddlewareFactory.withRoles([
+          'school_admin',
+          'school_manager'
+        ])
+      ],
+    ),
+
+    // Tenant Users
+    GetPage(
+      name: AppRoutes.tenantUsers,
+      page: () => const TenantPlaceholderView(title: 'Users'),
+      binding: AuthBinding(),
+      middlewares: [AuthMiddlewareFactory.withRoles(['school_admin'])],
+    ),
+
+    // Tenant Attendance
+    GetPage(
+      name: AppRoutes.tenantAttendance,
+      page: () => const TenantPlaceholderView(title: 'Attendance'),
+      binding: AuthBinding(),
+      middlewares: [
+        AuthMiddlewareFactory.withRoles([
+          'school_admin',
+          'school_manager',
+          'teacher',
+          'assistant'
+        ])
+      ],
+    ),
+
+    // Tenant Meals
+    GetPage(
+      name: AppRoutes.tenantMeals,
+      page: () => const TenantPlaceholderView(title: 'Meals'),
+      binding: AuthBinding(),
+      middlewares: [
+        AuthMiddlewareFactory.withRoles([
+          'school_admin',
+          'school_manager',
+          'teacher',
+          'assistant'
+        ])
+      ],
+    ),
+
+    // Tenant Activities
+    GetPage(
+      name: AppRoutes.tenantActivities,
+      page: () => const TenantPlaceholderView(title: 'Activities'),
+      binding: AuthBinding(),
+      middlewares: [
+        AuthMiddlewareFactory.withRoles([
+          'school_admin',
+          'school_manager',
+          'teacher',
+          'assistant'
+        ])
+      ],
+    ),
+
+    // Tenant Reports
+    GetPage(
+      name: AppRoutes.tenantReports,
+      page: () => const TenantPlaceholderView(title: 'Reports'),
+      binding: AuthBinding(),
+      middlewares: [
+        AuthMiddlewareFactory.withRoles([
+          'school_admin',
+          'school_manager',
+          'teacher'
+        ])
+      ],
+    ),
+
+    // Tenant Billing
+    GetPage(
+      name: AppRoutes.tenantBilling,
+      page: () => const TenantPlaceholderView(title: 'Billing'),
+      binding: AuthBinding(),
+      middlewares: [AuthMiddlewareFactory.withRoles(['school_admin'])],
+    ),
+
+    // Tenant Settings
+    GetPage(
+      name: AppRoutes.tenantSettings,
+      page: () => const TenantPlaceholderView(title: 'Settings'),
+      binding: AuthBinding(),
+      middlewares: [
+        AuthMiddlewareFactory.withRoles([
+          'school_admin',
+          'school_manager'
+        ])
+      ],
+    ),
+
+    // Tenant Messages
+    GetPage(
+      name: AppRoutes.tenantMessages,
+      page: () => const TenantPlaceholderView(title: 'Messages'),
+      binding: AuthBinding(),
+      middlewares: [
+        AuthMiddlewareFactory.withRoles([
+          'school_admin',
+          'school_manager',
+          'teacher',
+          'assistant'
+        ])
+      ],
     ),
 
     // =========================================================================
@@ -279,6 +482,80 @@ class AdminPlaceholderView extends StatelessWidget {
   }
 }
 
+// Parent placeholder view
+class ParentPlaceholderView extends StatelessWidget {
+  final String title;
+
+  const ParentPlaceholderView({
+    super.key,
+    required this.title,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(title),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.family_restroom, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'This feature is coming soon',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Tenant placeholder view
+class TenantPlaceholderView extends StatelessWidget {
+  final String title;
+
+  const TenantPlaceholderView({
+    super.key,
+    required this.title,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(title),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.school, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'This feature is coming soon',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // Active Schools placeholder
 class ActiveSchoolsPlaceholderView extends StatelessWidget {
   const ActiveSchoolsPlaceholderView({super.key});
@@ -297,38 +574,6 @@ class ActiveSchoolsPlaceholderView extends StatelessWidget {
             SizedBox(height: 16),
             Text(
               'Active Schools',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'This feature is coming soon',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// Sales Pipeline placeholder
-class SalesPipelinePlaceholderView extends StatelessWidget {
-  const SalesPipelinePlaceholderView({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Sales Pipeline'),
-      ),
-      body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.trending_up, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
-            Text(
-              'Sales Pipeline',
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 8),

@@ -45,7 +45,7 @@ class AdminMenuItems {
             AppSidebarItem(
               label: 'Sales Pipeline',
               onTap: () {
-                // Get.toNamed(AppRoutes.adminSalesPipeline);
+                Get.toNamed(AppRoutes.adminSalesPipeline);
               },
             ),
             AppSidebarItem(
