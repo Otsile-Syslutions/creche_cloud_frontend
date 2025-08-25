@@ -34,6 +34,8 @@ class MarketExplorerController extends GetxController {
   final Rx<ZAECDCenters?> selectedProspectForDetail = Rx<ZAECDCenters?>(null);
   final Rx<MarketAnalytics?> analytics = Rx<MarketAnalytics?>(null);
 
+  // Market Statistics from Backend
+  final Rx<MarketStatistics?> marketStats = Rx<MarketStatistics?>(null);
 
   // Filters
   final RxString searchQuery = ''.obs;
@@ -57,7 +59,7 @@ class MarketExplorerController extends GetxController {
   final RxInt totalItems = 0.obs;
   final RxInt totalPages = 0.obs;
 
-  // Statistics
+  // Statistics (from backend)
   final RxInt totalCenters = 0.obs;
   final RxInt totalChildren = 0.obs;
   final RxDouble totalPotentialMRR = 0.0.obs;
@@ -312,9 +314,9 @@ class MarketExplorerController extends GetxController {
           totalPages.value = data['pagination']['totalPages'] ?? data['pagination']['total'] ?? 0;
         }
 
-        // Update statistics
+        // Update market statistics from backend
         if (data['stats'] != null) {
-          _updateStatistics(data['stats']);
+          _updateMarketStatistics(data['stats']);
         }
 
         errorMessage.value = '';
@@ -372,6 +374,28 @@ class MarketExplorerController extends GetxController {
     }
   }
 
+  // Update market statistics from backend response
+  void _updateMarketStatistics(Map<String, dynamic> stats) {
+    try {
+      // Parse market statistics
+      marketStats.value = MarketStatistics.fromJson(stats);
+
+      // Update local observable values for backward compatibility
+      if (stats['filtered'] != null) {
+        totalCenters.value = stats['filtered']['totalCenters'] ?? 0;
+        totalChildren.value = stats['filtered']['totalChildren'] ?? 0;
+        totalPotentialMRR.value = (stats['filtered']['totalPotentialMRR'] ?? 0).toDouble();
+        avgLeadScore.value = (stats['filtered']['avgLeadScore'] ?? 0).toDouble();
+        centersWithPhone.value = stats['filtered']['withPhone'] ?? 0;
+        centersWithEmail.value = stats['filtered']['withEmail'] ?? 0;
+      }
+
+      AppLogger.d('Market statistics updated: ${marketStats.value?.toJson()}');
+    } catch (e) {
+      AppLogger.e('Error updating market statistics', e);
+    }
+  }
+
   // Fetch analytics - with better error handling
   Future<void> fetchAnalytics() async {
     try {
@@ -391,7 +415,14 @@ class MarketExplorerController extends GetxController {
         final responseData = response.data!;
         final data = responseData['data'] ?? responseData;
 
+        // Update both analytics and market stats if available
         analytics.value = MarketAnalytics.fromJson(data);
+
+        // If the analytics endpoint also returns market stats, update them
+        if (data['marketTotals'] != null || data['onboarded'] != null) {
+          marketStats.value = MarketStatistics.fromJson(data);
+        }
+
         AppLogger.d('Analytics loaded successfully');
       } else {
         AppLogger.w('Failed to fetch analytics: ${response.message}');
@@ -792,15 +823,6 @@ class MarketExplorerController extends GetxController {
     return params;
   }
 
-  void _updateStatistics(Map<String, dynamic> stats) {
-    totalCenters.value = stats['totalCenters'] ?? 0;
-    totalChildren.value = stats['totalChildren'] ?? 0;
-    totalPotentialMRR.value = (stats['totalPotentialMRR'] ?? 0).toDouble();
-    avgLeadScore.value = (stats['avgLeadScore'] ?? 0).toDouble();
-    centersWithPhone.value = stats['withPhone'] ?? 0;
-    centersWithEmail.value = stats['withEmail'] ?? 0;
-  }
-
   // UI helper methods
   void toggleView(String view) {
     selectedView.value = view;
@@ -887,7 +909,7 @@ class MarketExplorerController extends GetxController {
     }
   }
 
-  // Computed values
+  // Computed values with backend data
   int get totalSelectedMRR {
     return selectedCenters.fold(0, (sum, center) => sum + center.potentialMRR.toInt());
   }
@@ -896,10 +918,18 @@ class MarketExplorerController extends GetxController {
     return selectedCenters.fold(0, (sum, center) => sum + center.numberOfChildren);
   }
 
-  double get marketPenetration {
-    if (totalCenters.value == 0) return 0;
-    return (127 / totalCenters.value) * 100;
-  }
+  // Get market totals from backend stats
+  int get totalMarketSchools => marketStats.value?.marketTotals?.schools ?? 0;
+  int get totalMarketChildren => marketStats.value?.marketTotals?.children ?? 0;
+  double get totalMarketMRR => marketStats.value?.marketTotals?.mrr ?? 0.0;
+
+  // Get onboarded totals from backend stats
+  int get onboardedSchools => marketStats.value?.onboarded?.schools ?? 0;
+  int get onboardedChildren => marketStats.value?.onboarded?.children ?? 0;
+  double get currentMRR => marketStats.value?.onboarded?.mrr ?? 0.0;
+
+  // Calculate market share percentage
+  double get marketSharePercentage => marketStats.value?.marketShare?.percentage ?? 0.0;
 
   bool get hasMorePages => currentPage.value < totalPages.value;
 
@@ -916,5 +946,268 @@ class MarketExplorerController extends GetxController {
         hasPhone.value ||
         hasEmail.value ||
         assignedRep.value.isNotEmpty;
+  }
+}
+
+// Market Statistics Model
+class MarketStatistics {
+  final MarketTotals? marketTotals;
+  final OnboardedStats? onboarded;
+  final FilteredStats? filtered;
+  final MarketShare? marketShare;
+  final List<PipelineStage>? pipeline;
+  final List<LeadStatusStat>? leadStatus;
+  final CompetitorStats? competitors;
+
+  MarketStatistics({
+    this.marketTotals,
+    this.onboarded,
+    this.filtered,
+    this.marketShare,
+    this.pipeline,
+    this.leadStatus,
+    this.competitors,
+  });
+
+  factory MarketStatistics.fromJson(Map<String, dynamic> json) {
+    return MarketStatistics(
+      marketTotals: json['marketTotals'] != null
+          ? MarketTotals.fromJson(json['marketTotals'])
+          : null,
+      onboarded: json['onboarded'] != null
+          ? OnboardedStats.fromJson(json['onboarded'])
+          : null,
+      filtered: json['filtered'] != null
+          ? FilteredStats.fromJson(json['filtered'])
+          : null,
+      marketShare: json['marketShare'] != null
+          ? MarketShare.fromJson(json['marketShare'])
+          : null,
+      pipeline: json['pipeline'] != null
+          ? (json['pipeline'] as List)
+          .map((e) => PipelineStage.fromJson(e))
+          .toList()
+          : null,
+      leadStatus: json['leadStatus'] != null
+          ? (json['leadStatus'] as List)
+          .map((e) => LeadStatusStat.fromJson(e))
+          .toList()
+          : null,
+      competitors: json['competitors'] != null
+          ? CompetitorStats.fromJson(json['competitors'])
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'marketTotals': marketTotals?.toJson(),
+      'onboarded': onboarded?.toJson(),
+      'filtered': filtered?.toJson(),
+      'marketShare': marketShare?.toJson(),
+      'pipeline': pipeline?.map((e) => e.toJson()).toList(),
+      'leadStatus': leadStatus?.map((e) => e.toJson()).toList(),
+      'competitors': competitors?.toJson(),
+    };
+  }
+}
+
+class MarketTotals {
+  final int schools;
+  final int children;
+  final double mrr;
+
+  MarketTotals({
+    required this.schools,
+    required this.children,
+    required this.mrr,
+  });
+
+  factory MarketTotals.fromJson(Map<String, dynamic> json) {
+    return MarketTotals(
+      schools: json['schools'] ?? 0,
+      children: json['children'] ?? 0,
+      mrr: (json['mrr'] ?? 0).toDouble(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'schools': schools,
+      'children': children,
+      'mrr': mrr,
+    };
+  }
+}
+
+class OnboardedStats {
+  final int schools;
+  final int children;
+  final double mrr;
+
+  OnboardedStats({
+    required this.schools,
+    required this.children,
+    required this.mrr,
+  });
+
+  factory OnboardedStats.fromJson(Map<String, dynamic> json) {
+    return OnboardedStats(
+      schools: json['schools'] ?? 0,
+      children: json['children'] ?? 0,
+      mrr: (json['mrr'] ?? 0).toDouble(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'schools': schools,
+      'children': children,
+      'mrr': mrr,
+    };
+  }
+}
+
+class FilteredStats {
+  final int totalCenters;
+  final int totalChildren;
+  final double totalPotentialMRR;
+  final double avgLeadScore;
+  final int withPhone;
+  final int withEmail;
+
+  FilteredStats({
+    required this.totalCenters,
+    required this.totalChildren,
+    required this.totalPotentialMRR,
+    required this.avgLeadScore,
+    required this.withPhone,
+    required this.withEmail,
+  });
+
+  factory FilteredStats.fromJson(Map<String, dynamic> json) {
+    return FilteredStats(
+      totalCenters: json['totalCenters'] ?? 0,
+      totalChildren: json['totalChildren'] ?? 0,
+      totalPotentialMRR: (json['totalPotentialMRR'] ?? 0).toDouble(),
+      avgLeadScore: (json['avgLeadScore'] ?? 0).toDouble(),
+      withPhone: json['withPhone'] ?? 0,
+      withEmail: json['withEmail'] ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'totalCenters': totalCenters,
+      'totalChildren': totalChildren,
+      'totalPotentialMRR': totalPotentialMRR,
+      'avgLeadScore': avgLeadScore,
+      'withPhone': withPhone,
+      'withEmail': withEmail,
+    };
+  }
+}
+
+class MarketShare {
+  final double percentage;
+  final int schoolsRemaining;
+  final double potentialRemaining;
+
+  MarketShare({
+    required this.percentage,
+    required this.schoolsRemaining,
+    required this.potentialRemaining,
+  });
+
+  factory MarketShare.fromJson(Map<String, dynamic> json) {
+    return MarketShare(
+      percentage: (json['percentage'] ?? 0).toDouble(),
+      schoolsRemaining: json['schoolsRemaining'] ?? 0,
+      potentialRemaining: (json['potentialRemaining'] ?? 0).toDouble(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'percentage': percentage,
+      'schoolsRemaining': schoolsRemaining,
+      'potentialRemaining': potentialRemaining,
+    };
+  }
+}
+
+class PipelineStage {
+  final String id;
+  final int count;
+  final double totalMRR;
+
+  PipelineStage({
+    required this.id,
+    required this.count,
+    required this.totalMRR,
+  });
+
+  factory PipelineStage.fromJson(Map<String, dynamic> json) {
+    return PipelineStage(
+      id: json['_id'] ?? '',
+      count: json['count'] ?? 0,
+      totalMRR: (json['totalMRR'] ?? 0).toDouble(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      '_id': id,
+      'count': count,
+      'totalMRR': totalMRR,
+    };
+  }
+}
+
+class LeadStatusStat {
+  final String id;
+  final int count;
+
+  LeadStatusStat({
+    required this.id,
+    required this.count,
+  });
+
+  factory LeadStatusStat.fromJson(Map<String, dynamic> json) {
+    return LeadStatusStat(
+      id: json['_id'] ?? '',
+      count: json['count'] ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      '_id': id,
+      'count': count,
+    };
+  }
+}
+
+class CompetitorStats {
+  final int usingCompetitors;
+  final int wonFromCompetitors;
+
+  CompetitorStats({
+    required this.usingCompetitors,
+    required this.wonFromCompetitors,
+  });
+
+  factory CompetitorStats.fromJson(Map<String, dynamic> json) {
+    return CompetitorStats(
+      usingCompetitors: json['usingCompetitors'] ?? 0,
+      wonFromCompetitors: json['wonFromCompetitors'] ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'usingCompetitors': usingCompetitors,
+      'wonFromCompetitors': wonFromCompetitors,
+    };
   }
 }
