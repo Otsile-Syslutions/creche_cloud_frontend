@@ -1,4 +1,4 @@
-// lib/features/admin_platform/customer_management/market_explorer/widgets/market_metrics.dart
+// lib/features/admin_platform/customer_management/market_explorer/widgets/metrics_section.dart
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -98,20 +98,14 @@ class MetricsSection extends GetView<MarketExplorerController> {
                 hasSelection ? 'Avg. Score' : 'Market Share',
                 hasSelection
                     ? _calculateAverageScore().toStringAsFixed(1)
-                    : marketSharePercentage > 0
-                    ? '${marketSharePercentage.toStringAsFixed(2)}%'
-                    : '${controller.avgLeadScore.value.toStringAsFixed(1)}',
+                    : '${marketSharePercentage.toStringAsFixed(2)}%',
                 hasSelection
                     ? Icons.analytics_outlined
-                    : marketSharePercentage > 0
-                    ? Icons.pie_chart_outline_outlined
-                    : Icons.score_outlined,
+                    : Icons.pie_chart_outline_outlined,
                 subtitle: hasSelection
                     ? 'Lead score average'
-                    : marketSharePercentage > 0
-                    ? 'Market penetration'
-                    : 'Avg lead score in filter',
-                isPercentage: !hasSelection && marketSharePercentage > 0,
+                    : 'Market penetration',
+                isPercentage: !hasSelection,
                 isLoading: controller.isLoading.value,
               ),
             ),
